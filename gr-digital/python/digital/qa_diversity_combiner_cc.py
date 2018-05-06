@@ -26,8 +26,6 @@ from gnuradio import blocks
 import digital_swig as digital
 import pmt
 import numpy as np
-import random
-import cmath
 
 class qa_diversity_combiner_cc (gr_unittest.TestCase):
 
@@ -37,59 +35,87 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    # Test for selection combining with 2 inputs and vector length 1.
-    def test_001_t (self):
-        mode = 0
-        num_inputs = 2
-        vlen = 1
-
-        data1 = (np.random.randn(10) + 1j * np.random.randn(10))
-        src1 = blocks.vector_source_c(data1)
-        data2 = (np.random.randn(10) + 1j * np.random.randn(10))
-        src2 = blocks.vector_source_c(data2)
-        diversity_combiner = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c()
-        self.tb.connect(src1, diversity_combiner, sink)
-        self.tb.connect(src2, (diversity_combiner, 1))
-        self.tb.run()
-        self.assertComplexTuplesAlmostEqual(data1, sink.data(), 6)
-
-    # Test for selection combining with 2 inputs, vector length 1 and random CSI changes.
-    def test_003_t (self):
-        mode = 0
-        num_inputs = 2
-        vlen = 1
-        num_tags = 4
-        tag_pos = [2, 5, 6, 8]
-
-        rand = (np.random.randn(20) + 1j * np.random.randn(20))
-        data1 = rand[0:10]
-        data2 = rand[10:20]
-
+    # Function that dices the csi vectors and calculates the expected result.
+    def dice_csi_tags (self, num_inputs, data, num_tags, tag_pos):
         tags = []
-        expected_result = data1
+        expected_result = data[0]
         for i in range(0, num_tags):
-            csi1 = random.random() + 1j*random.random()
-            csi2 = random.random() + 1j * random.random()
-            csi = pmt.make_c32vector(num_inputs, csi1)
-            pmt.c32vector_set(csi, 1, csi2)
-            tags.append(gr.tag_utils.python_to_tag((tag_pos[i], pmt.string_to_symbol("csi"), csi, pmt.from_long(0))))
+            # Dice CSI for one symbol.
+            csi = (np.random.randn(num_inputs) + 1j * np.random.randn(num_inputs))
+            # Assign the CSI vector to a PMT vector.
+            csi_pmt = pmt.make_c32vector(num_inputs, csi[0])
+            for j, channel in enumerate(csi):
+                pmt.c32vector_set(csi_pmt, j, channel)
+            # Append stream tags with CSI to data stream.
+            tags.append(gr.tag_utils.python_to_tag((tag_pos[i],
+                                                    pmt.string_to_symbol("csi"),
+                                                    csi_pmt,
+                                                    pmt.from_long(0))))
+            # Calculate the expected result by selecting the channel with the greater magnitude.
+            expected_result[tag_pos[i]:] = data[np.argmax(np.abs(csi))][tag_pos[i]:]
+        return tags, expected_result
 
-            if(abs(csi1) >= abs(csi2)):
-                expected_result[tag_pos[i]:] = data1[tag_pos[i]:]
-            else:
-                expected_result[tag_pos[i]:] = data2[tag_pos[i]:]
+    # Test for selection combining with 2 inputs, vector length 1 and 4 random CSI changes.
+    def test_001_t (self):
+        # Define test params.
+        mode = 0
+        num_inputs = 2
+        vlen = 1
+        tag_pos = [2, 5, 6, 8]
+        num_tags = len(tag_pos)
 
+        data1 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
+        data2 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
+        data = [data1, data2]
+
+        tags, expected_result = self.dice_csi_tags(num_inputs, data, num_tags, tag_pos)
+
+        # Build up the test flowgraph and run it.
         src1 = blocks.vector_source_c(data=data1,
                                       repeat=False,
-                                      vlen=1,
+                                      vlen=vlen,
                                       tags=tags)
-        src2 = blocks.vector_source_c(data2)
+        src2 = blocks.vector_source_c(data=data2)
         comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
         sink = blocks.vector_sink_c()
         self.tb.connect(src1, comb, sink)
         self.tb.connect(src2, (comb, 1))
         self.tb.run()
+        # Check if the expected result equals the actual result.
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 6)
+
+    # Test for selection combining with 3 inputs, vector length 1 and 5 random CSI changes.
+    def test_002_t (self):
+        # Define test params.
+        mode = 0
+        num_inputs = 3
+        vlen = 1
+        tag_pos = [1, 3, 6, 7, 8]
+        num_tags = len(tag_pos)
+
+        data1 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
+        data2 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
+        data3 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
+        data = [data1, data2, data3]
+
+        tags, expected_result = self.dice_csi_tags(num_inputs, data, num_tags, tag_pos)
+
+        # Build up the test flowgraph and run it.
+        src1 = blocks.vector_source_c(data=data1,
+                                      repeat=False,
+                                      vlen=vlen,
+                                      tags=tags)
+        src2 = blocks.vector_source_c(data=data2,
+                                      vlen=vlen)
+        src3 = blocks.vector_source_c(data=data3,
+                                      vlen=vlen)
+        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
+        sink = blocks.vector_sink_c(vlen=vlen)
+        self.tb.connect(src1, comb, sink)
+        self.tb.connect(src2, (comb, 1))
+        self.tb.connect(src3, (comb, 2))
+        self.tb.run()
+        # Check if the expected result equals the actual result.
         self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 6)
 
 

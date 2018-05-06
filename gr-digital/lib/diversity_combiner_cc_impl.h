@@ -28,17 +28,32 @@
 
 namespace gr {
   namespace digital {
-
+/*! \brief Diversity combining block with selection combining and maximum-ratio combining mode.
+ *
+ * \param num_inputs Number of inputs ports.
+ * \param vlen Vector length of the input and output items.
+ * \param combining_technique Combining technique selection combining (0) or maximum-ratio combining (1).
+ */
     class diversity_combiner_cc_impl : public diversity_combiner_cc
     {
      private:
-      uint16_t d_num_inputs;
-      uint16_t d_vlen;
+      uint16_t d_num_inputs; /*!< Number of inputs ports. */
+      uint16_t d_vlen; /*!< Vector length of the input and output items. */
       uint8_t d_combining_technique;
+      /*!< Combining technique selection combining (0) or maximum-ratio combining (1). */
       std::vector<gr_complex> d_csi;
+      /*!< Vector of length d_num_inputs which stores the current channel
+       * state information (CSI). The vector is being updated which each
+       * received tag of the key='csi'.
+       */
       std::vector<float> d_csi_squared;
+      /*!< Vector of length d_num_inputs which stores the current squared channel
+       * state information (CSI). The vector is being updated which each
+       * received tag of the key='csi'.
+       */
       uint16_t d_best_path;
-
+      /*!< Number of the input port which is selected as output for the current symbol. */
+      void process_symbol(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
      public:
       diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, uint8_t combining_technique);
       ~diversity_combiner_cc_impl();

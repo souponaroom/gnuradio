@@ -73,24 +73,49 @@ namespace gr {
     {
     }
 
+    void
+    diversity_combiner_cc_impl::process_symbol(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length){
+      switch (d_combining_technique) {
+        case 0: { // Selection combining
+          // Search for path coefficient with maximal magnitude.
+          // Therefore we calculate the magnitude square out of the complex CSI vector.
+          for (int i = 0; i < d_num_inputs; ++i) {
+            d_csi_squared[i] = std::abs(d_csi[i]);
+          }
+          // Select maximum value.
+          d_best_path = std::distance(d_csi_squared.begin(),
+                                             std::max_element(d_csi_squared.begin(),
+                                                              d_csi_squared.end()));
+          const gr_complex *in = &((const gr_complex *) input[d_best_path])[offset];
+          // Copy items of the current symbol from best_path to output.
+          memcpy(out, in, length * sizeof(gr_complex) * d_vlen);
+          break;
+        }
+        case 1: { // Maximum-Ration combining
+          break;
+        }
+      }
+    }
+
     int
     diversity_combiner_cc_impl::work(int noutput_items,
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
     {
+      // Define output pointer 'out' and its control variable 'nprocessed'.
       gr_complex *out = (gr_complex *) output_items[0];
-      //const gr_complex *in = (const gr_complex *) input_items[0];
       uint16_t nprocessed = 0;
 
-      // Get all tags in buffer.
+      // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
       std::vector <gr::tag_t> tags;
       const std::string s = "csi";
       pmt::pmt_t d_key = pmt::string_to_symbol(s);
       get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+
       uint16_t symbol_length;
 
       // Handle samples before the first tag (with memory).
-      if(tags.size() == 0){
+      if(tags.size() == 0){ // Input buffer includes no tags at all.
         symbol_length = noutput_items;
         switch (d_combining_technique) {
           case 0: { // Selection combining
@@ -104,12 +129,13 @@ namespace gr {
             break;
           }
         }
-      } else {
+      } else { // Input buffer includes tags.
         if (tags[0].offset - nitems_read(0) > 0){
+          /* There are items in the input buffer, before the first tag arrives,
+           * which belong to the previous symbol. */
           symbol_length = tags[0].offset - nitems_read(0);
           switch (d_combining_technique) {
             case 0: { // Selection combining
-              GR_LOG_DEBUG(d_logger, format("Items before first tag, d_best is %d (length %d).")%(int)d_best_path %(int)symbol_length);
               const gr_complex *in = &((const gr_complex *) input_items[d_best_path])[nprocessed];
               // Copy items of the current symbol from best_path to output.
               memcpy(&out[nprocessed], in, symbol_length * sizeof(gr_complex) * d_vlen);
@@ -122,7 +148,6 @@ namespace gr {
           }
         }
         // Iterate over tags in buffer.
-
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
@@ -130,47 +155,13 @@ namespace gr {
           } else {
             symbol_length = noutput_items - tags[i].offset + nitems_read(0);
           }
+          // Get CSI from tag.
           d_csi = pmt::c32vector_elements(tags[i].value);
-          GR_LOG_DEBUG(d_logger, format("New CSI: %d, %d")%d_csi[0] %d_csi[1]);
-          switch (d_combining_technique) {
-            case 0: { // Selection combining
-              // Search for path coefficient with maximal magnitude.
-              // Therefore we calculate the magnitude square out of the complex CSI vector.
-              for (int j = 0; j < d_num_inputs; ++j) {
-                d_csi_squared[j] = std::abs(d_csi[j]);
-              }
-              //volk_32fc_magnitude_squared_32f(&d_csi_squared, &d_csi, d_num_inputs); // TODO: d_csi to pmt vector of tag
-              // Select maximum value.
-              d_best_path = std::distance(d_csi_squared.begin(), std::max_element(d_csi_squared.begin(), d_csi_squared.end()));
-              GR_LOG_DEBUG(d_logger, format("Tag at pos %d: best is %d (length %d).")%(int)nprocessed %(int)d_best_path %(int)symbol_length);
-              const gr_complex *in = &((const gr_complex *) input_items[d_best_path])[nprocessed];
-              // Copy items of the current symbol from best_path to output.
-              memcpy(&out[nprocessed], in, symbol_length * sizeof(gr_complex) * d_vlen);
-              nprocessed += symbol_length;
-              break;
-            }
-            case 1: { // Maximum-Ration combining
-              break;
-            }
-          }
+          // Process the next symbol with the received CSI.
+          process_symbol(input_items, &out[nprocessed], nprocessed, symbol_length);
+          nprocessed += symbol_length;
         }
       }
-
-      /*for (int i = 0; i < noutput_items; ++i) {
-        for (int j = 0; j < d_vlen; ++j) {
-          out[j + i*d_vlen] = d_csi[0]*in[j + i*d_vlen];
-        }
-      }
-
-      for (int m = 1; m < d_num_inputs; ++m) {
-        const gr_complex *in = (const gr_complex *) input_items[m];
-
-        for (int i = 0; i < noutput_items; ++i) {
-          for (int j = 0; j < d_vlen; ++j) {
-            out[j + i*d_vlen] += d_csi[m]*in[j + i*d_vlen];
-          }
-        }
-      }*/
 
       // Tell runtime system how many output items we produced.
       return noutput_items;
