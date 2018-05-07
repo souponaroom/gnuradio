@@ -35,88 +35,272 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    # Function that dices the csi vectors and calculates the expected result.
-    def dice_csi_tags (self, num_inputs, data, num_tags, tag_pos):
+    # Function which randomly generates the CSI vectors and calculates the expected result.
+    def dice_csi_tags (self, num_inputs, data, vlen, num_tags, tag_pos, combining_technique):
         tags = []
-        expected_result = data[0]
+        expected_result = np.array(data[0], copy=True)
         for i in range(0, num_tags):
-            # Dice CSI for one symbol.
+            # Randomly generate CSI for one symbol.
             csi = (np.random.randn(num_inputs) + 1j * np.random.randn(num_inputs))
             # Assign the CSI vector to a PMT vector.
             csi_pmt = pmt.make_c32vector(num_inputs, csi[0])
-            for j, channel in enumerate(csi):
-                pmt.c32vector_set(csi_pmt, j, channel)
+            for k, channel in enumerate(csi):
+                pmt.c32vector_set(v=csi_pmt, k=k, x=channel)
             # Append stream tags with CSI to data stream.
             tags.append(gr.tag_utils.python_to_tag((tag_pos[i],
                                                     pmt.string_to_symbol("csi"),
                                                     csi_pmt,
                                                     pmt.from_long(0))))
-            # Calculate the expected result by selecting the channel with the greater magnitude.
-            expected_result[tag_pos[i]:] = data[np.argmax(np.abs(csi))][tag_pos[i]:]
+            # Calculate the expected result.
+            if combining_technique == 0:
+                # Select the path with the greatest magnitude.
+                expected_result[vlen*tag_pos[i]:] = data[np.argmax(np.abs(csi))][vlen*tag_pos[i]:]
+            elif combining_technique == 1:
+                # Calculate the normalized weighting vector.
+                weighting_vector = np.sqrt(np.divide(np.square(np.abs(csi)),
+                                                     np.sum(np.square(np.abs(csi))))) * np.exp(-1j * np.angle(csi))
+                # The weighted sum corresponds to a matrix multiplication
+                # of the weighting vector and the data matrix.
+                expected_result[vlen*tag_pos[i]:] = (np.dot(weighting_vector, data))[vlen*tag_pos[i]:]
         return tags, expected_result
 
-    # Test for selection combining with 2 inputs, vector length 1 and 4 random CSI changes.
+    # Test for SC: inputs: 2, vector length: 1, random CSI changes: 4.
     def test_001_t (self):
         # Define test params.
+        data_length = 20
         mode = 0
         num_inputs = 2
         vlen = 1
-        tag_pos = [2, 5, 6, 8]
+        tag_pos = np.array([2, 5, 6, 8])  # Vector-wise indexing.
         num_tags = len(tag_pos)
+        # Generate random input data.
+        data = np.array(
+            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        data1 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
-        data2 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
-        data = [data1, data2]
-
-        tags, expected_result = self.dice_csi_tags(num_inputs, data, num_tags, tag_pos)
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
 
         # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data1,
+        src1 = blocks.vector_source_c(data=data[0],
                                       repeat=False,
                                       vlen=vlen,
                                       tags=tags)
-        src2 = blocks.vector_source_c(data=data2)
         comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
         sink = blocks.vector_sink_c()
         self.tb.connect(src1, comb, sink)
-        self.tb.connect(src2, (comb, 1))
+        # Connect all other sources.
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
         self.tb.run()
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 6)
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
 
-    # Test for selection combining with 3 inputs, vector length 1 and 5 random CSI changes.
+    # Test for SC: inputs: 3, vector length: 2, random CSI changes: 5.
     def test_002_t (self):
         # Define test params.
+        data_length = 20
         mode = 0
         num_inputs = 3
-        vlen = 1
-        tag_pos = [1, 3, 6, 7, 8]
+        vlen = 2
+        tag_pos = [0, 3, 6, 7, 8]  # Vector-wise indexing.
         num_tags = len(tag_pos)
+        # Generate random input data.
+        data = np.array(
+            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        data1 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
-        data2 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
-        data3 = (np.random.randn(10*vlen) + 1j * np.random.randn(10*vlen))
-        data = [data1, data2, data3]
-
-        tags, expected_result = self.dice_csi_tags(num_inputs, data, num_tags, tag_pos)
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
 
         # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data1,
+        src1 = blocks.vector_source_c(data=data[0],
                                       repeat=False,
                                       vlen=vlen,
                                       tags=tags)
-        src2 = blocks.vector_source_c(data=data2,
-                                      vlen=vlen)
-        src3 = blocks.vector_source_c(data=data3,
-                                      vlen=vlen)
         comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
         sink = blocks.vector_sink_c(vlen=vlen)
         self.tb.connect(src1, comb, sink)
-        self.tb.connect(src2, (comb, 1))
-        self.tb.connect(src3, (comb, 2))
+        # Connect all other sources.
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
         self.tb.run()
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 6)
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+
+    # Test for SC: inputs: 8, vector length: 4, random CSI changes: 4.
+    def test_003_t(self):
+        # Define test params.
+        data_length = 20
+        mode = 0
+        num_inputs = 8
+        vlen = 2
+        tag_pos = np.array([3, 5, 6, 8])  # Vector-wise indexing.
+        num_tags = len(tag_pos)
+        # Generate random input data.
+        data = np.array([(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
+
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
+
+        # Build up the test flowgraph and run it.
+        src1 = blocks.vector_source_c(data=data[0],
+                                      repeat=False,
+                                      vlen=vlen,
+                                      tags=tags)
+        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
+        sink = blocks.vector_sink_c(vlen=vlen)
+        self.tb.connect(src1, comb, sink)
+        # Connect all other
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
+        self.tb.run()
+        # Check if the expected result equals the actual result.
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+
+    # Test for MRC: inputs: 2, vector length: 1, 4 random CSI changes.
+    def test_004_t(self):
+        # Define test params.
+        data_length = 20
+        mode = 1
+        num_inputs = 2
+        vlen = 1
+        tag_pos = [2, 4, 5, 9]  # Vector-wise indexing.
+        num_tags = len(tag_pos)
+        # Generate random input data.
+        data = np.array(
+            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
+
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
+
+        # Build up the test flowgraph and run it.
+        src1 = blocks.vector_source_c(data=data[0],
+                                      repeat=False,
+                                      vlen=vlen,
+                                      tags=tags)
+        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
+        sink = blocks.vector_sink_c(vlen=vlen)
+        self.tb.connect(src1, comb, sink)
+        # Connect all other sources.
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
+        self.tb.run()
+
+        # Check if the expected result equals the actual result.
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+
+    # Test for MRC: inputs: 3, vector length: 2, 6 random CSI changes.
+    def test_005_t(self):
+        # Define test params.
+        data_length = 20
+        mode = 1
+        num_inputs = 3
+        vlen = 2
+        tag_pos = [1, 3, 4, 8, 9]  # Vector-wise indexing.
+        num_tags = len(tag_pos)
+        # Generate random input data.
+        data = np.array(
+            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
+
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
+
+        # Build up the test flowgraph and run it.
+        src1 = blocks.vector_source_c(data=data[0],
+                                  repeat=False,
+                                  vlen=vlen,
+                                  tags=tags)
+        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
+        sink = blocks.vector_sink_c(vlen=vlen)
+        self.tb.connect(src1, comb, sink)
+        # Connect all other sources.
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
+        self.tb.run()
+
+        # Check if the expected result equals the actual result.
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+
+    # Test for MRC: inputs: 8, vector length: 5, 2 random CSI changes.
+    def test_006_t(self):
+        # Define test params.
+        data_length = 20
+        mode = 1
+        num_inputs = 8
+        vlen = 2
+        tag_pos = [1, 2]  # Vector-wise indexing.
+        num_tags = len(tag_pos)
+        # Generate random input data.
+        data = np.array(
+            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
+
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
+
+        # Build up the test flowgraph and run it.
+        src1 = blocks.vector_source_c(data=data[0],
+                                      repeat=False,
+                                      vlen=vlen,
+                                      tags=tags)
+        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
+        sink = blocks.vector_sink_c(vlen=vlen)
+        self.tb.connect(src1, comb, sink)
+        # Connect all other sources.
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
+        self.tb.run()
+
+        # Check if the expected result equals the actual result.
+        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+
+
 
 
 if __name__ == '__main__':

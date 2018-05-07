@@ -53,8 +53,13 @@ namespace gr {
        */
       uint16_t d_best_path;
       /*!< Number of the input port which is selected as output for the current symbol. */
+      std::vector<gr_complex> d_mrc_weighting;
+
+
+      void combine_inputs(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
       void process_symbol(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
-     public:
+
+    public:
       diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, uint8_t combining_technique);
       ~diversity_combiner_cc_impl();
 
