@@ -38,7 +38,13 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     # Function which randomly generates the CSI vectors and calculates the expected result.
     def dice_csi_tags (self, num_inputs, data, vlen, num_tags, tag_pos, combining_technique):
         tags = []
-        expected_result = np.array(data[0], copy=True)
+        if combining_technique == 'SC':
+            # SC initially selects channel 0 before it is updated by the CSI.
+            expected_result = np.array(data[0], copy=True)
+        else:
+            # MRC initially weights all channels equally before it is updated by the CSI.
+            expected_result = np.dot(np.full(num_inputs, 1.0/num_inputs), data)
+
         for i in range(0, num_tags):
             # Randomly generate CSI for one symbol.
             csi = (np.random.randn(num_inputs) + 1j * np.random.randn(num_inputs))
@@ -148,7 +154,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         data_length = 20
         mode = 'SC'
         num_inputs = 8
-        vlen = 2
+        vlen = 4
         tag_pos = np.array([3, 5, 6, 8])  # Vector-wise indexing.
         num_tags = len(tag_pos)
         # Generate random input data.
@@ -245,9 +251,9 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
 
         # Build up the test flowgraph and run it.
         src1 = blocks.vector_source_c(data=data[0],
-                                  repeat=False,
-                                  vlen=vlen,
-                                  tags=tags)
+                                      repeat=False,
+                                      vlen=vlen,
+                                      tags=tags)
         comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
         sink = blocks.vector_sink_c(vlen=vlen)
         self.tb.connect(src1, comb, sink)
@@ -266,7 +272,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         data_length = 20
         mode = 'MRC'
         num_inputs = 8
-        vlen = 2
+        vlen = 5
         tag_pos = [1, 2]  # Vector-wise indexing.
         num_tags = len(tag_pos)
         # Generate random input data.
@@ -299,9 +305,6 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
 
         # Check if the expected result equals the actual result.
         self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
-
-
-
 
 if __name__ == '__main__':
     gr_unittest.run(qa_diversity_combiner_cc, "qa_diversity_combiner_cc.xml")

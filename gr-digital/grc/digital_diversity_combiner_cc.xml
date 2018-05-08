@@ -1,0 +1,44 @@
+<block>
+  <name>Diversity Combiner</name>
+  <key>digital_diversity_combiner_cc</key>
+  <category>[DIGITAL]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.diversity_combiner_cc($num_inputs, $vlen, $combining_technique)</make>
+  <param>
+    <name>Num Inputs</name>
+    <key>num_inputs</key>
+    <value>2</value>
+    <type>int</type>
+  </param>
+  <param>
+    <name>Vec Length</name>
+    <key>vlen</key>
+    <value>1</value>
+    <type>int</type>
+  </param>
+  <param>
+    <name>Combining Technique</name>
+    <key>combining_technique</key>
+    <value>"MRC"</value>
+    <type>string</type>
+    <option>
+      <name>Selection Combining</name>
+      <key>"SC"</key>
+    </option>
+    <option>
+      <name>Maxiumum-Ratio Combining</name>
+      <key>"MRC"</key>
+    </option>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+    <vlen>$vlen</vlen>
+    <nports>$num_inputs</nports>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+    <vlen>$vlen</vlen>
+  </source>
+</block>

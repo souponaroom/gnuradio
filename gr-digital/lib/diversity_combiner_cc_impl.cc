@@ -50,20 +50,23 @@ namespace gr {
     /*
      * The private constructor
      */
-    diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, std::string combining_technique)
+    diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs,
+                                                           uint16_t vlen,
+                                                           std::string combining_technique)
       : gr::sync_block("diversity_combiner_cc",
               gr::io_signature::make(num_inputs, num_inputs, vlen*sizeof(gr_complex)),
               gr::io_signature::make(1, 1, vlen*sizeof(gr_complex))),
         d_num_inputs(num_inputs),
         d_vlen(vlen),
         d_combining_technique(combining_technique),
-        d_best_path(0)
+        d_best_path(0) // Initially, the SC algorithm selects channel 0, until it is changed by CSI.
     {
       // Resize vectors csi, csi_squared and mrc_weighting.
       d_csi.resize(num_inputs);
       d_csi_squared.resize(num_inputs);
       d_mrc_weighting.resize(num_inputs);
-      d_mrc_weighting[0] = 1.0/num_inputs;
+      // Initially, the MRC algorithm weights each channel equally, until it is changed by CSI.
+      std::fill(d_mrc_weighting.begin(), d_mrc_weighting.end(), 1.0/num_inputs);
       // Set tag propagation policy to 'All to All'.
       set_tag_propagation_policy(TPP_ALL_TO_ALL);
     }
@@ -92,8 +95,7 @@ namespace gr {
       }
       else if(d_combining_technique.compare("MRC") == 0) { // Maximum-Ratio combining
         // Calculate the normalized weighting coefficients.
-        float total_path_energy = std::accumulate(d_csi_squared.begin(),
-                                                  d_csi_squared.end(), 0.0);
+        float total_path_energy = std::accumulate(d_csi_squared.begin(), d_csi_squared.end(), 0.0);
         for (int i = 0; i < d_num_inputs; ++i) {
           d_mrc_weighting[i] = std::polar(std::sqrt(d_csi_squared[i]/total_path_energy), -std::arg(d_csi[i]));
         }
@@ -125,8 +127,8 @@ namespace gr {
 
     int
     diversity_combiner_cc_impl::work(int noutput_items,
-        gr_vector_const_void_star &input_items,
-        gr_vector_void_star &output_items)
+                                     gr_vector_const_void_star &input_items,
+                                     gr_vector_void_star &output_items)
     {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
@@ -139,7 +141,7 @@ namespace gr {
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
-      // Handle samples before the first tag (with memory).
+      // Handle the samples which are located before the first tag.
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         symbol_length = noutput_items;
         process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
@@ -162,8 +164,9 @@ namespace gr {
           }
           // Get CSI from tag.
           d_csi = pmt::c32vector_elements(tags[i].value);
-          // Process the next symbol with the received CSI.
+          // Calculated the weighting vector for the next symbol with the received CSI.
           combine_inputs(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
+          // Process the symbol with the calculated weighting vector.
           process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
           nprocessed += symbol_length;
         }

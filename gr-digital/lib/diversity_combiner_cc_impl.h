@@ -37,13 +37,14 @@ namespace gr {
  * The output stream is calculated out of a combination of the input streams with knowledge
  * of the channel state information (CSI) and with the algorithm of the selected combining technique.
  * The CSI is transported via stream tags with key='csi'. The combining parameters are initially
- * set to selection of channel 0 for SC and an equal weighting of all channels for MRC
- * and are updated with each incoming tag. The items between two tags are referred to as "symbols"
- * in this documentation.
+ * set to the selection of channel 0 for SC and an equal weighting of all channels for MRC
+ * and are updated with each incoming CSI. The items between two tags are referred to as "symbols"
+ * in this documentation. The length of a symbol can vary.
  *
  * \param num_inputs Number of inputs ports.
  * \param vlen Vector length of the input and output items.
- * \param combining_technique Combining technique. Selection combining ('SC') or maximum-ratio combining ('MRC').
+ * \param combining_technique Combining technique. Selection combining ('SC') or
+ * maximum-ratio combining ('MRC').
  */
     class diversity_combiner_cc_impl : public diversity_combiner_cc
     {
