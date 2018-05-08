@@ -52,10 +52,10 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
                                                     csi_pmt,
                                                     pmt.from_long(0))))
             # Calculate the expected result.
-            if combining_technique == 0:
+            if combining_technique == 'SC':
                 # Select the path with the greatest magnitude.
                 expected_result[vlen*tag_pos[i]:] = data[np.argmax(np.abs(csi))][vlen*tag_pos[i]:]
-            elif combining_technique == 1:
+            elif combining_technique == 'MRC':
                 # Calculate the normalized weighting vector.
                 weighting_vector = np.sqrt(np.divide(np.square(np.abs(csi)),
                                                      np.sum(np.square(np.abs(csi))))) * np.exp(-1j * np.angle(csi))
@@ -68,7 +68,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def test_001_t (self):
         # Define test params.
         data_length = 20
-        mode = 0
+        mode = 'SC'
         num_inputs = 2
         vlen = 1
         tag_pos = np.array([2, 5, 6, 8])  # Vector-wise indexing.
@@ -107,7 +107,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def test_002_t (self):
         # Define test params.
         data_length = 20
-        mode = 0
+        mode = 'SC'
         num_inputs = 3
         vlen = 2
         tag_pos = [0, 3, 6, 7, 8]  # Vector-wise indexing.
@@ -146,7 +146,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def test_003_t(self):
         # Define test params.
         data_length = 20
-        mode = 0
+        mode = 'SC'
         num_inputs = 8
         vlen = 2
         tag_pos = np.array([3, 5, 6, 8])  # Vector-wise indexing.
@@ -184,7 +184,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def test_004_t(self):
         # Define test params.
         data_length = 20
-        mode = 1
+        mode = 'MRC'
         num_inputs = 2
         vlen = 1
         tag_pos = [2, 4, 5, 9]  # Vector-wise indexing.
@@ -224,7 +224,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def test_005_t(self):
         # Define test params.
         data_length = 20
-        mode = 1
+        mode = 'MRC'
         num_inputs = 3
         vlen = 2
         tag_pos = [1, 3, 4, 8, 9]  # Vector-wise indexing.
@@ -264,7 +264,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
     def test_006_t(self):
         # Define test params.
         data_length = 20
-        mode = 1
+        mode = 'MRC'
         num_inputs = 8
         vlen = 2
         tag_pos = [1, 2]  # Vector-wise indexing.

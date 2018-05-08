@@ -31,7 +31,7 @@ namespace gr {
   namespace digital {
 
     /*!
-     * \brief <+description of block+>
+     * \brief Combines the input streams to one output stream to increase the SNR.
      * \ingroup digital
      *
      */
@@ -48,7 +48,7 @@ namespace gr {
        * class. digital::diversity_combiner_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t num_inputs, uint16_t vlen, uint8_t combining_technique);
+      static sptr make(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
     };
 
   } // namespace digital

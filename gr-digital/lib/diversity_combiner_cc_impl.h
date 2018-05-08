@@ -28,19 +28,30 @@
 
 namespace gr {
   namespace digital {
-/*! \brief Diversity combining block with selection combining and maximum-ratio combining mode.
+/*! \brief Combines the input streams to one output stream to increase the SNR.
+ *
+ * Diversity combining block. The following combining techniques are implemented right now:
+ * - Selection Combining, key = 'SC'
+ * - Maximum-Ratio Combining, key = 'MRC'
+ *
+ * The output stream is calculated out of a combination of the input streams with knowledge
+ * of the channel state information (CSI) and with the algorithm of the selected combining technique.
+ * The CSI is transported via stream tags with key='csi'. The combining parameters are initially
+ * set to selection of channel 0 for SC and an equal weighting of all channels for MRC
+ * and are updated with each incoming tag. The items between two tags are referred to as "symbols"
+ * in this documentation.
  *
  * \param num_inputs Number of inputs ports.
  * \param vlen Vector length of the input and output items.
- * \param combining_technique Combining technique selection combining (0) or maximum-ratio combining (1).
+ * \param combining_technique Combining technique. Selection combining ('SC') or maximum-ratio combining ('MRC').
  */
     class diversity_combiner_cc_impl : public diversity_combiner_cc
     {
      private:
       uint16_t d_num_inputs; /*!< Number of inputs ports. */
       uint16_t d_vlen; /*!< Vector length of the input and output items. */
-      uint8_t d_combining_technique;
-      /*!< Combining technique selection combining (0) or maximum-ratio combining (1). */
+      std::string d_combining_technique;
+      /*!< Combining technique selection combining ('SC') or maximum-ratio combining ('MRC'). */
       std::vector<gr_complex> d_csi;
       /*!< Vector of length d_num_inputs which stores the current channel
        * state information (CSI). The vector is being updated which each
@@ -54,13 +65,28 @@ namespace gr {
       uint16_t d_best_path;
       /*!< Number of the input port which is selected as output for the current symbol. */
       std::vector<gr_complex> d_mrc_weighting;
-
+      /*!< Vector of length d_num_inputs which stores the current normalized weighting vector. */
 
       void combine_inputs(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
+      /*! \brief Calculates the weighting vector out of CSI.
+       *
+       * @param input Vector of pointers to the input items, one entry per input stream.
+       * @param out Pointer to the start of unwritten output items.
+       * @param offset Number of already written input items.
+       * @param length Number of items of the current symbol in the current buffer.
+       */
       void process_symbol(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
+      /*! \brief Combines the input streams by the current weighting vector and
+       * writes result to output buffer.
+       *
+       * @param input Vector of pointers to the input items, one entry per input stream.
+       * @param out Pointer to the start of unwritten output items.
+       * @param offset Number of already written input items.
+       * @param length Number of items of the current symbol in the current buffer.
+       */
 
     public:
-      diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, uint8_t combining_technique);
+      diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
       ~diversity_combiner_cc_impl();
 
       // Where all the action really happens

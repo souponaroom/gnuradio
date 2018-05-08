@@ -30,6 +30,7 @@
 #include <volk/volk.h>
 #include <pmt/pmt.h>
 #include <stdio.h>
+#include <string>
 #include <math.h>
 #include <numeric>
 #include <complex>
@@ -40,7 +41,7 @@ namespace gr {
   namespace digital {
 
     diversity_combiner_cc::sptr
-    diversity_combiner_cc::make(uint16_t num_inputs, uint16_t vlen, uint8_t combining_technique)
+    diversity_combiner_cc::make(uint16_t num_inputs, uint16_t vlen, std::string combining_technique)
     {
       return gnuradio::get_initial_sptr
         (new diversity_combiner_cc_impl(num_inputs, vlen, combining_technique));
@@ -49,7 +50,7 @@ namespace gr {
     /*
      * The private constructor
      */
-    diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, uint8_t combining_technique)
+    diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, std::string combining_technique)
       : gr::sync_block("diversity_combiner_cc",
               gr::io_signature::make(num_inputs, num_inputs, vlen*sizeof(gr_complex)),
               gr::io_signature::make(1, 1, vlen*sizeof(gr_complex))),
@@ -62,7 +63,7 @@ namespace gr {
       d_csi.resize(num_inputs);
       d_csi_squared.resize(num_inputs);
       d_mrc_weighting.resize(num_inputs);
-      d_mrc_weighting[0] = 1.0;
+      d_mrc_weighting[0] = 1.0/num_inputs;
       // Set tag propagation policy to 'All to All'.
       set_tag_propagation_policy(TPP_ALL_TO_ALL);
     }
@@ -83,24 +84,21 @@ namespace gr {
       for (int i = 0; i < d_num_inputs; ++i) {
         d_csi_squared[i] = std::norm(d_csi[i]);
       }
-      switch (d_combining_technique) {
-        case 0: { // Selection combining
-          // Search for path coefficient with maximum magnitude.
-          d_best_path = std::distance(d_csi_squared.begin(),
-                                      std::max_element(d_csi_squared.begin(),
-                                                       d_csi_squared.end()));
-          break;
-        }
-        case 1: { // Maximum-Ratio combining
-          // Calculate the normalized weighting coefficients.
-          float total_path_energy = std::accumulate(d_csi_squared.begin(),
-                                                    d_csi_squared.end(), 0.0);
-          for (int i = 0; i < d_num_inputs; ++i) {
-            d_mrc_weighting[i] = std::polar(std::sqrt(d_csi_squared[i]/total_path_energy), -std::arg(d_csi[i]));
-          }
-          break;
+      if(d_combining_technique.compare("SC") == 0) { // Selection combining
+        // Search for path coefficient with maximum magnitude.
+        d_best_path = std::distance(d_csi_squared.begin(),
+                                    std::max_element(d_csi_squared.begin(),
+                                                     d_csi_squared.end()));
+      }
+      else if(d_combining_technique.compare("MRC") == 0) { // Maximum-Ratio combining
+        // Calculate the normalized weighting coefficients.
+        float total_path_energy = std::accumulate(d_csi_squared.begin(),
+                                                  d_csi_squared.end(), 0.0);
+        for (int i = 0; i < d_num_inputs; ++i) {
+          d_mrc_weighting[i] = std::polar(std::sqrt(d_csi_squared[i]/total_path_energy), -std::arg(d_csi[i]));
         }
       }
+
     }
 
     void
@@ -108,23 +106,19 @@ namespace gr {
                                                gr_complex* out,
                                                uint16_t offset,
                                                uint16_t length){
-      switch (d_combining_technique) {
-        case 0: { // Selection combining
-          const gr_complex *in = &((const gr_complex *) input[d_best_path])[offset];
-          // Copy items of the current symbol from best_path to output.
-          memcpy(out, in, length * sizeof(gr_complex) * d_vlen);
-          break;
-        }
-        case 1: { // Maximum-Ratio combining
-          // Calculate the output stream as the weighted sum of the input streams.
-          std::fill(out, &out[length*d_vlen], 0.0);
-          for (int inport = 0; inport < d_num_inputs; ++inport) {
-            const gr_complex *in = &((const gr_complex *) input[inport])[offset];
-            for (int l = 0; l < length * d_vlen; ++l) {
-              out[l] += d_mrc_weighting[inport] * in[l];
-            }
+      if(d_combining_technique.compare("SC") == 0) { // Selection combining
+        const gr_complex *in = &((const gr_complex *) input[d_best_path])[offset];
+        // Copy items of the current symbol from best_path to output.
+        memcpy(out, in, length * sizeof(gr_complex) * d_vlen);
+      }
+      else if(d_combining_technique.compare("MRC") == 0) { // Maximum-Ratio combining
+        // Calculate the output stream as the weighted sum of the input streams.
+        std::fill(out, &out[length*d_vlen], 0.0);
+        for (int inport = 0; inport < d_num_inputs; ++inport) {
+          const gr_complex *in = &((const gr_complex *) input[inport])[offset];
+          for (int l = 0; l < length * d_vlen; ++l) {
+            out[l] += d_mrc_weighting[inport] * in[l];
           }
-          break;
         }
       }
     }
