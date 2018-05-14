@@ -132,6 +132,7 @@ list(APPEND digital_sources
     symbol_sync_cc_impl.cc
     symbol_sync_ff_impl.cc
     timing_error_detector.cc
+    alamouti_encoder_cc_impl.cc
 )
 
 #Add Windows DLL resource file if using MSVC
