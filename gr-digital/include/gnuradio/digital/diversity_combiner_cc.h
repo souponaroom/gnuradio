@@ -49,6 +49,8 @@ namespace gr {
        * creating new instances.
        */
       static sptr make(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
+      
+      virtual void set_combining_technique(std::string combining_technique) = 0;
     };
 
   } // namespace digital

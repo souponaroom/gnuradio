@@ -53,6 +53,9 @@ namespace gr {
       uint16_t d_vlen; /*!< Vector length of the input and output items. */
       std::string d_combining_technique;
       /*!< Combining technique selection combining ('SC') or maximum-ratio combining ('MRC'). */
+      std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
+      static const std::string s; /*!< String that matches the key of the CSI tags. */
+      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       std::vector<gr_complex> d_csi;
       /*!< Vector of length d_num_inputs which stores the current channel
        * state information (CSI). The vector is being updated which each
@@ -68,7 +71,7 @@ namespace gr {
       std::vector<gr_complex> d_mrc_weighting;
       /*!< Vector of length d_num_inputs which stores the current normalized weighting vector. */
 
-      void combine_inputs(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
+      void combine_inputs(gr_vector_const_void_star input, gr_complex* out, uint64_t offset, uint64_t length);
       /*! \brief Calculates the weighting vector out of CSI.
        *
        * @param input Vector of pointers to the input items, one entry per input stream.
@@ -76,7 +79,7 @@ namespace gr {
        * @param offset Number of already written input items.
        * @param length Number of items of the current symbol in the current buffer.
        */
-      void process_symbol(gr_vector_const_void_star input, gr_complex* out, uint16_t offset, uint16_t length);
+      void process_symbol(gr_vector_const_void_star input, gr_complex* out, uint64_t offset, uint64_t length);
       /*! \brief Combines the input streams by the current weighting vector and
        * writes result to output buffer.
        *
@@ -89,6 +92,10 @@ namespace gr {
     public:
       diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
       ~diversity_combiner_cc_impl();
+
+      void set_combining_technique(std::string combining_technique) {
+        d_combining_technique = combining_technique;
+      }
 
       // Where all the action really happens
       int work(int noutput_items,

@@ -40,6 +40,9 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
+    const std::string diversity_combiner_cc_impl::s = "csi";
+    const pmt::pmt_t diversity_combiner_cc_impl::d_key = pmt::string_to_symbol(s);
+
     diversity_combiner_cc::sptr
     diversity_combiner_cc::make(uint16_t num_inputs, uint16_t vlen, std::string combining_technique)
     {
@@ -81,8 +84,8 @@ namespace gr {
     void
     diversity_combiner_cc_impl::combine_inputs(gr_vector_const_void_star input,
                                                gr_complex* out,
-                                               uint16_t offset,
-                                               uint16_t length){
+                                               uint64_t offset,
+                                               uint64_t length){
       // Calculate the magnitude square of the complex CSI vector.
       for (int i = 0; i < d_num_inputs; ++i) {
         d_csi_squared[i] = std::norm(d_csi[i]);
@@ -106,19 +109,19 @@ namespace gr {
     void
     diversity_combiner_cc_impl::process_symbol(gr_vector_const_void_star input,
                                                gr_complex* out,
-                                               uint16_t offset,
-                                               uint16_t length){
+                                               uint64_t offset,
+                                               uint64_t length){
       if(d_combining_technique.compare("SC") == 0) { // Selection combining
         const gr_complex *in = &((const gr_complex *) input[d_best_path])[offset];
         // Copy items of the current symbol from best_path to output.
-        memcpy(out, in, length * sizeof(gr_complex) * d_vlen);
+        std::copy(in, &in[length*d_vlen], out);
       }
       else if(d_combining_technique.compare("MRC") == 0) { // Maximum-Ratio combining
         // Calculate the output stream as the weighted sum of the input streams.
         std::fill(out, &out[length*d_vlen], 0.0);
         for (int inport = 0; inport < d_num_inputs; ++inport) {
           const gr_complex *in = &((const gr_complex *) input[inport])[offset];
-          for (int l = 0; l < length * d_vlen; ++l) {
+          for (unsigned int l = 0; l < length * d_vlen; ++l) {
             out[l] += d_mrc_weighting[inport] * in[l];
           }
         }
@@ -134,24 +137,21 @@ namespace gr {
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
 
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      std::vector <gr::tag_t> tags;
-      const std::string s = "csi";
-      pmt::pmt_t d_key = pmt::string_to_symbol(s);
       get_tags_in_window(tags, 0, 0, noutput_items, d_key);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
-      // Handle the samples which are located before the first tag.
       if(tags.size() == 0){ // Input buffer includes no tags at all.
+        // Handle all samples in buffer as they belong to the current symbol.
         symbol_length = noutput_items;
-        process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
+        process_symbol(input_items, out, 0, symbol_length);
         nprocessed += symbol_length;
       } else { // Input buffer includes tags.
         if (tags[0].offset - nitems_read(0) > 0){
           /* There are items in the input buffer, before the first tag arrives,
            * which belong to the previous symbol. */
           symbol_length = tags[0].offset - nitems_read(0);
-          process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
+          process_symbol(input_items, out, 0, symbol_length);
           nprocessed += symbol_length;
         }
         // Iterate over tags in buffer.
@@ -164,7 +164,7 @@ namespace gr {
           }
           // Get CSI from tag.
           d_csi = pmt::c32vector_elements(tags[i].value);
-          // Calculated the weighting vector for the next symbol with the received CSI.
+          // Calculate the weighting vector for the next symbol with the received CSI.
           combine_inputs(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
           // Process the symbol with the calculated weighting vector.
           process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
