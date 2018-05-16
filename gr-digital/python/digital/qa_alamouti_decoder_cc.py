@@ -40,8 +40,8 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
         tags = []
         # Calculate initial behaviour before first tag.
         output = np.empty(shape=[len(input)], dtype=complex)
-        output[::2] = (input[::2] + input[1::2])/2.0
-        output[1::2] = (input[::2] - input[1::2])/2.0
+        output[::2] = (input[::2] + np.conj(input[1::2]))/2.0
+        output[1::2] = (input[::2] - np.conj(input[1::2]))/2.0
 
         # Iterate over tags and update the calculated output according to the diced CSI.
         for i in range(0, num_tags):
@@ -59,11 +59,11 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
             # Calculate the expected result.
             total_branch_energy = np.sum(np.square(np.abs(csi)))
             if tag_pos[i]%2 == 0:
-                output[tag_pos[i]  ::2] = (np.conj(csi[0])*input[tag_pos[i]::2] + csi[1]*input[tag_pos[i]+1::2])/total_branch_energy
-                output[tag_pos[i]+1::2] = (np.conj(csi[1])*input[tag_pos[i]::2] - csi[0]*input[tag_pos[i]+1::2])/total_branch_energy
+                output[tag_pos[i]  ::2] = (np.conj(csi[0])*input[tag_pos[i]::2] + csi[1]*np.conj(input[tag_pos[i]+1::2]))/total_branch_energy
+                output[tag_pos[i]+1::2] = (np.conj(csi[1])*input[tag_pos[i]::2] - csi[0]*np.conj(input[tag_pos[i]+1::2]))/total_branch_energy
             else:
-                output[tag_pos[i]+1::2] = (np.conj(csi[0])*input[tag_pos[i]+1::2] + csi[1]*input[tag_pos[i]+2::2])/total_branch_energy
-                output[tag_pos[i]+2::2] = (np.conj(csi[1])*input[tag_pos[i]+1::2] - csi[0]*input[tag_pos[i]+2::2])/total_branch_energy
+                output[tag_pos[i]+1::2] = (np.conj(csi[0])*input[tag_pos[i]+1::2] + csi[1]*np.conj(input[tag_pos[i]+2::2]))/total_branch_energy
+                output[tag_pos[i]+2::2] = (np.conj(csi[1])*input[tag_pos[i]+1::2] - csi[0]*np.conj(input[tag_pos[i]+2::2]))/total_branch_energy
 
         return tags, output
 
