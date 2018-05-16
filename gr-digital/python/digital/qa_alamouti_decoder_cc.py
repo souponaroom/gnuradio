@@ -58,8 +58,12 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
                                                     pmt.from_long(0))))
             # Calculate the expected result.
             total_branch_energy = np.sum(np.square(np.abs(csi)))
-            output[tag_pos[i]  ::2] = (np.conj(csi[0])*input[tag_pos[i]::2] + csi[1]*input[tag_pos[i]+1::2])/total_branch_energy
-            output[tag_pos[i]+1::2] = (np.conj(csi[1])*input[tag_pos[i]::2] - csi[0]*input[tag_pos[i]+1::2])/total_branch_energy
+            if tag_pos[i]%2 == 0:
+                output[tag_pos[i]  ::2] = (np.conj(csi[0])*input[tag_pos[i]::2] + csi[1]*input[tag_pos[i]+1::2])/total_branch_energy
+                output[tag_pos[i]+1::2] = (np.conj(csi[1])*input[tag_pos[i]::2] - csi[0]*input[tag_pos[i]+1::2])/total_branch_energy
+            else:
+                output[tag_pos[i]+1::2] = (np.conj(csi[0])*input[tag_pos[i]+1::2] + csi[1]*input[tag_pos[i]+2::2])/total_branch_energy
+                output[tag_pos[i]+2::2] = (np.conj(csi[1])*input[tag_pos[i]+1::2] - csi[0]*input[tag_pos[i]+2::2])/total_branch_energy
 
         return tags, output
 
@@ -68,14 +72,15 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
     def test_001_t (self):
         # Define test params.
         data_length = 20
-        repetitions = 1
-        tag_pos = np.array([2, 6, 8])
-        num_tags = len(tag_pos)
+        repetitions = 5
+        num_tags = 4
 
         for i in range(repetitions):
             # Generate random input data.
             data = np.random.randn(data_length) + 1j * np.random.randn(data_length)
-
+            # Generate random tag positions.
+            tag_pos = np.random.randint(low=0, high=data_length, size=num_tags)
+            tag_pos = np.sort(tag_pos)
             # Calculate expected result.
             tags, expected_result = self.dice_csi_tags(data,
                                                        num_tags,

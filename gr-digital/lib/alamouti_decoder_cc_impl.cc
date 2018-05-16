@@ -24,8 +24,11 @@
 #include "config.h"
 #endif
 
+#include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "alamouti_decoder_cc_impl.h"
+
+using namespace boost;
 
 namespace gr {
   namespace digital {
@@ -105,6 +108,16 @@ namespace gr {
           /* There are items in the input buffer, before the first tag arrives,
 +          * which belong to the previous symbol. */
           symbol_length = tags[0].offset - nitems_read(0);
+          // Check if the next tag is on an uneven position.
+          if(tags[0].offset%2 != 0){
+            // This should be prevented by the system developer in most cases.
+            GR_LOG_WARN(d_logger, format("Detected 'csi' tag on uneven position (tag[%].offset = %d). "
+                                         "The Alamouti scheme works on sequences of 2 samples. "
+                                         "If you are not really sure what you are doing, "
+                                         "you should only set 'csi' tags on even sample positions."));
+            // The CSI is updated with the start of the next sequence (=next even sample).
+            ++symbol_length;
+          }
           decode_symbol(in, out, symbol_length);
           nprocessed += symbol_length;
         }
@@ -112,9 +125,20 @@ namespace gr {
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
-            symbol_length = tags[i + 1].offset - tags[i].offset;
+            // This is not the last tag in the buffer.
+            symbol_length = tags[i + 1].offset - nitems_read(0) - nprocessed;
+            // Check if the next tag is on an uneven position (which it should usually not).
+            if(symbol_length%2 != 0){
+              GR_LOG_WARN(d_logger, format("Detected 'csi' tag on uneven position (tag[%].offset = %d). "
+                                                   "The Alamouti scheme works on sequences of 2 samples. "
+                                                   "If you are not really sure what you are doing, "
+                                                   "you should only set 'csi' tags on even sample positions."));
+              // The CSI is updated with the start of the next sequence (=next even sample).
+              ++symbol_length;
+            }
           } else {
-            symbol_length = noutput_items - tags[i].offset + nitems_read(0);
+            // This is the last tag in the buffer.
+            symbol_length = noutput_items - nprocessed;
           }
           // Get CSI from tag.
           d_csi = pmt::c32vector_elements(tags[i].value);
