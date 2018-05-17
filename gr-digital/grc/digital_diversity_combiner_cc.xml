@@ -1,7 +1,7 @@
 <block>
   <name>Diversity Combiner</name>
   <key>digital_diversity_combiner_cc</key>
-  <category>[DIGITAL]</category>
+  <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
   <make>digital.diversity_combiner_cc($num_inputs, $vlen, $combining_technique)</make>
   <param>

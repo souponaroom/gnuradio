@@ -29,12 +29,27 @@
 
 namespace gr {
   namespace digital {
-
     /*!
      * \brief Combines the input streams to one output stream to increase the SNR.
      * \ingroup digital
      *
+     * Diversity combining block. The following combining techniques are implemented right now:
+     * - Selection Combining, key = 'SC'
+     * - Maximum-Ratio Combining, key = 'MRC'
+     *
+     * The output stream is calculated out of a combination of the input streams with knowledge
+     * of the channel state information (CSI) and with the algorithm of the selected combining technique.
+     * The CSI is transported via stream tags with key='csi'. The combining parameters are initially
+     * set to the selection of channel 0 for SC and an equal weighting of all channels for MRC
+     * and are updated with each incoming CSI. The items between two tags are referred to as "symbols"
+     * in this documentation. The length of a symbol can vary.
+     *
+     * \param num_inputs Number of inputs ports.
+     * \param vlen Vector length of the input and output items.
+     * \param combining_technique Combining technique. Selection combining ('SC') or
+     * maximum-ratio combining ('MRC').
      */
+
     class DIGITAL_API diversity_combiner_cc : virtual public gr::sync_block
     {
      public:
