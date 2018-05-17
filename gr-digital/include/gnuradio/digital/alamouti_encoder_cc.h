@@ -30,11 +30,24 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
-     *
-     */
+/*! \brief Encodes an incoming stream after the rules of Alamouti's code,
+ * producing two output streams.
+ *  \ingroup digital
+ *
+ * The Alamouti encoder works with sequences of length 2, encoding them
+ * into a code sequence of length 2 at each of the two output branches, respectively.
+ * The number of input items is automatically scheduled to a multiple of 2, however,
+ * if the input data stream is terminated, the absolute number of input items
+ * must be an even number.
+ * The Alamouti encoder is a sync block which produces the same amount of
+ * output items at each port as there are input items. The code rate is R=1.
+ *
+ * There exist different versions of the exact algorithm (changed
+ * position of negations). This implementation follows [1].
+ *
+ * [1] Andrea Goldsmith. 2005. Wireless Communications.
+ *     Cambridge University Press, New York, NY, USA.
+ */
     class DIGITAL_API alamouti_encoder_cc : virtual public gr::sync_block
     {
      public:

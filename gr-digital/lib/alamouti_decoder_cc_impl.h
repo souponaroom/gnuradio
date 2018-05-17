@@ -28,7 +28,30 @@
 
 namespace gr {
   namespace digital {
-
+/*! \brief Decodes an incoming stream after the rules of Alamouti's code.
+ *
+ * The Alamouti decoder works with sequences of length 2, decoding them
+ * into a code sequence of length 2.
+ * The number of input items is automatically scheduled to a multiple of 2, however,
+ * if the input data stream is terminated, the absolute number of input items
+ * must be an even number.
+ * The Alamouti decoder is a sync block which produces the same amount of
+ * output items as there are input items. The code rate is R=1.
+ *
+ * The CSI is transported via stream tags with key='csi'.
+ * Initially the CSI is set to 1.0 + 0j for both branches and are updated
+ * with each incoming CSI. Because the Alamouti algorithm works with sequences
+ * of length 2, the tags should be set only on samples with even positions.
+ * CSI tags on uneven sample positions are not processed until the beginning of
+ * the next sequence (in this case one sample delay) begins.
+ *
+ * There exist different versions of the exact algorithm (changed
+ * position of negations). This implementation follows [1] and is therefore
+ * consistent with the Alamouti encoding block 'alamouti_encoder_cc'.
+ *
+ * [1] Andrea Goldsmith. 2005. Wireless Communications.
+ *     Cambridge University Press, New York, NY, USA.
+ */
     class alamouti_decoder_cc_impl : public alamouti_decoder_cc
     {
      private:
@@ -39,6 +62,16 @@ namespace gr {
       /*!< Array of length 2 which stores the current channel
        * state information (CSI). The array is being updated which each
        * received tag of the key='csi'.
+       */
+
+      /*!
+       * \brief Decodes the given buffer after the rules of Alamouti's code.
+       *
+       * \details The used CSI is the current vector of d_csi.
+       *
+       * @param in Pointer to input buffer.
+       * @param out Pointer to output buffer.
+       * @param length Number of samples that are being decoded.
        */
       void decode_symbol(const gr_complex* in, gr_complex* out, uint32_t length);
 

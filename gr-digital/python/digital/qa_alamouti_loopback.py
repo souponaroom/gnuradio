@@ -47,13 +47,13 @@ class qa_alamouti_loopback (gr_unittest.TestCase):
             # Generate random input data.
             data = np.random.randn(data_length) + 1j * np.random.randn(data_length)
             # Generate random tag positions.
-            tag_pos = np.random.randint(low=0, high=data_length/2, size=num_tags)*2.0
+            tag_pos = np.random.randint(low=0, high=data_length/2, size=num_tags)*2
             # Add tag pos 0 for initial channel state.
             tag_pos = np.append(tag_pos, 0)
             tag_pos = np.sort(tag_pos)
 
             # Iterate over tags.
-            for i in range(0, num_tags):
+            for i in range(0, num_tags+1):
                 # Randomly generate CSI for one symbol.
                 csi = (np.random.randn(2) + 1j * np.random.randn(2))
                 # Assign the CSI vector to a PMT vector.
@@ -67,7 +67,8 @@ class qa_alamouti_loopback (gr_unittest.TestCase):
                                                      pmt.from_long(0))))]
 
                 # Build up the test flowgraph.
-                src = blocks.vector_source_c(data=data[tag_pos[i]::],
+                subdata = data[tag_pos[i]::]
+                src = blocks.vector_source_c(data=subdata,
                                              repeat=False,
                                              tags=tags)
                 alamouti_encoder = digital.alamouti_encoder_cc()

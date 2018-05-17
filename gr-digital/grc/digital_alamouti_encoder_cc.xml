@@ -1,0 +1,16 @@
+<block>
+  <name>Alamouti Encoder</name>
+  <key>digital_alamouti_encoder_cc</key>
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.alamouti_encoder_cc()</make>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+    <nports>2</nports>
+  </source>
+</block>

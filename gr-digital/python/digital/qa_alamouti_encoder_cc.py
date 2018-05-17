@@ -46,7 +46,7 @@ class qa_alamouti_encoder_cc (gr_unittest.TestCase):
 
         return output
 
-    # 5 Tests validating the correct output of the encoder with random input data.
+    # 5 tests validating the correct output of the encoder with random input data.
     def test_001_t (self):
         # Define test params.
         data_length = 20

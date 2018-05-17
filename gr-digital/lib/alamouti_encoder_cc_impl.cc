@@ -27,8 +27,6 @@
 #include <gnuradio/io_signature.h>
 #include "alamouti_encoder_cc_impl.h"
 
-using namespace boost;
-
 namespace gr {
   namespace digital {
 
