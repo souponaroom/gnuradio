@@ -56,8 +56,7 @@ namespace gr {
        */
       set_output_multiple(2);
       // Init CSI array.
-      d_csi.push_back(1.0);
-      d_csi.push_back(1.0);
+      d_csi = std::vector<gr_complex>(2, 1.0);
       // Set tag propagation policy to 'All to All'.
       set_tag_propagation_policy(TPP_ALL_TO_ALL);
     }
@@ -96,7 +95,7 @@ namespace gr {
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
       get_tags_in_window(tags, 0, 0, noutput_items, d_key);
 
-      uint16_t symbol_length; // Number of items in the current symbol.
+      uint32_t symbol_length; // Number of items in the current symbol.
 
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
