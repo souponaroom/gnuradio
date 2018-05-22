@@ -132,6 +132,8 @@ list(APPEND digital_sources
     symbol_sync_cc_impl.cc
     symbol_sync_ff_impl.cc
     timing_error_detector.cc
+    alamouti_encoder_cc_impl.cc
+    alamouti_decoder_cc_impl.cc
     diversity_combiner_cc_impl.cc
 )
 
