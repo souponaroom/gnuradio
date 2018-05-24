@@ -35,19 +35,7 @@ class qa_diff_stbc_dec_cc (gr_unittest.TestCase):
         self.tb = None
 
     def test_001_t (self):
-        data = np.array([1, 0, 0, 1, 0, 1, 0, -1, 0, 1])
-        phase_shift = 0.0
-
-        # Build up the test flowgraph.
-        src = blocks.vector_source_c(data=data)
-        decoder = digital.diff_stbc_dec_cc(phase_shift)
-        sink = blocks.vector_sink_c()
-        self.tb.connect(src, decoder, sink)
-        # Run flowgraph.
         self.tb.run()
-
-        print 'result'
-        print sink.data()
 
 
 if __name__ == '__main__':

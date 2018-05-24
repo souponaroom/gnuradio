@@ -20,15 +20,15 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef INCLUDED_DIGITAL_DIFF_STBC_DEC_CC_IMPL_H
-#define INCLUDED_DIGITAL_DIFF_STBC_DEC_CC_IMPL_H
+#ifndef INCLUDED_DIGITAL_DIFF_STBC_DECODER_CC_IMPL_H
+#define INCLUDED_DIGITAL_DIFF_STBC_DECODER_CC_IMPL_H
 
-#include <gnuradio/digital/diff_stbc_dec_cc.h>
+#include <gnuradio/digital/diff_stbc_decoder_cc.h>
 
 namespace gr {
   namespace digital {
 
-    class diff_stbc_dec_cc_impl : public diff_stbc_dec_cc
+    class diff_stbc_decoder_cc_impl : public diff_stbc_decoder_cc
     {
      private:
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
@@ -48,23 +48,26 @@ namespace gr {
        * previous input buffer.
        */
 
-      void calculate_output(const gr_complex* in,
-                            const gr_complex predecessor1,
-                            const gr_complex predecessor2,
-                            gr_complex* out);
+      void decode_sequences(const gr_complex* prev_seq,
+                            const gr_complex* seq,
+                            gr_complex* out,
+                            uint32_t length);
 
      public:
-      diff_stbc_dec_cc_impl(float phase_offset);
-      ~diff_stbc_dec_cc_impl();
+      diff_stbc_decoder_cc_impl(float phase_offset);
+      ~diff_stbc_decoder_cc_impl();
 
       // Where all the action really happens
-      int work(int noutput_items,
-         gr_vector_const_void_star &input_items,
-         gr_vector_void_star &output_items);
+      void forecast (int noutput_items, gr_vector_int &ninput_items_required);
+
+      int general_work(int noutput_items,
+           gr_vector_int &ninput_items,
+           gr_vector_const_void_star &input_items,
+           gr_vector_void_star &output_items);
     };
 
   } // namespace digital
 } // namespace gr
 
-#endif /* INCLUDED_DIGITAL_DIFF_STBC_DEC_CC_IMPL_H */
+#endif /* INCLUDED_DIGITAL_DIFF_STBC_DECODER_CC_IMPL_H */
 
