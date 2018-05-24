@@ -38,7 +38,7 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
         self.tb = None
 
     # Function which randomly generates the CSI vectors and calculates the expected result.
-    def dice_csi_tags(self, base, input, tag_pos):
+    def decode(self, base, input, tag_pos):
         # Calculate the expected behaviour without the presence of tags.
         output = np.empty(shape=[len(input)], dtype=complex)
         data = np.append(base, input)
@@ -51,7 +51,7 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
         tags = []
         for i in range(0, len(tag_pos)):
             # Assign the CSI vector to a PMT vector.
-            csi_pmt = pmt.make_c32vector(1, 0.0)
+            csi_pmt = pmt.from_long(True)
             # Append stream tags to data stream.
             tags.append(gr.tag_utils.python_to_tag((tag_pos[i],
                                                     pmt.string_to_symbol("start"),
@@ -59,6 +59,7 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
                                                     pmt.from_long(0))))
         return tags, np.delete(output, np.append(tag_pos, tag_pos+1))
 
+    # 5 Tests with random input data
     def test_001_t (self):
         # Define test params.
         data_length = 20
@@ -66,15 +67,14 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
         num_tags = 4
 
         for i in range(repetitions):
-            data = np.random.randint(-1, 2, size=data_length) #np.array([1, 0, 0, 1, 0, 1, 0, -1, 0, 1])
+            data = np.random.randint(-1, 2, size=data_length) + 1j*np.random.randint(-1, 2, size=data_length)
             # Generate random tag positions.
             tag_pos = np.random.randint(low=0, high=data_length / 2, size=num_tags) * 2
-            #tag_pos = np.array([6, 6])
             tag_pos = np.sort(tag_pos)
             phase_shift = 2.0 * np.pi * np.random.randn()
             base = np.array([M_SQRT_2 * np.exp(1j * phase_shift), M_SQRT_2 * np.exp(1j * phase_shift)])
 
-            tags, expected_result = self.dice_csi_tags(base, data, tag_pos)
+            tags, expected_result = self.decode(base, data, tag_pos)
 
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data,
@@ -85,14 +85,6 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
             self.tb.connect(src, stbc, sink)
             # Run flowgraph.
             self.tb.run()
-
-            '''
-            print 'result'
-            print sink.data()
-
-            print 'expected'
-            print expected_result
-            '''
 
             self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
 

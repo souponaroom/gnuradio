@@ -37,7 +37,7 @@ class qa_diff_stbc_cc (gr_unittest.TestCase):
         self.tb = None
 
     # Function which calculates the expected result.
-    def encode_stbc(self, base, input, phase_shift):
+    def encode(self, base, input, phase_shift):
         mapping_coeffs = np.empty(shape=[2, len(input)/2], dtype=complex)
         output = np.empty(shape=[2, len(input)], dtype=complex)
         # Calculate the coefficients for the new base.
@@ -75,16 +75,16 @@ class qa_diff_stbc_cc (gr_unittest.TestCase):
 
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data)
-            stbc = digital.diff_stbc_cc(phase_shift)
+            alamouti = digital.diff_stbc_cc(phase_shift)
             sink1 = blocks.vector_sink_c()
             sink2 = blocks.vector_sink_c()
-            self.tb.connect(src, stbc, sink1)
-            self.tb.connect((stbc, 1), sink2)
+            self.tb.connect(src, alamouti, sink1)
+            self.tb.connect((alamouti, 1), sink2)
             # Run flowgraph.
             self.tb.run()
 
             # Calculate expected result.
-            expected_result = self.encode_stbc(base, data, phase_shift)
+            expected_result = self.encode(base, data, phase_shift)
 
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(expected_result[0], sink1.data(), 4)

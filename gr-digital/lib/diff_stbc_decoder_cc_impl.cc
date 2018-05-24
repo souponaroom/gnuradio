@@ -106,13 +106,24 @@ namespace gr {
 
       // Collect all tags of the input buffer with key "start" in the vector 'tags'.
       get_tags_in_window(tags, 0, 0, noutput_items, d_key);
-      //TODO check for tags at uneven positions and fix them
+      // Check if the next tag is on an uneven position.
+      for (unsigned int j = 0; j < tags.size(); ++j) {
+        if (tags[j].offset%2 != 0){
+          // This should be prevented by the system developer in most cases.
+          GR_LOG_DEBUG(d_logger, format("Detected start tag on uneven position (tag[%d].offset = %d).\n "
+                                        "This differenatial STBC scheme works on sequences of 2 samples. "
+                                        "If you are not really sure what you are doing, "
+                                        "you should only set 'start' tags on even sample positions.")
+                                 %0 %tags[0].offset);
+          break;
+        }
+      }
       //GR_LOG_DEBUG(d_logger, format("%d noutput_items, %d tags")%noutput_items %tags.size());
 
       if (tags.size() > 0) {
         //GR_LOG_DEBUG(d_logger, format("There are tags at pos %d.")%tags[0].offset);
         // Process samples before the first tag.
-        input_block_length = tags[0].offset - nitems_read(0);
+        input_block_length = (tags[0].offset-(tags[0].offset%2)) - nitems_read(0);
         // Decode remaining sequences of the current block before the first tag.
         decode_sequences(d_predecessor, in, out, input_block_length);
         nconsumed = input_block_length;
@@ -126,7 +137,7 @@ namespace gr {
           /* Calculate input block length. The output block length is
            * one sequence shorter than the input block length
            * due to differential coding. */
-          input_block_length = tags[i + 1].offset - tags[i].offset;
+          input_block_length = (tags[i+1].offset-(tags[i+1].offset%2)) - (tags[i].offset-(tags[i].offset%2));
           //GR_LOG_DEBUG(d_logger, format("in iteration %d, input block length %d")%i %input_block_length);
           // Decode sequences of this block.
           if (input_block_length > 2) {
