@@ -75,6 +75,7 @@
 #include "gnuradio/digital/alamouti_decoder_cc.h"
 #include "gnuradio/digital/diversity_combiner_cc.h"
 #include "gnuradio/digital/diff_stbc_cc.h"
+#include "gnuradio/digital/diff_stbc_dec_cc.h"
 %}
 
 %include "gnuradio/digital/binary_slicer_fb.h"
@@ -115,6 +116,7 @@
 %include "gnuradio/digital/alamouti_decoder_cc.h"
 %include "gnuradio/digital/diversity_combiner_cc.h"
 %include "gnuradio/digital/diff_stbc_cc.h"
+%include "gnuradio/digital/diff_stbc_dec_cc.h"
 
 GR_SWIG_BLOCK_MAGIC2(digital, binary_slicer_fb);
 GR_SWIG_BLOCK_MAGIC2(digital, cma_equalizer_cc);
@@ -149,6 +151,7 @@ GR_SWIG_BLOCK_MAGIC2(digital, alamouti_encoder_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, alamouti_decoder_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, diversity_combiner_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, diff_stbc_cc);
+GR_SWIG_BLOCK_MAGIC2(digital, diff_stbc_dec_cc);
 
 GR_SWIG_BLOCK_MAGIC_FACTORY(digital, cpmmod_bc, gmskmod_bc);
 
