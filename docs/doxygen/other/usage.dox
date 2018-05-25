@@ -38,8 +38,9 @@ more tutorials on using the software system and examples.
 <b>Signal Processing and Digital Communications</b>
 
 \li \subpage page_pfb
-\li \subpage page_ofdm
+#\li \subpage page_ofdm
 \li \subpage page_packet_data
+\li \subpage page_mimo
 
 <b>Out-of-tree Modules</b>
 
