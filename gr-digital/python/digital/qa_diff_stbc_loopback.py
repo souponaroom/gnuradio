@@ -50,30 +50,25 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
         for n in range(repetitions):
             modulation_order = np.random.randint(1, 4)
             phase_shift = 2.0 * np.pi * np.random.randn()
-            #phase_shift = 0.0
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.pi*np.random.randint(0, 2**modulation_order, size=data_length)/(2.0**modulation_order) + phase_shift))
-            base = np.array([M_SQRT_2*np.exp(1j * phase_shift), M_SQRT_2*np.exp(1j * phase_shift)])
 
             # Randomly generate normalized channel matrix.
             channel_gain_dist = np.random.rand()
             channel_matrix = np.array([channel_gain_dist*np.exp(2j*np.pi*np.random.rand()),
                                        np.sqrt(1-np.square(np.abs(channel_gain_dist)))*np.exp(2j*np.pi*np.random.rand())])
-            # Append stream tags with CSI to data stream.
 
-            csi = (np.random.randn(2) + 1j * np.random.randn(2))
-            # Assign the CSI vector to a PMT vector.
-            csi_pmt = pmt.from_bool(True)
+            # Set a stream tag to the beginning of the stream.
+            tag_pmt = pmt.from_bool(True)
             # Append stream tags with CSI to data stream.
             tags = [(gr.tag_utils.python_to_tag((0,
                                                  pmt.string_to_symbol("start"),
-                                                 csi_pmt,
+                                                 tag_pmt,
                                                  pmt.from_long(0))))]
 
             # Build up the test flowgraph.
-            src = blocks.vector_source_c(data=data,
-                                         tags=tags)
-            diff_stbc_encoder = digital.diff_stbc_cc(phase_shift)
+            src = blocks.vector_source_c(data=data, tags=tags)
+            diff_stbc_encoder = digital.diff_stbc_encoder_cc(phase_shift)
             # Simulate channel with matrix multiplication.
             channel = blocks.multiply_matrix_cc_make([channel_matrix])
             diff_stbc_decoder = digital.diff_stbc_decoder_cc(phase_shift)
@@ -86,7 +81,6 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
             self.tb.connect((diff_stbc_encoder, 1), encoder_sink2)
             # Run flowgraph.
             self.tb.run()
-
 
             ''' 
             Check if the expected result (=the data itself with only missing sequences at the tag

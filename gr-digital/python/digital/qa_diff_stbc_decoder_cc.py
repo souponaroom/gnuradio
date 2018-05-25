@@ -37,15 +37,15 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    # Function which randomly generates the CSI vectors and calculates the expected result.
-    def decode(self, base, input, tag_pos):
+    # Produce stream tags and calculate expected result.
+    def decode(self, basis, input, tag_pos):
         # Calculate the expected behaviour without the presence of tags.
         output = np.empty(shape=[len(input)], dtype=complex)
-        data = np.append(base, input)
-        output[::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*base[0] - \
-                      (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(base[1])
-        output[1::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*base[1] + \
-                      (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(base[0])
+        data = np.append(basis, input)
+        output[::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*basis[0] - \
+                      (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(basis[1])
+        output[1::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*basis[1] + \
+                       (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(basis[0])
 
         # Iterate over tags and update the calculated output according to the diced CSI.
         tags = []
@@ -59,7 +59,7 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
                                                     pmt.from_long(0))))
         return tags, np.delete(output, np.append(tag_pos, tag_pos+1))
 
-    # 5 Tests with random input data
+    ''' 5 test with random input data, random tag positions, random basis.'''
     def test_001_t (self):
         # Define test params.
         data_length = 20
@@ -71,10 +71,11 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
             # Generate random tag positions.
             tag_pos = np.random.randint(low=0, high=data_length / 2, size=num_tags) * 2
             tag_pos = np.sort(tag_pos)
-            phase_shift = 2.0 * np.pi * np.random.randn()
-            base = np.array([M_SQRT_2 * np.exp(1j * phase_shift), M_SQRT_2 * np.exp(1j * phase_shift)])
 
-            tags, expected_result = self.decode(base, data, tag_pos)
+            phase_shift = 2.0 * np.pi * np.random.randn()
+            basis = np.array([M_SQRT_2 * np.exp(1j * phase_shift), M_SQRT_2 * np.exp(1j * phase_shift)])
+
+            tags, expected_result = self.decode(basis, data, tag_pos)
 
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data,

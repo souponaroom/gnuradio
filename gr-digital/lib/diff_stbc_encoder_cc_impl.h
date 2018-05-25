@@ -20,10 +20,10 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef INCLUDED_DIGITAL_DIFF_STBC_CC_IMPL_H
-#define INCLUDED_DIGITAL_DIFF_STBC_CC_IMPL_H
+#ifndef INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_IMPL_H
+#define INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_IMPL_H
 
-#include <gnuradio/digital/diff_stbc_cc.h>
+#include <gnuradio/digital/diff_stbc_encoder_cc.h>
 
 namespace gr {
   namespace digital {
@@ -38,6 +38,11 @@ namespace gr {
  * The differential STBC encoder is a sync block which produces the same amount of
  * output items at each port as there are input items. The code rate is R=1.
  *
+ * The incoming samples are expected to be PSK modulated samples of any modulation order.
+ * If the constellation is phase shifted, meaning that there is no constellation point
+ * on the real axis, this must be stated by setting the input argument 'phase_offset'
+ * to the phase (in radians) of one of the constellation points.
+ *
  * The algorithm of this differential STBC follows [1]. Briefly, this STBC
  * is the differential version of the well known Alamouti Code.
  *
@@ -45,7 +50,7 @@ namespace gr {
  * WCNC. 1999 IEEE Wireless Communications and Networking Conference (Cat. No.99TH8466),
  * New Orleans, LA, 1999, pp. 1043-1047 vol.3. doi: 10.1109/WCNC.1999.796832
  */
-    class diff_stbc_cc_impl : public diff_stbc_cc
+    class diff_stbc_encoder_cc_impl : public diff_stbc_encoder_cc
     {
      private:
       const std::vector <gr_complex> d_basis_vecs;
@@ -91,8 +96,8 @@ namespace gr {
                             gr_complex* out2);
 
      public:
-      diff_stbc_cc_impl(float phase_offset);
-      ~diff_stbc_cc_impl();
+      diff_stbc_encoder_cc_impl(float phase_offset);
+      ~diff_stbc_encoder_cc_impl();
 
       // Where all the action really happens
       int work(int noutput_items,
@@ -103,5 +108,5 @@ namespace gr {
   } // namespace digital
 } // namespace gr
 
-#endif /* INCLUDED_DIGITAL_DIFF_STBC_CC_IMPL_H */
+#endif /* INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_IMPL_H */
 

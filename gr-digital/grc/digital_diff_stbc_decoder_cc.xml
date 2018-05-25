@@ -1,0 +1,21 @@
+<block>
+  <name>Differential STBC Decoder</name>
+  <key>digital_diff_stbc_decoder_cc</key>
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.diff_stbc_decoder_cc($phase_offset)</make>
+  <param>
+    <name>Phase Offset</name>
+    <key>phase_offset</key>
+    <value>0.0</value>
+    <type>float</type>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+  </source>
+</block>

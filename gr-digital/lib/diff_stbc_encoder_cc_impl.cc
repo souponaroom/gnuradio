@@ -29,23 +29,23 @@
 #include <complex>
 
 #include <gnuradio/io_signature.h>
-#include "diff_stbc_cc_impl.h"
+#include "diff_stbc_encoder_cc_impl.h"
 
 namespace gr {
   namespace digital {
 
-    diff_stbc_cc::sptr
-    diff_stbc_cc::make(float phase_offset)
+    diff_stbc_encoder_cc::sptr
+    diff_stbc_encoder_cc::make(float phase_offset)
     {
       return gnuradio::get_initial_sptr
-        (new diff_stbc_cc_impl(phase_offset));
+        (new diff_stbc_encoder_cc_impl(phase_offset));
     }
 
     /*
      * The private constructor
      */
-    diff_stbc_cc_impl::diff_stbc_cc_impl(float phase_offset)
-      : gr::sync_block("diff_stbc_cc",
+    diff_stbc_encoder_cc_impl::diff_stbc_encoder_cc_impl(float phase_offset)
+      : gr::sync_block("diff_stbc_encoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(2, 2, sizeof(gr_complex))),
         d_basis_vecs(std::vector<gr_complex>(2, std::polar((float)M_SQRT1_2, phase_offset)))
@@ -61,18 +61,18 @@ namespace gr {
     /*
      * Our virtual destructor.
      */
-    diff_stbc_cc_impl::~diff_stbc_cc_impl()
+    diff_stbc_encoder_cc_impl::~diff_stbc_encoder_cc_impl()
     {
     }
 
     void
-    diff_stbc_cc_impl::map_symbols(const gr_complex *in) {
+    diff_stbc_encoder_cc_impl::map_symbols(const gr_complex *in) {
       d_mapping_coeffs[0] =  in[0]*std::conj(d_basis_vecs[0]) + in[1]*std::conj(d_basis_vecs[1]);
       d_mapping_coeffs[1] = -in[0]*          d_basis_vecs[1]  + in[1]*          d_basis_vecs[0];
     }
 
     void
-    diff_stbc_cc_impl::calculate_output(const gr_complex *in,
+    diff_stbc_encoder_cc_impl::calculate_output(const gr_complex *in,
                                         const gr_complex predecessor1,
                                         const gr_complex predecessor2,
                                         gr_complex *out1,
@@ -89,7 +89,7 @@ namespace gr {
     }
 
     int
-    diff_stbc_cc_impl::work(int noutput_items,
+    diff_stbc_encoder_cc_impl::work(int noutput_items,
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
     {

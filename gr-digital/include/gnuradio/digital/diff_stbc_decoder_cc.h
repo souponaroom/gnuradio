@@ -30,11 +30,40 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
-     *
-     */
+/*! \brief Decodes an incoming stream after the rules of a differential
+ * Space Time Block Code (STBC).
+ *
+ * The differential STBC decoder works with 'sequences' of length 2, decoding them
+ * into a code sequence of length 2.
+ * The number of input items is automatically scheduled to a multiple of 2, however,
+ * if the input data stream is terminated, the absolute number of input items
+ * must be an even number.
+ * When running with an infinite sequence stream, the differential STBC decoder is a sync
+ * block which produces the same amount of output items as there are input items.
+ * The code rate is R=1.
+ * If a finite block of sequences is transmitted, the decoder needs a reference sequence
+ * to differentially decode the first sequence. When using stream tags 'start'
+ * on the stream, the decoder therefore produces one sequence less than it consumes, because
+ * the tagged sequence is skipped and taken as reference to differentially decode the first
+ * sequence after the tag as first decoded output sequence. If there is no tag at the very
+ * first sequence of the transmission, the decoder uses a dummy sequence (= basis vectors of
+ * basis transformation 'd_basis_vecs') to decode the first sequence. Generally this leads
+ * to a wrong decoded first symbol. The following symbols are decoded correctly.
+ * To avoid a wrong decoded first symbol, there must be a stream tag on the first
+ * incoming sequence.
+ *
+ * The incoming samples are expected to be PSK modulated samples of any modulation order.
+ * If the constellation is phase shifted, meaning that there is no constellation point
+ * on the real axis, this must be stated by setting the input argument 'phase_offset'
+ * to the phase (in radians) of one of the constellation points.
+ *
+ * The algorithm of this differential STBC follows [1]. Briefly, this STBC
+ * is the differential version of the well known Alamouti Code.
+ *
+ * [1] V. Tarokh and H. Jafarkhani, "A differential detection scheme for transmit diversity,"
+ * WCNC. 1999 IEEE Wireless Communications and Networking Conference (Cat. No.99TH8466),
+ * New Orleans, LA, 1999, pp. 1043-1047 vol.3. doi: 10.1109/WCNC.1999.796832
+ */
     class DIGITAL_API diff_stbc_decoder_cc : virtual public gr::block
     {
      public:

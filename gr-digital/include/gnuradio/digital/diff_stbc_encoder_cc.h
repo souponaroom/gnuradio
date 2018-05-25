@@ -21,8 +21,8 @@
  */
 
 
-#ifndef INCLUDED_DIGITAL_DIFF_STBC_CC_H
-#define INCLUDED_DIGITAL_DIFF_STBC_CC_H
+#ifndef INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_H
+#define INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_H
 
 #include <gnuradio/digital/api.h>
 #include <gnuradio/sync_block.h>
@@ -41,6 +41,11 @@ namespace gr {
  * The differential STBC encoder is a sync block which produces the same amount of
  * output items at each port as there are input items. The code rate is R=1.
  *
+ * The incoming samples are expected to be PSK modulated samples of any modulation order.
+ * If the constellation is phase shifted, meaning that there is no constellation point
+ * on the real axis, this must be stated by setting the input argument 'phase_offset'
+ * to the phase (in radians) of one of the constellation points.
+ *
  * The algorithm of this differential STBC follows [1]. Briefly, this STBC
  * is the differential version of the well known Alamouti Code.
  *
@@ -48,17 +53,17 @@ namespace gr {
  * WCNC. 1999 IEEE Wireless Communications and Networking Conference (Cat. No.99TH8466),
  * New Orleans, LA, 1999, pp. 1043-1047 vol.3. doi: 10.1109/WCNC.1999.796832
  */
-    class DIGITAL_API diff_stbc_cc : virtual public gr::sync_block
+    class DIGITAL_API diff_stbc_encoder_cc : virtual public gr::sync_block
     {
      public:
-      typedef boost::shared_ptr<diff_stbc_cc> sptr;
+      typedef boost::shared_ptr<diff_stbc_encoder_cc> sptr;
 
       /*!
-       * \brief Return a shared_ptr to a new instance of digital::diff_stbc_cc.
+       * \brief Return a shared_ptr to a new instance of digital::diff_stbc_encoder_cc.
        *
-       * To avoid accidental use of raw pointers, digital::diff_stbc_cc's
+       * To avoid accidental use of raw pointers, digital::diff_stbc_encoder_cc's
        * constructor is in a private implementation
-       * class. digital::diff_stbc_cc::make is the public interface for
+       * class. digital::diff_stbc_encoder_cc::make is the public interface for
        * creating new instances.
        */
       static sptr make(float phase_offset = 0.0);
@@ -67,5 +72,5 @@ namespace gr {
   } // namespace digital
 } // namespace gr
 
-#endif /* INCLUDED_DIGITAL_DIFF_STBC_CC_H */
+#endif /* INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_H */
 

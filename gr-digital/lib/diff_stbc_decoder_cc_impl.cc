@@ -75,17 +75,16 @@ namespace gr {
 
     void
     diff_stbc_decoder_cc_impl::decode_sequences(const gr_complex *prev_seq,
-                                            const gr_complex *seq,
-                                            gr_complex *out,
-                                            uint32_t length) {
+                                                const gr_complex *seq,
+                                                gr_complex *out,
+                                                uint32_t length) {
       if(length > 0) {
-        // Calculate the dot product of the received input sequences.
+        // Calculate the dot product of the received input sequences with the new basis.
         gr_complex r_1 = seq[0] * std::conj(prev_seq[0]) + std::conj(seq[1]) * prev_seq[1];
         gr_complex r_2 = seq[0] * std::conj(prev_seq[1]) - std::conj(seq[1]) * prev_seq[0];
-        // Calculate the decoded (but not normalized) samples and write them to the output buffer.
+        // Calculate the decoded (but not normalized!) samples and write them to the output buffer.
         out[0] = d_basis_vecs[0] * r_1 - std::conj(d_basis_vecs[1]) * r_2;
         out[1] = d_basis_vecs[1] * r_1 + std::conj(d_basis_vecs[0]) * r_2;
-
         // Recursively decode the remaining sequences of this block.
         decode_sequences(seq, &seq[2], &out[2], length-2);
       }
@@ -118,10 +117,7 @@ namespace gr {
           break;
         }
       }
-      //GR_LOG_DEBUG(d_logger, format("%d noutput_items, %d tags")%noutput_items %tags.size());
-
       if (tags.size() > 0) {
-        //GR_LOG_DEBUG(d_logger, format("There are tags at pos %d.")%tags[0].offset);
         // Process samples before the first tag.
         input_block_length = (tags[0].offset-(tags[0].offset%2)) - nitems_read(0);
         // Decode remaining sequences of the current block before the first tag.
@@ -129,16 +125,13 @@ namespace gr {
         nconsumed = input_block_length;
         nproduced = input_block_length;
 
-        //GR_LOG_DEBUG(d_logger, format("before tags: nconsumed: %d, nproduced %d")%nconsumed %nproduced);
-
-        // Iterate over blocks between taqs.
+        // Iterate over data blocks between taqs.
         for (unsigned int i = 0; i+1 < tags.size(); ++i) {
           // This is not the last tag in the buffer.
           /* Calculate input block length. The output block length is
            * one sequence shorter than the input block length
            * due to differential coding. */
           input_block_length = (tags[i+1].offset-(tags[i+1].offset%2)) - (tags[i].offset-(tags[i].offset%2));
-          //GR_LOG_DEBUG(d_logger, format("in iteration %d, input block length %d")%i %input_block_length);
           // Decode sequences of this block.
           if (input_block_length > 2) {
             decode_sequences(&in[nconsumed], &in[nconsumed + 2], &out[nproduced], input_block_length - 2);
@@ -147,8 +140,6 @@ namespace gr {
           nconsumed += input_block_length;
 
         }
-        //GR_LOG_DEBUG(d_logger, format("After tags: nconsumed: %d, nproduced %d")%nconsumed %nproduced);
-
         // Process samples after last tag in the buffer.
         input_block_length = noutput_items - nconsumed;
         // Decode remaining sequences of this buffer.
@@ -158,24 +149,17 @@ namespace gr {
           nproduced += input_block_length - 2;
         }
         nconsumed += input_block_length;
-        //GR_LOG_DEBUG(d_logger, format("end: nconsumed: %d, nproduced %d")%nconsumed %nproduced);
       } else{
-        //GR_LOG_DEBUG(d_logger, format("There are no tags."));
         // Process all samples, because there is no tag in this buffer.
         decode_sequences(d_predecessor, in, out, noutput_items);
         nconsumed = noutput_items;
         nproduced = noutput_items;
-        //GR_LOG_DEBUG(d_logger, format("no tags: nconsumed: %d, nproduced %d")%nconsumed %nproduced);
       }
-
-      //GR_LOG_DEBUG(d_logger, format("nconsumed: %d, nproduced %d")%nconsumed %nproduced);
-
       // Remember last sequence as predecessor of the next buffer.
       d_predecessor[0] = in[noutput_items-2];
       d_predecessor[1] = in[noutput_items-1];
 
-      // Tell runtime system how many input items we consumed on
-      // each input stream.
+      // Tell runtime system how many input items we consumed.
       consume_each (nconsumed);
 
       // Tell runtime system how many output items we produced.

@@ -122,8 +122,7 @@ install(FILES
     alamouti_encoder_cc.h
     alamouti_decoder_cc.h
     diversity_combiner_cc.h
-    diff_stbc_cc.h
-    diff_stbc_dec_cc.h
+    diff_stbc_encoder_cc.h
     diff_stbc_decoder_cc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
     COMPONENT "digital_devel"
 )

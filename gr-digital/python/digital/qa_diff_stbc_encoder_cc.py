@@ -28,7 +28,7 @@ import numpy as np
 
 M_SQRT_2 = 1.0/np.sqrt(2)
 
-class qa_diff_stbc_cc (gr_unittest.TestCase):
+class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
 
     def setUp (self):
         self.tb = gr.top_block ()
@@ -36,20 +36,20 @@ class qa_diff_stbc_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    # Function which calculates the expected result.
-    def encode(self, base, input, phase_shift):
+    # Function which encodes the input data to compare it with the actual result of the encoder block.
+    def encode(self, basis, input, phase_shift):
         mapping_coeffs = np.empty(shape=[2, len(input)/2], dtype=complex)
         output = np.empty(shape=[2, len(input)], dtype=complex)
-        # Calculate the coefficients for the new base.
-        mapping_coeffs[0] = input[::2] *  np.conj(base[0]) + input[1::2] * np.conj(base[1])
-        mapping_coeffs[1] = input[::2] * -base[1] + input[1::2] * base[0]
+        # Calculate the coefficients for the new basis.
+        mapping_coeffs[0] = input[::2] *  np.conj(basis[0]) + input[1::2] * np.conj(basis[1])
+        mapping_coeffs[1] = input[::2] * -basis[1] + input[1::2] * basis[0]
 
         # Calculate the expected result.
         # The first vector is calculated with help of the fixed predecessor.
         pre = M_SQRT_2 * np.exp(1j * phase_shift)
         output[0][0] = mapping_coeffs[0][0] * pre - mapping_coeffs[1][0] * np.conj(pre)
         output[1][0] = mapping_coeffs[0][0] * pre + mapping_coeffs[1][0] * np.conj(pre)
-
+        # Iteratively calculate the coefficients for the new vector basis.
         for i in range(1, len(input)/2):
             output[0][i*2] = mapping_coeffs[0][i]*output[0][(i-1)*2] - mapping_coeffs[1][i]*np.conj(output[1][(i-1)*2])
             output[1][i*2] = mapping_coeffs[0][i]*output[1][(i-1)*2] + mapping_coeffs[1][i]*np.conj(output[0][(i-1)*2])
@@ -58,9 +58,8 @@ class qa_diff_stbc_cc (gr_unittest.TestCase):
         output[1][1::2] =  np.conj(output[0][::2])
         return output
 
-    ''' 5 tests validating the correct output of the encoder 
-        with random input data, random modulation order
-        and random phase shift. '''
+    ''' 5 tests validating the correct output of the encoder with random input data, 
+        random modulation order and random phase shift. '''
     def test_001_t(self):
         # Define test params.
         data_length = 20
@@ -71,20 +70,20 @@ class qa_diff_stbc_cc (gr_unittest.TestCase):
             phase_shift = 2.0 * np.pi * np.random.randn()
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.pi*np.random.randint(0, 2**modulation_order, size=data_length)/(2.0**modulation_order) + phase_shift))
-            base = np.array([M_SQRT_2*np.exp(1j * phase_shift), M_SQRT_2*np.exp(1j * phase_shift)])
+            basis = np.array([M_SQRT_2*np.exp(1j * phase_shift), M_SQRT_2*np.exp(1j * phase_shift)])
 
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data)
-            alamouti = digital.diff_stbc_cc(phase_shift)
+            encoder = digital.diff_stbc_encoder_cc(phase_shift)
             sink1 = blocks.vector_sink_c()
             sink2 = blocks.vector_sink_c()
-            self.tb.connect(src, alamouti, sink1)
-            self.tb.connect((alamouti, 1), sink2)
+            self.tb.connect(src, encoder, sink1)
+            self.tb.connect((encoder, 1), sink2)
             # Run flowgraph.
             self.tb.run()
 
             # Calculate expected result.
-            expected_result = self.encode(base, data, phase_shift)
+            expected_result = self.encode(basis, data, phase_shift)
 
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(expected_result[0], sink1.data(), 4)
@@ -94,4 +93,4 @@ class qa_diff_stbc_cc (gr_unittest.TestCase):
         # check data
 
 if __name__ == '__main__':
-    gr_unittest.run(qa_diff_stbc_cc, "qa_diff_stbc_cc.xml")
+    gr_unittest.run(qa_diff_stbc_encoder_cc, "qa_diff_stbc_encoder_cc.xml")
