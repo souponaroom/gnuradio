@@ -1,7 +1,30 @@
-/*! \page_mimo MIMO
+# Copyright (C) 2018 Free Software Foundation, Inc.
+#
+# Permission is granted to copy, distribute and/or modify this document
+# under the terms of the GNU Free Documentation License, Version 1.3
+# or any later version published by the Free Software Foundation;
+# with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+# A copy of the license is included in the section entitled "GNU
+# Free Documentation License".
+
+/*! \page page_mimo MIMO
 
 \section mimo_introduction Introduction
 
-test test
+The following manual includes both, an introduction to the theoretical background about MIMO as well as a practical usage manual of all the GNU Radio blocks of the section MIMO.
+For the theoretical introduction to MIMO, the reader does not require any preknowledge about MIMO itselve, but a fundamental background in communications theory is assumed. Although, if you are not yet familiar with the basic functionalities of GNU Radio, you should probably stop here and come back after you read an introduction to GNU Radio and did the tutorials.
+
+\subsection mimo_motivation Motivation
+
+\section mimo_math_intro Mathematical Descritption of MIMO
+
+Before we dive right into the many great MIMO techniques and algorithms, we first have to find a smart and consistent way to describe our communications systems that is now expanded to multiple antennas at the transmitter and receiver. For this purpose, we use the great power of linear algebrea.
+Let us assume a MIMO system with M transmitting antennas and N receiving antennas and let's further assume a discrete time. One complex sample is precessed at each time slot and antenna, meaning it is modulated and transmitted or received and sampled. Hence, the transmitted data per time slot can be described in an M-dimensinal vector, where each dimension represents one of the transmitting antennas. In equal way, we can describe the received data in an N-dimensional vector. A Discrete-Time AWGN channel with slow and frequency flat fading satisfies for the purpose of a general explanation of fundamental MIMO algorithms. Each transmission between one transmitting antenna and a receiving antenna is characterized through a complex path coefficient where the attenuation is described by the magnitude and the applied phase shift by the phase of this path coefficient. All in all, there exist NxM different path coefficients. They can be collected in a channel matrix H with the dimensions NxM. A transmission through this channel equals a matrix multiplication of the channel matrix H with the transmission vector S, resulting in the reception vector R.
+
+\f[ 
+a_3
+\f]
+
+
 
 */
