@@ -11,20 +11,79 @@
 
 \section mimo_introduction Introduction
 
-The following manual includes both, an introduction to the theoretical background about MIMO as well as a practical usage manual of all the GNU Radio blocks of the section MIMO.
-For the theoretical introduction to MIMO, the reader does not require any preknowledge about MIMO itselve, but a fundamental background in communications theory is assumed. Although, if you are not yet familiar with the basic functionalities of GNU Radio, you should probably stop here and come back after you read an introduction to GNU Radio and did the tutorials.
+The following manual includes both, an introduction to the theoretical background of MIMO and a practical usage manual of all the GNU Radio blocks which are included in the section MIMO.
+
+For the theoretical introduction to MIMO, the reader does not require any preknowledge about MIMO itselve, but a fundamental background in communications theory is assumed. Although, if you are not yet familiar with the basic functionalities of GNU Radio, you should probably stop here and come back after you read an introduction to GNU Radio and did the tutorials. \ref page_exploring_gnuradio is also a good way to start.
 
 \subsection mimo_motivation Motivation
 
-\section mimo_math_intro Mathematical Descritption of MIMO
+\section mimo_math_intro Mathematical Descritption
 
-Before we dive right into the many great MIMO techniques and algorithms, we first have to find a smart and consistent way to describe our communications systems that is now expanded to multiple antennas at the transmitter and receiver. For this purpose, we use the great power of linear algebrea.
-Let us assume a MIMO system with M transmitting antennas and N receiving antennas and let's further assume a discrete time. One complex sample is precessed at each time slot and antenna, meaning it is modulated and transmitted or received and sampled. Hence, the transmitted data per time slot can be described in an M-dimensinal vector, where each dimension represents one of the transmitting antennas. In equal way, we can describe the received data in an N-dimensional vector. A Discrete-Time AWGN channel with slow and frequency flat fading satisfies for the purpose of a general explanation of fundamental MIMO algorithms. Each transmission between one transmitting antenna and a receiving antenna is characterized through a complex path coefficient where the attenuation is described by the magnitude and the applied phase shift by the phase of this path coefficient. All in all, there exist NxM different path coefficients. They can be collected in a channel matrix H with the dimensions NxM. A transmission through this channel equals a matrix multiplication of the channel matrix H with the transmission vector S, resulting in the reception vector R.
+Before we dive right into the many great MIMO techniques and algorithms, we first have to find a smart and consistent way to describe our communications systems that is now expanded to multiple antennas at the transmitter and receiver. For this purpose, we use the great power of linear algebra.
+
+Let us assume a MIMO system with M transmitting antennas and N receiving antennas and let's further assume a discrete time. One complex sample is processed at each time slot and antenna, meaning it is modulated and transmitted or received and sampled. Hence, the transmitted data per time slot can be described in an M-dimensinal vector, where each dimension represents one of the transmitting antennas. In equal way, we can describe the received data in an N-dimensional vector. A Discrete-Time AWGN channel with slow and frequency flat fading satisfies for the purpose of a general explanation of fundamental MIMO algorithms. Each transmission between one transmitting antenna and a receiving antenna is characterized through a complex path coefficient where the attenuation is described by the magnitude and the applied phase shift by the phase of this path coefficient. All in all, there exist NxM different path coefficients. They can be collected in a channel matrix H with the dimensions NxM. A transmission through this channel equals a matrix multiplication of the channel matrix H with the transmission vector S, resulting in the reception vector R.
+Each reveiving antenna has its independend Additive White Gauissian Noise (AWGN) applied. We will neglect this noise vector at some points, if it is not relevant for the calculations.
 
 \f[ 
-a_3
+R = H S + N = \begin{pmatrix}
+h_{11} & h_{12} & \dots & h_{1M} \\
+h_{21} & h_{22} & \dots & h_{2M} \\
+\vdots & \vdots & \ddots & \vdots \\
+h_{N1} & h_{N2} & \dots & h_{NM}
+\end{pmatrix}
+\begin{pmatrix}
+s_1 \\ s_2 \\ \vdots \\ s_M
+\end{pmatrix} +
+\begin{pmatrix}
+n_1 \\ n_2 \\ \vdots \\ s_N
+\end{pmatrix}
 \f]
 
+--diversity and MUX
+
+\section mimo_diversity Diversity
+
+\subsection mimo_receiver_diversity Receiver Diversity
+week 00 space diversity and array gain
+
+\section mimo_diversity_combining Diversity Combining
+
+Especially at the receiver side, multiple antennas have an enormous effect on the SNR without the need of increasing the transmit power. The only prize we pay is the additional calculational effort when combining the multiple RX antenna signals to one resulting signal. (And of course the fact, that we have to physically provide multiple antennas.)
+
+\subsection mimo_combining_techniques Combining Techniques
+
+In this project, we focus on linear combining techniques, meaning that the output of the combiner is a linear combination of the input branches. The general signal processing of a linear combining block is therefore a simple weighted sum (after [1]):
+
+\f[
+y = \sum_{i=1}^N \alpha_i r_i \quad \text{with} \quad \alpha_i = a_i e^{j\phi_i}
+\f]
+
+\f$ y \f$ describes a sample that results out of a combination of N received input signals \f$ r \f$, each weighted by a complex coefficient \f$ \alpha_i \f$.
+
+\subsection mimo_selection_combining Selection Combining (SC)
+
+One of the easiest combining methods is simply selecting the path with the best input signal in terms of SNR as output signal. When assuming equal noise at each receiver, this is equal to a selection of the path coefficient with the highest magnitude. This leads to the following combining algorithm (if there are no equal csi coefficients):
+
+\f[
+\alpha_i = 1 for (csi_i \geq csi_j \quad \text{with} j \neq i) \quad \text{else} \quad 0
+\f]
+
+The selection combining mitigates the effects of fading by constantly switching to the path with the least attenuation. It has obviously no array gain because it only takes one received signal at each time into account.
+
+\subsection mimo_maximum_ratio_combining Maximum-Ratio Combining (MRC)
+
+Optimizing the weighted sum in favor of a maximum SNR results in maximum-ratio combining:
+
+3
+
+The magnitude weighting of each path is proportional to its path coefficient. Afterwards it is normalized to avoid an amplification of the signal. The phase of the weighting elements is the inverse of the phase shift of its related path coefficient. Therefore, all products of the weighted sum have the same phase.  This so called ‘co-phasing‘ [1] leads to a constructive interference of the different path signals instead of a random interference that could also lead to a signal cancellation in the case of destructive interference, which would obviously not maximize the SNR.
+
+\subsection mimo_diversity_combining_usage Usage
+
+The diversity combiner is implemented in the C++ block diversity_combining_cc. It takes N complex input ports and has one complex output port. The combining technique is stored as a string type in a local variable. This has the advantage, that it can be changed during run-time with a respective setter method. The block is generally working in stream mode but vector passing can be enabled by setting the vector length > 1.
+
+CSI is provided via stream tags with the key ‘csi’. With each incoming CSI stream tag, the weighting vector is calculated with the new data. The idea is, that a stream tag comes with each new symbol, where symbol means a frame of data samples which belong together. The definition of a symbol (and therefore the frequency of tagging CSI) is the job of the system designer who uses this block.
 
 
+[1] Andrea Goldsmith. 2005. Wireless Communications. Cambridge University Press, New York, NY, USA.
 */
