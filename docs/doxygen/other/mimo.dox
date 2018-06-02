@@ -17,7 +17,7 @@ For the theoretical introduction to MIMO, the reader does not require any prekno
 
 \subsection mimo_motivation Motivation
 
-\section mimo_math_intro Mathematical Descritption
+\section mimo_math_intro Mathematical Description
 
 Before we dive right into the many great MIMO techniques and algorithms, we first have to find a smart and consistent way to describe our communications systems that is now expanded to multiple antennas at the transmitter and receiver. For this purpose, we use the great power of linear algebra.
 
@@ -83,6 +83,13 @@ The magnitude weighting of each path is proportional to its path coefficient. Af
 The diversity combiner is implemented in the C++ block diversity_combining_cc. It takes N complex input ports and has one complex output port. The combining technique is stored as a string type in a local variable. This has the advantage, that it can be changed during run-time with a respective setter method. The block is generally working in stream mode but vector passing can be enabled by setting the vector length > 1.
 
 CSI is provided via stream tags with the key ‘csi’. With each incoming CSI stream tag, the weighting vector is calculated with the new data. The idea is, that a stream tag comes with each new symbol, where symbol means a frame of data samples which belong together. The definition of a symbol (and therefore the frequency of tagging CSI) is the job of the system designer who uses this block.
+
+\subsection mimo_diversity_combining_csi Providing CSI
+
+Providing channel state information (CSI) via stream tags is a fundamental requirement for the diversity combining block and also for many other MIMO blocks which are introduced later on. The channel can be estimated at the receiver with pilot symbols, for example. A detailled instruction to channel estimation for MIMO channels is not part of this documentation but you can have an inpirational look at the channel estimation of the MIMO-OFDM transceiver [not yet implemented; scheduled for August].  
+The produced CSI is a channel matrix of the dimensions NxM. In case of diversity combining, the matrix reduces to a N-dimensional vector.
+The CSI matrix is now tagged to the data stream. For this purpose, we are converting the matrix to a Polymorphic Type (PMT) to append this PMT to the stream. 
+--code example --
 
 \section mimo_stbc Space Time Block Code (STBC)
 
