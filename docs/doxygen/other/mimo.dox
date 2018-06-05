@@ -195,7 +195,27 @@ The algorithm of this implementation follows [1]. Basically this is the Alamouti
 - Differentially encode the transformed input sequences and distribute the resulting output sequence among the 2 antennas. The differential operation can be done by a complex multiplication.
 - Use Alamouti’s scheme to produce an orthogonal sequence to the generated output sequence which is appended to the output sequence. Summarizing, one input sequence of 2 complex samples results in one output sequence of 2 complex samples at each of the 2 antennas, respectively. This equals a code rate of r=1.
 
+\subsection mimo_differential_stbc_implementation Implementational Thoughts
 
+Two fundamental design questions have shaped the differential STBC blocks:
+
+- <b>Which type of input samples are valid?</b>\n
+→ Generally, the algorithm qualifies a complex PSK constellation of any constellation order as valid input. The encoder does not even has to know the modulation order, because it has now effect on the algorithm.
+But however, the encoder and decoder need at least one input sample to generate a valid basis vector. While the encoder could just grab the first two incoming samples and set them to be the basis vector, the decoder initially has no such input samples. We know, that the normalized constellation points are located on the unit circle of the complex plane. The only missing information for the generation of a valid sample is therefore its phase. This information has to be provided to the encoder block from remote in form of an input argument. \a phase_offset describes this phase shift related to the real axis and is fed to the encoder block as an input argument.
+
+- <b>Is a synchronous data stream possible?</b>\n
+(Or: Can we use a GNU Radio ‘sync’ block?)\n
+→The differential scheme does not allow a direct mapping of a single input data sequence to an encoded sequence and of a received data sequence to the decoded data sequence.
+To encode a sequence, we need the current input sequence as well as the previously encoded sequence. We are therefore producing one sequence for each consumed sequence (that is a sync block after definition), but we need memory of one sequence. This predecessor is defined for all sequences except the very first one. For this first sequence, we define a random ‘dummy’ sequence (in this implementation this sequence equals the defined basis vector). This makes the encoder practically a sync block although the very first transmitted sequence does not contain any useful information.
+The situation for the decoder is data stream wise similar to the one of the encoder. Despite, I implemented the decoder with a general block. This has to reasons:\n
+1.) The use of a ‘dummy’ sequence at the beginning of a reception leads to a wrong decoded first sequence. We don’t want to produce false data at the decoder.\n
+2.) A fully fleshed receiver includes much more than just a MIMO receiver. There are synchronizers for time and frequency synchronization and the data is maybe structured in different data blocks. This leads to very many situations that are equal to a new beginning of a transmission and therefore to the argument of 1.).\n
+To handle this issue, I introduced stream tags to the decoder block, tagging the start of a new data ‘block’ (= integer number of data sequences) with the tag key 'start'. When a new block begins, the decoder  consumes the first sequence without producing one, only storing the sequence in his memory. For the following sequences of the block, the decoder works data synchronously.
+
+\subsection mimo_differential_stbc_usage Usage
+
+The differential STBC does not require any CSI. The usage of this MIMO scheme is therefore as simple as inserting the gr::digital::diff_stbc_encoder_cc after the symbol mapping at the transmitter and the gr::digital::diff_stbc_decoder_cc before the symbol_demapper at the receiver.
+To avoid the reception of erroneous sample, the usage of 'start' tags is highly recommended. For example, the tags can be set in the synchronizer, when it gets on track and produces synchronized samples.
 
 [1] Andrea Goldsmith. 2005. Wireless Communications. Cambridge University Press, New York, NY, USA.
 
