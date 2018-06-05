@@ -44,7 +44,11 @@ n_1 \\ n_2 \\ \vdots \\ s_N
 \section mimo_diversity Diversity
 
 \subsection mimo_receiver_diversity Receiver Diversity
-week 00 space diversity and array gain
+Fading has an enormous influence on the quality of a physical communication channel and therefore on the quality of communication through that channel.
+
+Fading effects can be mitigated by combining independently fading signal paths. These independent fading paths can be achieved in different dimensions, for example through time, polarization or space. The latter is the dimension we exploit in for MIMO techniques. This is called \b space \b diversity [1].
+
+A positive side effect of the receiver diversity is the increase of the signal-to-noise ratio (SNR) when combining the different reception signals coherently. This SNR enhancement is called \b array \b gain [1].
 
 \section mimo_diversity_combining Diversity Combining
 
@@ -65,7 +69,7 @@ y = \sum_{i=1}^N \alpha_i r_i \quad \text{with} \quad \alpha_i = a_i e^{j\phi_i}
 One of the easiest combining methods is simply selecting the path with the best input signal in terms of SNR as output signal. When assuming equal noise at each receiver, this is equal to a selection of the path coefficient with the highest magnitude. This leads to the following combining algorithm (if there are no equal csi coefficients):
 
 \f[
-\alpha_i = 1 for (csi_i \geq csi_j \quad \text{with} j \neq i) \quad \text{else} \quad 0
+\alpha_i = 1, \quad \text{for} \quad \text{csi}[i] > \text{csi}[j] \quad \text{and} \quad  j \neq i, 0 \quad \text{otherwise}
 \f]
 
 The selection combining mitigates the effects of fading by constantly switching to the path with the least attenuation. It has obviously no array gain because it only takes one received signal at each time into account.
@@ -74,22 +78,56 @@ The selection combining mitigates the effects of fading by constantly switching 
 
 Optimizing the weighted sum in favor of a maximum SNR results in maximum-ratio combining:
 
-3
+\f[
+\alpha_i = \frac{\text{csi}[i]}{E} \quad \text{with} \quad E = \sum_{i=1}^N \text{csi}_i^2
+\f]
 
 The magnitude weighting of each path is proportional to its path coefficient. Afterwards it is normalized to avoid an amplification of the signal. The phase of the weighting elements is the inverse of the phase shift of its related path coefficient. Therefore, all products of the weighted sum have the same phase.  This so called ‘co-phasing‘ [1] leads to a constructive interference of the different path signals instead of a random interference that could also lead to a signal cancellation in the case of destructive interference, which would obviously not maximize the SNR.
 
 \subsection mimo_diversity_combining_usage Usage
 
-The diversity combiner is implemented in the C++ block diversity_combining_cc. It takes N complex input ports and has one complex output port. The combining technique is stored as a string type in a local variable. This has the advantage, that it can be changed during run-time with a respective setter method. The block is generally working in stream mode but vector passing can be enabled by setting the vector length > 1.
+The diversity combiner is implemented in the C++ block gr::digital::diversity_combiner_cc. It takes N complex input ports and has one complex output port. The combining technique is stored as a string type in a local variable. This has the advantage, that it can be changed during run-time with a respective setter method. The block is generally working in stream mode but vector passing can be enabled by setting the vector length > 1.
 
 CSI is provided via stream tags with the key ‘csi’. With each incoming CSI stream tag, the weighting vector is calculated with the new data. The idea is, that a stream tag comes with each new symbol, where symbol means a frame of data samples which belong together. The definition of a symbol (and therefore the frequency of tagging CSI) is the job of the system designer who uses this block.
 
 \subsection mimo_diversity_combining_csi Providing CSI
 
-Providing channel state information (CSI) via stream tags is a fundamental requirement for the diversity combining block and also for many other MIMO blocks which are introduced later on. The channel can be estimated at the receiver with pilot symbols, for example. A detailled instruction to channel estimation for MIMO channels is not part of this documentation but you can have an inpirational look at the channel estimation of the MIMO-OFDM transceiver [not yet implemented; scheduled for August].  
+Providing channel state information (CSI) via stream tags is a fundamental requirement for the diversity combining block and also for many other MIMO blocks which are introduced later on. The channel can be estimated at the receiver with pilot symbols, for example. A detailled instruction to channel estimation for MIMO channels is not part of this documentation but you can have an inpirational look at the channel estimation of the MIMO-OFDM transceiver [not yet implemented; scheduled for August 2018].
+
 The produced CSI is a channel matrix of the dimensions NxM. In case of diversity combining, the matrix reduces to a N-dimensional vector.
-The CSI matrix is now tagged to the data stream. For this purpose, we are converting the matrix to a Polymorphic Type (PMT) to append this PMT to the stream. 
---code example --
+The CSI matrix is tagged to the data stream. For this purpose, we are converting the matrix to a Polymorphic Type (PMT, see \ref page_pmt) to append this PMT to the stream.
+
+In Python, this could look like:
+\code
+import pmt
+N = # Number of receiving antennas.
+csi = # N-dim array with CSI.
+tag_pos = # Absolute sample position in current input buffer.
+
+# Assign the CSI vector to a PMT vector.
+csi_pmt = pmt.make_c32vector(N, csi[0])
+for k, channel in enumerate(csi):
+    pmt.c32vector_set(v=csi_pmt, k=k, x=channel)
+
+# Append stream tags with CSI to data stream.
+tags.append(gr.tag_utils.python_to_tag((tag_pos, pmt.string_to_symbol("csi"),csi_pmt, pmt.from_long(0))))
+\endcode
+In C++, this could look like:
+\code
+#include <pmt/pmt.h>
+N = // Number of receiving antennas.
+csi = // N-dim array with CSI.
+tag_pos = // Absolute sample position in current input buffer.
+
+// Assign the CSI vector to a PMT vector.
+pmt::pmt_t csi_pmt = pmt::make_c32vector(N, csi[0]);
+for (int i = 0; i < N; ++i){
+  pmt::c32vector_set(csi_pmt, i, csi[i]);
+}
+
+// Append stream tags with CSI to data stream.
+add_item_tag(0, nitems_written(0) + tag_pos, pmt::mp("csi"), csi_pmt);
+\endcode
 
 \section mimo_stbc Space Time Block Code (STBC)
 
@@ -98,15 +136,22 @@ Using a Multiple Input Multiple Output (MIMO) system adds the new dimension spac
 The same principle underlays Space Time Codes (STCs), where the data is distributed over time and space. Space-time block-codes (STBCs) are a less complex alternative to common STCs, having a linear receiver complexity while still extracting excellent diversity gain [1]. Thanks to their linearity, STBCs can be described with a matrix.
 
 The transmission at a single symbol time can be described by
-01
+
+\f[
+\mathbf{r} = \mathbf{Hs} + \mathbf{n} \quad \text{with} \; \mathbf{s} \in \mathbb{C}^M,\; \mathbf{r} \in \mathbb{C}^N,\; \mathbf{H} \in \mathbb{C}^{N\times M},\; \mathbf{n} \in \mathbb{C}^N
+\f]
 
 for a MIMO system with M transmitting antennas and N antennas at the receiver side. To describe a STBC, we have to add the dimension time to the scheme. Thanks to the block character of STBCs, the time dimension is limited to the block length T. This would results in
 
-02
+\f[
+\mathbf{R} = \mathbf{HS} + \mathbf{N} \quad \text{with} \; \mathbf{S} \in \mathbb{C}^{M\times T},\; \mathbf{R} \in \mathbb{C}^{N\times T},\; \mathbf{H} \in \mathbb{C}^{N\times M\times T},\; \mathbf{N} \in \mathbb{C}^{N\times T}
+\f]
 
 Fortunately, we don’t have to deal with 3-dimensional matrices. Instead we can pass each column of S separately through the channel, and therefore again calculating each time step separately. However, we still have to generate the 2-dimensional transmission matrix S. Instead of defining an other matrix multiplication that produces S out of the input vector s, we simply define a generator matrix:
 
-03
+\f[
+\mathbf{G}= \begin{bmatrix} g_{1,1}	& g_{1,2} & \dots	 & g_{1,T}      \\ g_{2,1}	& g_{2,2} & \dots  & g_{2,T} 	  \\ \vdots	&  \vdots	& \ddots & \vdots \\ g_{M,1}	& \dots & g_{M,2} & g_{M,T} \end{bmatrix}
+\f]
 
 G describes the distribution of the STBC over space with M rows, and over time with T columns. The matrix elements of G are the modulated transmission symbols. The number of different data symbols k (= dim(s)) which are included in G define the code rate r=k/T. The maximum code rate is r=M, where each transmitted symbol at each antenna and each time slot is a different input symbol. The minimum code rate is r=1/T. In this case, we would take one input symbol and transmit it over all antennas and repeat it M T times. The choice of r depends on the trade-off between data rate and diversity gain.
 
@@ -114,16 +159,23 @@ G describes the distribution of the STBC over space with M rows, and over time w
 
 A very popular STBC is the Alamouti code. It is defined with the generator matrix
 
-04
+\f[
+\mathbf{G}= \begin{bmatrix} s_{1}	& s_{2}      \\ -s_{2}^*	& s_{1}^* \end{bmatrix}
+\f]
+
 As you can see, the number of transmit antennas is M=2 and the code rate is r=2/2=1. The data rate does not change when applying this code. What makes the Alamouti code so popular is the fact that it is the only STBC that achieves full diversity gain without a reduction of the data rate [2]. This quality of full diversity gain comes from an orthogonal design of the STBC. Orthogonal STBCs have the additional advantage of a linear decoding complexity at the receiver [3]. I won’t dive into theoretical details of orthogonal STBCs (you can read more about it in [1],[2],[3]) and directly go on with the decoding at the receiver.
 
 After going through the channel (we ignore the noise for this calculation), the signal that arrives at the receiver looks like:
 
-05
+\f[
+\mathbf{r}= \mathbf{G} \begin{bmatrix} h_1 \\ h_2 \end{bmatrix}  = \begin{bmatrix} h_1 s_1 \; \quad \; + \; h_2 s_2 \\ h_1 (-s_2^*) + h_2 s_1^* \end{bmatrix}
+\f]
 
 The decoder can now separate the input data symbols with the help of CSI:
 
-06
+\f[
+\begin{bmatrix} y_1 \\ y_2 \end{bmatrix} = \begin{bmatrix} h_1^* & h_2 \\ h_2^* & -h_1 \end{bmatrix} \begin{bmatrix} r_1 \\ r_2^* \end{bmatrix} = \begin{bmatrix} (|h_1|^2 + |h_2|^2) s_1 \\ (|h_1|^2 + |h_2|^2) s_2 \end{bmatrix}
+\f]
 
 After a normalization, the input symbols are restored completely in y. The inclusion of AWGN in the channel model would lead to a disturbance of the received signal, but the important message here is the fact that the two input signals can be separated completely from each other (thanks to the orthogonal design) although they are traveling through the same physical channel at the same time.
 
