@@ -95,7 +95,7 @@ CSI is provided via stream tags with the key ‘csi’. With each incoming CSI s
 Providing channel state information (CSI) via stream tags is a fundamental requirement for the diversity combining block and also for many other MIMO blocks which are introduced later on. The channel can be estimated at the receiver with pilot symbols, for example. A detailled instruction to channel estimation for MIMO channels is not part of this documentation but you can have an inpirational look at the channel estimation of the MIMO-OFDM transceiver [not yet implemented; scheduled for August 2018].
 
 The produced CSI is a channel matrix of the dimensions NxM. In case of diversity combining, the matrix reduces to a N-dimensional vector.
-The CSI matrix is tagged to the data stream. For this purpose, we are converting the matrix to a Polymorphic Type (PMT, see \ref page_pmt) to append this PMT to the stream.
+The CSI matrix is tagged to the data stream. For this purpose, we are converting the matrix to a Polymorphic Type (see also \ref page_pmt) to append this PMT to the stream.
 
 In Python, this could look like:
 \code
@@ -181,9 +181,9 @@ After a normalization, the input symbols are restored completely in y. The inclu
 
 \subsection mimo_alamouti_usage Usage
 
-The encoder takes a sequence of two input samples at a time and calculates the 2×2 generator Matrix G for Alamouti code. This matrix is directly transmitted over the two TX antennas by splitting the matrix up into two row vectors that define the transmitted symbol sequence at each antenna, respectively. I am explicitly using the expression ‘sequence’ instead of vector to clarify, that the encoder block works in stream mode, but processes two input samples at a time. To ensure an even number of samples in the input buffer, I called set_output_multiple(2) in the constructor.
+The gr::digital::alamouti_encoder_cc takes a sequence of two input samples at a time and calculates the 2×2 generator Matrix G for Alamouti code. This matrix is directly transmitted over the two TX antennas by splitting the matrix up into two row vectors that define the transmitted symbol sequence at each antenna, respectively. I am explicitly using the expression ‘sequence’ instead of vector to clarify, that the encoder block works in stream mode, but processes two input samples at a time. To ensure an even number of samples in the input buffer, I called set_output_multiple(2) in the constructor.
 
-The decoder works with the same scheme. In contrast to the encoder, the decoder needs channel state information to decode the signal. This is provided via stream tags and handled in the same way as in the diversity combining block.
+The gr::digital::alamouti_decoder_cc works with the same scheme. In contrast to the encoder, the decoder needs channel state information to decode the signal. This is provided via stream tags (see \ref mimo_diversity_combining_csi) and handled in the same way as for the \ref mimo_diversity_combining.
 
 \section mimo_differential_stbc Differential STBC
 
