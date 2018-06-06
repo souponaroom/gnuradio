@@ -17,6 +17,29 @@ For the theoretical introduction to MIMO, the reader does not require any prekno
 
 \subsection mimo_motivation Motivation
 
+The use of multiple antennas at the transmitter and receiver (MIMO) is an essential method in
+wireless communications. It uses space as an additional degree of freedom in form of spatially
+separated antennas at the transmitter and receiver to significantly improve the performance of
+a communications system. <b>Spatial diversity</b> can be used to mitigate the effect of fading by
+combining independently fading signal paths at the receiver [1], thereby achieving an increased
+signal-to-noise ratio (SNR). <b>Spatial multiplexing</b> obtains independent spatial paths at the
+same frequency and time which is used to transmit parallel data streams on these paths, thereby
+increasing the channel capacity by a multiple factor.
+
+A lot of effort was put in the last few decades into the development and research of algorithms
+which could exploit the mentioned effects as efficiently and effectively as possible. The goal is to
+converge to the theoretical Shannon channel capacity without disregarding the complexity and
+feasibility for practical use cases.
+
+MIMO is not a standard application in GNU Radio yet. Although there are several projects
+based on MIMO with GNU Radio, they are rather specialized on their application purpose. This
+project aims to fill this lack by introducing a unified interface for basic MIMO applications in
+the GNU Radio core. Therefore, several MIMO algorithms are implemented in GNU Radio
+blocks. These blocks stand for themselves at first and can be used as basic MIMO blocks in
+many projects. As a demonstration of how to integrate the MIMO capability into a transmission
+system, the second part of this project includes the realized MIMO algorithms into the existing
+OFDM transceiver of GNU Radio.
+
 \section mimo_math_intro Mathematical Description
 
 Before we dive right into the many great MIMO techniques and algorithms, we first have to find a smart and consistent way to describe our communications systems that is now expanded to multiple antennas at the transmitter and receiver. For this purpose, we use the great power of linear algebra.
@@ -39,13 +62,11 @@ n_1 \\ n_2 \\ \vdots \\ s_N
 \end{pmatrix}
 \f]
 
---diversity and MUX
 
 \section mimo_diversity Diversity
 
 \subsection mimo_receiver_diversity Receiver Diversity
 Fading has an enormous influence on the quality of a physical communication channel and therefore on the quality of communication through that channel.
-
 Fading effects can be mitigated by combining independently fading signal paths. These independent fading paths can be achieved in different dimensions, for example through time, polarization or space. The latter is the dimension we exploit in for MIMO techniques. This is called \b space \b diversity [1].
 
 A positive side effect of the receiver diversity is the increase of the signal-to-noise ratio (SNR) when combining the different reception signals coherently. This SNR enhancement is called \b array \b gain [1].
@@ -53,8 +74,6 @@ A positive side effect of the receiver diversity is the increase of the signal-t
 \section mimo_diversity_combining Diversity Combining
 
 Especially at the receiver side, multiple antennas have an enormous effect on the SNR without the need of increasing the transmit power. The only prize we pay is the additional calculational effort when combining the multiple RX antenna signals to one resulting signal. (And of course the fact, that we have to physically provide multiple antennas.)
-
-\subsection mimo_combining_techniques Combining Techniques
 
 In this project, we focus on linear combining techniques, meaning that the output of the combiner is a linear combination of the input branches. The general signal processing of a linear combining block is therefore a simple weighted sum (after [1]):
 
@@ -69,7 +88,7 @@ y = \sum_{i=1}^N \alpha_i r_i \quad \text{with} \quad \alpha_i = a_i e^{j\phi_i}
 One of the easiest combining methods is simply selecting the path with the best input signal in terms of SNR as output signal. When assuming equal noise at each receiver, this is equal to a selection of the path coefficient with the highest magnitude. This leads to the following combining algorithm (if there are no equal csi coefficients):
 
 \f[
-\alpha_i = 1, \quad \text{for} \quad \text{csi}[i] > \text{csi}[j] \quad \text{and} \quad  j \neq i, 0 \quad \text{otherwise}
+\alpha_i = 1, \quad \text{for} \quad \text{csi}[i] > \text{csi}[j] \quad \text{and} \quad  j \neq i, \quad 0 \quad \text{otherwise}
 \f]
 
 The selection combining mitigates the effects of fading by constantly switching to the path with the least attenuation. It has obviously no array gain because it only takes one received signal at each time into account.
@@ -181,7 +200,7 @@ After a normalization, the input symbols are restored completely in y. The inclu
 
 \subsection mimo_alamouti_usage Usage
 
-The gr::digital::alamouti_encoder_cc takes a sequence of two input samples at a time and calculates the 2×2 generator Matrix G for Alamouti code. This matrix is directly transmitted over the two TX antennas by splitting the matrix up into two row vectors that define the transmitted symbol sequence at each antenna, respectively. I am explicitly using the expression ‘sequence’ instead of vector to clarify, that the encoder block works in stream mode, but processes two input samples at a time. To ensure an even number of samples in the input buffer, I called set_output_multiple(2) in the constructor.
+The gr::digital::alamouti_encoder_cc takes a sequence of two input samples at a time and calculates the 2×2 generator Matrix G for Alamouti code. This matrix is directly transmitted over the two TX antennas by splitting the matrix up into two row vectors that define the transmitted symbol sequence at each antenna, respectively. I am explicitly using the expression ‘sequence’ instead of vector to clarify, that the encoder block works in stream mode, but processes two input samples at a time. To ensure an even number of samples in the input buffer, I called gr::block::set_output_multiple with the parameter \a multiple = 2  in the constructor.
 
 The gr::digital::alamouti_decoder_cc works with the same scheme. In contrast to the encoder, the decoder needs channel state information to decode the signal. This is provided via stream tags (see \ref mimo_diversity_combining_csi) and handled in the same way as for the \ref mimo_diversity_combining.
 
@@ -189,7 +208,7 @@ The gr::digital::alamouti_decoder_cc works with the same scheme. In contrast to 
 
 As in SISO systems, a differential modulation makes the presence of CSI at the receiver redundant. The price we are paying for this enormous simplification of the receiver is a loss of approximately 3dB in SNR.
 
-The algorithm of this implementation follows [1]. Basically this is the Alamouti STBC which is expanded about its differential feature. The rough idea of this algorithm is as follows:
+The algorithm of this implementation follows [4]. Basically this is the Alamouti STBC which is expanded about its differential feature. The rough idea of this algorithm is as follows:
 
 - Transform each input sequences (= a pair of complex input samples) from the standard basis {(1 0), (0 1)} to a new orthonormal basis {(a b), (-b* a*)} where a and b are normalized PSK constellation points (like the input samples). The input sequences can be identified by two weighting coefficients A and B which describe the proportion of each basis vector to the sequence. A and B can be calculated over a dot product of the input sequence with the basis vectors.
 - Differentially encode the transformed input sequences and distribute the resulting output sequence among the 2 antennas. The differential operation can be done by a complex multiplication.
@@ -214,12 +233,16 @@ To handle this issue, I introduced stream tags to the decoder block, tagging the
 
 \subsection mimo_differential_stbc_usage Usage
 
-The differential STBC does not require any CSI. The usage of this MIMO scheme is therefore as simple as inserting the gr::digital::diff_stbc_encoder_cc after the symbol mapping at the transmitter and the gr::digital::diff_stbc_decoder_cc before the symbol_demapper at the receiver.
+The differential STBC does not require any CSI. The usage of this MIMO scheme is therefore as simple as inserting the gr::digital::diff_stbc_encoder_cc after the symbol mapping at the transmitter and the gr::digital::diff_stbc_decoder_cc before the symbol demapper at the receiver.
 To avoid the reception of erroneous sample, the usage of 'start' tags is highly recommended. For example, the tags can be set in the synchronizer, when it gets on track and produces synchronized samples.
+
+\section mimo_references References
 
 [1] Andrea Goldsmith. 2005. Wireless Communications. Cambridge University Press, New York, NY, USA.
 
 [2] Vahid Tarokh; Nambi Seshadri & A. R. Calderbank (March 1998). “Space–time codes for high data rate wireless communication: Performance analysis and code construction”. IEEE Transactions on Information Theory. 44 (2): 744–765. doi: 10.1109/18.661517.
 
 [3] V. Tarokh, H. Jafarkhani and A. R. Calderbank, “Space-time block codes from orthogonal designs,” in IEEE Transactions on Information Theory, vol. 45, no. 5, pp. 1456-1467, Jul 1999. doi: 10.1109/18.771146
+
+[4] V. Tarokh and H. Jafarkhani, ”A differential detection scheme for transmit diversity,” in IEEE Journal on Selected Areas in Communications, vol. 18, no. 7, pp. 1169-1174, July 2000.
 */
