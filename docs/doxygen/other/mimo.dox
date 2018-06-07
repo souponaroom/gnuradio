@@ -11,9 +11,15 @@
 
 \section mimo_introduction Introduction
 
-The following manual includes both, an introduction to the theoretical background of MIMO and a practical usage manual of all the GNU Radio blocks which are included in the section MIMO.
+The following manual includes both, an introduction to the theoretical background 
+of MIMO and a practical usage manual of all the GNU Radio blocks which are included 
+in the section MIMO.
 
-For the theoretical introduction to MIMO, the reader does not require any preknowledge about MIMO itselve, but a fundamental background in communications theory is assumed. Although, if you are not yet familiar with the basic functionalities of GNU Radio, you should probably stop here and come back after you read an introduction to GNU Radio and did the tutorials. \ref page_exploring_gnuradio is also a good way to start.
+For the theoretical introduction to MIMO, the reader does not require any preknowledge 
+about MIMO itselve, but a fundamental background in communications theory is assumed. 
+Although, if you are not yet familiar with the basic functionalities of GNU Radio, 
+you should probably stop here and come back after you read an introduction to 
+GNU Radio and did the tutorials. \ref page_exploring_gnuradio is also a good way to start.
 
 \subsection mimo_motivation Motivation
 
@@ -42,10 +48,28 @@ OFDM transceiver of GNU Radio.
 
 \section mimo_math_intro Mathematical Description
 
-Before we dive right into the many great MIMO techniques and algorithms, we first have to find a smart and consistent way to describe our communications systems that is now expanded to multiple antennas at the transmitter and receiver. For this purpose, we use the great power of linear algebra.
+Before we dive right into the many great MIMO techniques and algorithms, 
+we first have to find a smart and consistent way to describe our communications systems 
+that is now expanded to multiple antennas at the transmitter and receiver. 
+For this purpose, we use the great power of linear algebra.
 
-Let us assume a MIMO system with M transmitting antennas and N receiving antennas and let's further assume a discrete time. One complex sample is processed at each time slot and antenna, meaning it is modulated and transmitted or received and sampled. Hence, the transmitted data per time slot can be described in an M-dimensinal vector, where each dimension represents one of the transmitting antennas. In equal way, we can describe the received data in an N-dimensional vector. A Discrete-Time AWGN channel with slow and frequency flat fading satisfies for the purpose of a general explanation of fundamental MIMO algorithms. Each transmission between one transmitting antenna and a receiving antenna is characterized through a complex path coefficient where the attenuation is described by the magnitude and the applied phase shift by the phase of this path coefficient. All in all, there exist NxM different path coefficients. They can be collected in a channel matrix H with the dimensions NxM. A transmission through this channel equals a matrix multiplication of the channel matrix H with the transmission vector S, resulting in the reception vector R.
-Each reveiving antenna has its independend Additive White Gauissian Noise (AWGN) applied. We will neglect this noise vector at some points, if it is not relevant for the calculations.
+Let us assume a MIMO system with M transmitting antennas and N receiving antennas 
+and let's further assume a discrete time. One complex sample is processed at each 
+time slot and antenna, meaning it is modulated and transmitted or received and sampled. 
+Hence, the transmitted data per time slot can be described in an M-dimensinal vector, 
+where each dimension represents one of the transmitting antennas. In equal way, 
+we can describe the received data in an N-dimensional vector. 
+A Discrete-Time AWGN channel with slow and frequency flat fading satisfies for 
+the purpose of a general explanation of fundamental MIMO algorithms. 
+Each transmission between one transmitting antenna and a receiving antenna is 
+characterized through a complex path coefficient where the attenuation is 
+described by the magnitude and the applied phase shift by the phase of this path coefficient. 
+All in all, there exist NxM different path coefficients. They can be collected 
+in a channel matrix H with the dimensions NxM. A transmission through this channel 
+equals a matrix multiplication of the channel matrix H with the transmission vector S, 
+resulting in the reception vector R.
+Each reveiving antenna has its independend Additive White Gauissian Noise (AWGN) applied. 
+We will neglect this noise vector at some points, if it is not relevant for the calculations.
 
 \f[ 
 R = H S + N = \begin{pmatrix}
@@ -66,32 +90,49 @@ n_1 \\ n_2 \\ \vdots \\ s_N
 \section mimo_diversity Diversity
 
 \subsection mimo_receiver_diversity Receiver Diversity
-Fading has an enormous influence on the quality of a physical communication channel and therefore on the quality of communication through that channel.
-Fading effects can be mitigated by combining independently fading signal paths. These independent fading paths can be achieved in different dimensions, for example through time, polarization or space. The latter is the dimension we exploit in for MIMO techniques. This is called \b space \b diversity [1].
+Fading has an enormous influence on the quality of a physical communication channel 
+and therefore on the quality of communication through that channel.
+Fading effects can be mitigated by combining independently fading signal paths. 
+These independent fading paths can be achieved in different dimensions, for example through time, 
+polarization or space. The latter is the dimension we exploit in for MIMO techniques. 
+This is called \b space \b diversity [1].
 
-A positive side effect of the receiver diversity is the increase of the signal-to-noise ratio (SNR) when combining the different reception signals coherently. This SNR enhancement is called \b array \b gain [1].
+A positive side effect of the receiver diversity is the increase of the 
+signal-to-noise ratio (SNR) when combining the different reception signals coherently. 
+This SNR enhancement is called \b array \b gain [1].
 
 \section mimo_diversity_combining Diversity Combining
 
-Especially at the receiver side, multiple antennas have an enormous effect on the SNR without the need of increasing the transmit power. The only prize we pay is the additional calculational effort when combining the multiple RX antenna signals to one resulting signal. (And of course the fact, that we have to physically provide multiple antennas.)
+Especially at the receiver side, multiple antennas have an enormous effect on 
+the SNR without the need of increasing the transmit power. The only prize we 
+pay is the additional calculational effort when combining the multiple RX antenna signals 
+to one resulting signal. (And of course the fact, that we have to physically provide multiple antennas.)
 
-In this project, we focus on linear combining techniques, meaning that the output of the combiner is a linear combination of the input branches. The general signal processing of a linear combining block is therefore a simple weighted sum (after [1]):
+In this project, we focus on linear combining techniques, meaning that the output 
+of the combiner is a linear combination of the input branches. 
+The general signal processing of a linear combining block is therefore a simple weighted sum (after [1]):
 
 \f[
 y = \sum_{i=1}^N \alpha_i r_i \quad \text{with} \quad \alpha_i = a_i e^{j\phi_i}
 \f]
 
-\f$ y \f$ describes a sample that results out of a combination of N received input signals \f$ r \f$, each weighted by a complex coefficient \f$ \alpha_i \f$.
+\f$ y \f$ describes a sample that results out of a combination of N received 
+input signals \f$ r \f$, each weighted by a complex coefficient \f$ \alpha_i \f$.
 
 \subsection mimo_selection_combining Selection Combining (SC)
 
-One of the easiest combining methods is simply selecting the path with the best input signal in terms of SNR as output signal. When assuming equal noise at each receiver, this is equal to a selection of the path coefficient with the highest magnitude. This leads to the following combining algorithm (if there are no equal csi coefficients):
+One of the easiest combining methods is simply selecting the path with the best 
+input signal in terms of SNR as output signal. When assuming equal noise at each receiver, 
+this is equal to a selection of the path coefficient with the highest magnitude. 
+This leads to the following combining algorithm (if there are no equal csi coefficients):
 
 \f[
 \alpha_i = 1, \quad \text{for} \quad \text{csi}[i] > \text{csi}[j] \quad \text{and} \quad  j \neq i, \quad 0 \quad \text{otherwise}
 \f]
 
-The selection combining mitigates the effects of fading by constantly switching to the path with the least attenuation. It has obviously no array gain because it only takes one received signal at each time into account.
+The selection combining mitigates the effects of fading by constantly switching 
+to the path with the least attenuation. It has obviously no array gain because 
+it only takes one received signal at each time into account.
 
 \subsection mimo_maximum_ratio_combining Maximum-Ratio Combining (MRC)
 
@@ -101,20 +142,41 @@ Optimizing the weighted sum in favor of a maximum SNR results in maximum-ratio c
 \alpha_i = \frac{\text{csi}[i]}{E} \quad \text{with} \quad E = \sum_{i=1}^N \text{csi}_i^2
 \f]
 
-The magnitude weighting of each path is proportional to its path coefficient. Afterwards it is normalized to avoid an amplification of the signal. The phase of the weighting elements is the inverse of the phase shift of its related path coefficient. Therefore, all products of the weighted sum have the same phase.  This so called ‘co-phasing‘ [1] leads to a constructive interference of the different path signals instead of a random interference that could also lead to a signal cancellation in the case of destructive interference, which would obviously not maximize the SNR.
+The magnitude weighting of each path is proportional to its path coefficient. 
+Afterwards it is normalized to avoid an amplification of the signal. 
+The phase of the weighting elements is the inverse of the phase shift of its related path coefficient. 
+Therefore, all products of the weighted sum have the same phase.  
+This so called ‘co-phasing‘ [1] leads to a constructive interference of the 
+different path signals instead of a random interference that could also lead 
+to a signal cancellation in the case of destructive interference, 
+which would obviously not maximize the SNR.
 
 \subsection mimo_diversity_combining_usage Usage
 
-The diversity combiner is implemented in the C++ block gr::digital::diversity_combiner_cc. It takes N complex input ports and has one complex output port. The combining technique is stored as a string type in a local variable. This has the advantage, that it can be changed during run-time with a respective setter method. The block is generally working in stream mode but vector passing can be enabled by setting the vector length > 1.
+The diversity combiner is implemented in the C++ block gr::digital::diversity_combiner_cc. 
+It takes N complex input ports and has one complex output port. The combining 
+technique is stored as a string type in a local variable. This has the advantage, 
+that it can be changed during run-time with a respective setter method. 
+The block is generally working in stream mode but vector passing can be enabled by setting the vector length > 1.
 
-CSI is provided via stream tags with the key ‘csi’. With each incoming CSI stream tag, the weighting vector is calculated with the new data. The idea is, that a stream tag comes with each new symbol, where symbol means a frame of data samples which belong together. The definition of a symbol (and therefore the frequency of tagging CSI) is the job of the system designer who uses this block.
+CSI is provided via stream tags with the key ‘csi’. With each incoming CSI stream tag, 
+the weighting vector is calculated with the new data. The idea is, 
+that a stream tag comes with each new symbol, where symbol means a frame of data samples which belong together. 
+The definition of a symbol (and therefore the frequency of tagging CSI) is the job of the system designer who uses this block.
 
 \subsection mimo_diversity_combining_csi Providing CSI
 
-Providing channel state information (CSI) via stream tags is a fundamental requirement for the diversity combining block and also for many other MIMO blocks which are introduced later on. The channel can be estimated at the receiver with pilot symbols, for example. A detailled instruction to channel estimation for MIMO channels is not part of this documentation but you can have an inpirational look at the channel estimation of the MIMO-OFDM transceiver [not yet implemented; scheduled for August 2018].
+Providing channel state information (CSI) via stream tags is a fundamental 
+requirement for the diversity combining block and also for many other MIMO blocks 
+which are introduced later on. The channel can be estimated at the receiver with pilot symbols, for example. 
+A detailled instruction to channel estimation for MIMO channels is not part of 
+this documentation but you can have an inpirational look at the channel estimation 
+of the MIMO-OFDM transceiver [not yet implemented; scheduled for August 2018].
 
-The produced CSI is a channel matrix of the dimensions NxM. In case of diversity combining, the matrix reduces to a N-dimensional vector.
-The CSI matrix is tagged to the data stream. For this purpose, we are converting the matrix to a Polymorphic Type (see also \ref page_pmt) to append this PMT to the stream.
+The produced CSI is a channel matrix of the dimensions NxM. In case of diversity combining, 
+the matrix reduces to a N-dimensional vector.
+The CSI matrix is tagged to the data stream. For this purpose, 
+we are converting the matrix to a Polymorphic Type (see also \ref page_pmt) to append this PMT to the stream.
 
 In Python, this could look like:
 \code
@@ -150,29 +212,57 @@ add_item_tag(0, nitems_written(0) + tag_pos, pmt::mp("csi"), csi_pmt);
 
 \section mimo_stbc Space Time Block Code (STBC)
 
-Using a Multiple Input Multiple Output (MIMO) system adds the new dimension space (via multiple antennas) to the pool of  degrees of freedom, next to frequency, time, code, polarization, etc., that a system designer can use. This gives the possibility to distribute the signal not just over time, but over on other (or multiple) dimension. We all know this technique from Frequency Division Multiplexing (FDM), where the data is split into multiple streams which are simultaneously transmitted over time, each on a different sub-carrier.
+Using a Multiple Input Multiple Output (MIMO) system adds the new dimension space (via multiple antennas) 
+to the pool of  degrees of freedom, next to frequency, time, code, polarization, etc., 
+that a system designer can use. This gives the possibility to distribute the signal 
+not just over time, but over on other (or multiple) dimension. 
+We all know this technique from Frequency Division Multiplexing (FDM), 
+where the data is split into multiple streams which are simultaneously transmitted over time, 
+each on a different sub-carrier.
 
-The same principle underlays Space Time Codes (STCs), where the data is distributed over time and space. Space-time block-codes (STBCs) are a less complex alternative to common STCs, having a linear receiver complexity while still extracting excellent diversity gain [1]. Thanks to their linearity, STBCs can be described with a matrix.
+The same principle underlays Space Time Codes (STCs), where the data is distributed over time and space. 
+Space-time block-codes (STBCs) are a less complex alternative to common STCs, 
+having a linear receiver complexity while still extracting excellent diversity gain [1]. 
+Thanks to their linearity, STBCs can be described with a matrix.
 
 The transmission at a single symbol time can be described by
 
 \f[
-\mathbf{r} = \mathbf{Hs} + \mathbf{n} \quad \text{with} \; \mathbf{s} \in \mathbb{C}^M,\; \mathbf{r} \in \mathbb{C}^N,\; \mathbf{H} \in \mathbb{C}^{N\times M},\; \mathbf{n} \in \mathbb{C}^N
+\mathbf{r} = \mathbf{Hs} + \mathbf{n} \quad \text{with} \; \mathbf{s} \in \mathbb{C}^M,\; 
+\mathbf{r} \in \mathbb{C}^N,\; \mathbf{H} \in \mathbb{C}^{N\times M},\; \mathbf{n} \in \mathbb{C}^N
 \f]
 
-for a MIMO system with M transmitting antennas and N antennas at the receiver side. To describe a STBC, we have to add the dimension time to the scheme. Thanks to the block character of STBCs, the time dimension is limited to the block length T. This would results in
+for a MIMO system with M transmitting antennas and N antennas at the receiver side. 
+To describe a STBC, we have to add the dimension time to the scheme. 
+Thanks to the block character of STBCs, the time dimension is limited to the block length T. 
+This would results in
 
 \f[
-\mathbf{R} = \mathbf{HS} + \mathbf{N} \quad \text{with} \; \mathbf{S} \in \mathbb{C}^{M\times T},\; \mathbf{R} \in \mathbb{C}^{N\times T},\; \mathbf{H} \in \mathbb{C}^{N\times M\times T},\; \mathbf{N} \in \mathbb{C}^{N\times T}
+\mathbf{R} = \mathbf{HS} + \mathbf{N} \quad \text{with} \; \mathbf{S} \in \mathbb{C}^{M\times T},\; 
+\mathbf{R} \in \mathbb{C}^{N\times T},\; \mathbf{H} \in \mathbb{C}^{N\times M\times T},\; \mathbf{N} \in \mathbb{C}^{N\times T}
 \f]
 
-Fortunately, we don’t have to deal with 3-dimensional matrices. Instead we can pass each column of S separately through the channel, and therefore again calculating each time step separately. However, we still have to generate the 2-dimensional transmission matrix S. Instead of defining an other matrix multiplication that produces S out of the input vector s, we simply define a generator matrix:
+Fortunately, we don’t have to deal with 3-dimensional matrices. 
+Instead we can pass each column of S separately through the channel, 
+and therefore again calculating each time step separately. However, 
+we still have to generate the 2-dimensional transmission matrix S. 
+Instead of defining an other matrix multiplication that produces S out of the input vector s, 
+we simply define a generator matrix:
 
 \f[
-\mathbf{G}= \begin{bmatrix} g_{1,1}	& g_{1,2} & \dots	 & g_{1,T}      \\ g_{2,1}	& g_{2,2} & \dots  & g_{2,T} 	  \\ \vdots	&  \vdots	& \ddots & \vdots \\ g_{M,1}	& \dots & g_{M,2} & g_{M,T} \end{bmatrix}
+\mathbf{G}= \begin{bmatrix} g_{1,1}	& g_{1,2} & \dots	 & g_{1,T} \\ 
+g_{2,1}	& g_{2,2} & \dots  & g_{2,T} 	  \\ 
+\vdots	&  \vdots	& \ddots & \vdots \\ 
+g_{M,1}	& \dots & g_{M,2} & g_{M,T} \end{bmatrix}
 \f]
 
-G describes the distribution of the STBC over space with M rows, and over time with T columns. The matrix elements of G are the modulated transmission symbols. The number of different data symbols k (= dim(s)) which are included in G define the code rate r=k/T. The maximum code rate is r=M, where each transmitted symbol at each antenna and each time slot is a different input symbol. The minimum code rate is r=1/T. In this case, we would take one input symbol and transmit it over all antennas and repeat it M T times. The choice of r depends on the trade-off between data rate and diversity gain.
+G describes the distribution of the STBC over space with M rows, and over time with T columns. 
+The matrix elements of G are the modulated transmission symbols. 
+The number of different data symbols k (= dim(s)) which are included in G define the code rate r=k/T. 
+The maximum code rate is r=M, where each transmitted symbol at each antenna 
+and each time slot is a different input symbol. The minimum code rate is r=1/T. 
+In this case, we would take one input symbol and transmit it over all antennas and repeat it M T times. 
+The choice of r depends on the trade-off between data rate and diversity gain.
 
 \section mimo_alamouti Alamouti Code
 
@@ -182,67 +272,149 @@ A very popular STBC is the Alamouti code. It is defined with the generator matri
 \mathbf{G}= \begin{bmatrix} s_{1}	& s_{2}      \\ -s_{2}^*	& s_{1}^* \end{bmatrix}
 \f]
 
-As you can see, the number of transmit antennas is M=2 and the code rate is r=2/2=1. The data rate does not change when applying this code. What makes the Alamouti code so popular is the fact that it is the only STBC that achieves full diversity gain without a reduction of the data rate [2]. This quality of full diversity gain comes from an orthogonal design of the STBC. Orthogonal STBCs have the additional advantage of a linear decoding complexity at the receiver [3]. I won’t dive into theoretical details of orthogonal STBCs (you can read more about it in [1],[2],[3]) and directly go on with the decoding at the receiver.
+As you can see, the number of transmit antennas is M=2 and the code rate is r=2/2=1. 
+The data rate does not change when applying this code. 
+What makes the Alamouti code so popular is the fact that it is the only STBC 
+that achieves full diversity gain without a reduction of the data rate [2]. 
+This quality of full diversity gain comes from an orthogonal design of the 
+STBC. Orthogonal STBCs have the additional advantage of a linear decoding complexity at the receiver [3]. 
+I won’t dive into theoretical details of orthogonal STBCs (
+you can read more about it in [1],[2],[3]) and directly go on with the decoding at the receiver.
 
-After going through the channel (we ignore the noise for this calculation), the signal that arrives at the receiver looks like:
+After going through the channel (we ignore the noise for this calculation), 
+the signal that arrives at the receiver looks like:
 
 \f[
-\mathbf{r}= \mathbf{G} \begin{bmatrix} h_1 \\ h_2 \end{bmatrix}  = \begin{bmatrix} h_1 s_1 \; \quad \; + \; h_2 s_2 \\ h_1 (-s_2^*) + h_2 s_1^* \end{bmatrix}
+\mathbf{r}= \mathbf{G} \begin{bmatrix} h_1 \\ h_2 \end{bmatrix}  = 
+\begin{bmatrix} h_1 s_1 \; \quad \; + \; h_2 s_2 \\ h_1 (-s_2^*) + h_2 s_1^* \end{bmatrix}
 \f]
 
 The decoder can now separate the input data symbols with the help of CSI:
 
 \f[
-\begin{bmatrix} y_1 \\ y_2 \end{bmatrix} = \begin{bmatrix} h_1^* & h_2 \\ h_2^* & -h_1 \end{bmatrix} \begin{bmatrix} r_1 \\ r_2^* \end{bmatrix} = \begin{bmatrix} (|h_1|^2 + |h_2|^2) s_1 \\ (|h_1|^2 + |h_2|^2) s_2 \end{bmatrix}
+\begin{bmatrix} y_1 \\ y_2 \end{bmatrix} = \begin{bmatrix} h_1^* & h_2 \\ 
+h_2^* & -h_1 \end{bmatrix} \begin{bmatrix} r_1 \\ r_2^* \end{bmatrix} = 
+\begin{bmatrix} (|h_1|^2 + |h_2|^2) s_1 \\ (|h_1|^2 + |h_2|^2) s_2 \end{bmatrix}
 \f]
 
-After a normalization, the input symbols are restored completely in y. The inclusion of AWGN in the channel model would lead to a disturbance of the received signal, but the important message here is the fact that the two input signals can be separated completely from each other (thanks to the orthogonal design) although they are traveling through the same physical channel at the same time.
+After a normalization, the input symbols are restored completely in y. 
+The inclusion of AWGN in the channel model would lead to a disturbance of the received signal, 
+but the important message here is the fact that the two input signals can be separated completely 
+from each other (thanks to the orthogonal design) although they are traveling 
+through the same physical channel at the same time.
 
 \subsection mimo_alamouti_usage Usage
 
-The gr::digital::alamouti_encoder_cc takes a sequence of two input samples at a time and calculates the 2×2 generator Matrix G for Alamouti code. This matrix is directly transmitted over the two TX antennas by splitting the matrix up into two row vectors that define the transmitted symbol sequence at each antenna, respectively. I am explicitly using the expression ‘sequence’ instead of vector to clarify, that the encoder block works in stream mode, but processes two input samples at a time. To ensure an even number of samples in the input buffer, I called gr::block::set_output_multiple with the parameter \a multiple = 2  in the constructor.
+The gr::digital::alamouti_encoder_cc takes a sequence of two input samples at a 
+time and calculates the 2×2 generator Matrix G for Alamouti code. 
+This matrix is directly transmitted over the two TX antennas by splitting the 
+matrix up into two row vectors that define the transmitted symbol sequence at each antenna, respectively. 
+I am explicitly using the expression ‘sequence’ instead of vector to clarify, 
+that the encoder block works in stream mode, but processes two input samples at a time. 
+To ensure an even number of samples in the input buffer, 
+I called gr::block::set_output_multiple with the parameter \a multiple = 2  in the constructor.
 
-The gr::digital::alamouti_decoder_cc works with the same scheme. In contrast to the encoder, the decoder needs channel state information to decode the signal. This is provided via stream tags (see \ref mimo_diversity_combining_csi) and handled in the same way as for the \ref mimo_diversity_combining.
+The gr::digital::alamouti_decoder_cc works with the same scheme. 
+In contrast to the encoder, the decoder needs channel state information to decode the signal. 
+This is provided via stream tags (see \ref mimo_diversity_combining_csi) and 
+handled in the same way as for the \ref mimo_diversity_combining.
 
 \section mimo_differential_stbc Differential STBC
 
-As in SISO systems, a differential modulation makes the presence of CSI at the receiver redundant. The price we are paying for this enormous simplification of the receiver is a loss of approximately 3dB in SNR.
+As in SISO systems, a differential modulation makes the presence of CSI at the receiver redundant. 
+The price we are paying for this enormous simplification of the receiver is a loss of approximately 3dB in SNR.
 
-The algorithm of this implementation follows [4]. Basically this is the Alamouti STBC which is expanded about its differential feature. The rough idea of this algorithm is as follows:
+The algorithm of this implementation follows [4]. 
+Basically this is the Alamouti STBC which is expanded about its differential feature. 
+The rough idea of this algorithm is as follows:
 
-- Transform each input sequences (= a pair of complex input samples) from the standard basis {(1 0), (0 1)} to a new orthonormal basis {(a b), (-b* a*)} where a and b are normalized PSK constellation points (like the input samples). The input sequences can be identified by two weighting coefficients A and B which describe the proportion of each basis vector to the sequence. A and B can be calculated over a dot product of the input sequence with the basis vectors.
-- Differentially encode the transformed input sequences and distribute the resulting output sequence among the 2 antennas. The differential operation can be done by a complex multiplication.
-- Use Alamouti’s scheme to produce an orthogonal sequence to the generated output sequence which is appended to the output sequence. Summarizing, one input sequence of 2 complex samples results in one output sequence of 2 complex samples at each of the 2 antennas, respectively. This equals a code rate of r=1.
+- Transform each input sequences (= a pair of complex input samples) from the 
+standard basis {(1 0), (0 1)} to a new orthonormal basis {(a b), (-b* a*)} 
+where a and b are normalized PSK constellation points (like the input samples). 
+The input sequences can be identified by two weighting coefficients A and B 
+which describe the proportion of each basis vector to the sequence. A and B 
+can be calculated over a dot product of the input sequence with the basis vectors.
+- Differentially encode the transformed input sequences and distribute the resulting 
+output sequence among the 2 antennas. The differential operation can be done 
+by a complex multiplication.
+- Use Alamouti’s scheme to produce an orthogonal sequence to the generated output 
+sequence which is appended to the output sequence. Summarizing, one 
+input sequence of 2 complex samples results in one output sequence of 2 complex samples 
+at each of the 2 antennas, respectively. This equals a code rate of r=1.
 
 \subsection mimo_differential_stbc_implementation Implementational Thoughts
 
 Two fundamental design questions have shaped the differential STBC blocks:
 
 - <b>Which type of input samples are valid?</b>\n
-→ Generally, the algorithm qualifies a complex PSK constellation of any constellation order as valid input. The encoder does not even has to know the modulation order, because it has now effect on the algorithm.
-But however, the encoder and decoder need at least one input sample to generate a valid basis vector. While the encoder could just grab the first two incoming samples and set them to be the basis vector, the decoder initially has no such input samples. We know, that the normalized constellation points are located on the unit circle of the complex plane. The only missing information for the generation of a valid sample is therefore its phase. This information has to be provided to the encoder block from remote in form of an input argument. \a phase_offset describes this phase shift related to the real axis and is fed to the encoder block as an input argument.
+→ Generally, the algorithm qualifies a complex PSK constellation of any 
+constellation order as valid input. The encoder does not even has to know the modulation order, 
+because it has now effect on the algorithm.
+But however, the encoder and decoder need at least one input sample to 
+generate a valid basis vector. While the encoder could just grab the 
+first two incoming samples and set them to be the basis vector, the decoder 
+initially has no such input samples. We know, that the normalized constellation points 
+are located on the unit circle of the complex plane. The only missing information for 
+the generation of a valid sample is therefore its phase. This information has to be 
+provided to the encoder block from remote in form of an input argument. 
+\a phase_offset describes this phase shift related to the real axis and is fed 
+to the encoder block as an input argument.
 
 - <b>Is a synchronous data stream possible?</b>\n
 (Or: Can we use a GNU Radio ‘sync’ block?)\n
-→The differential scheme does not allow a direct mapping of a single input data sequence to an encoded sequence and of a received data sequence to the decoded data sequence.
-To encode a sequence, we need the current input sequence as well as the previously encoded sequence. We are therefore producing one sequence for each consumed sequence (that is a sync block after definition), but we need memory of one sequence. This predecessor is defined for all sequences except the very first one. For this first sequence, we define a random ‘dummy’ sequence (in this implementation this sequence equals the defined basis vector). This makes the encoder practically a sync block although the very first transmitted sequence does not contain any useful information.
-The situation for the decoder is data stream wise similar to the one of the encoder. Despite, I implemented the decoder with a general block. This has to reasons:\n
-1.) The use of a ‘dummy’ sequence at the beginning of a reception leads to a wrong decoded first sequence. We don’t want to produce false data at the decoder.\n
-2.) A fully fleshed receiver includes much more than just a MIMO receiver. There are synchronizers for time and frequency synchronization and the data is maybe structured in different data blocks. This leads to very many situations that are equal to a new beginning of a transmission and therefore to the argument of 1.).\n
-To handle this issue, I introduced stream tags to the decoder block, tagging the start of a new data ‘block’ (= integer number of data sequences) with the tag key 'start'. When a new block begins, the decoder  consumes the first sequence without producing one, only storing the sequence in his memory. For the following sequences of the block, the decoder works data synchronously.
+→The differential scheme does not allow a direct mapping of a single input 
+data sequence to an encoded sequence and of a received data sequence to the 
+decoded data sequence.
+To encode a sequence, we need the current input sequence as well as the 
+previously encoded sequence. We are therefore producing one sequence for each 
+consumed sequence (that is a sync block after definition), but we need memory 
+of one sequence. This predecessor is defined for all sequences except the very 
+first one. For this first sequence, we define a random ‘dummy’ sequence (in this 
+implementation this sequence equals the defined basis vector). 
+This makes the encoder practically a sync block although the very first 
+transmitted sequence does not contain any useful information.
+The situation for the decoder is data stream wise similar to the one of the encoder. 
+Despite, I implemented the decoder with a general block. This has to reasons:\n
+1.) The use of a ‘dummy’ sequence at the beginning of a reception leads 
+to a wrong decoded first sequence. We don’t want to produce false data at the decoder.\n
+2.) A fully fleshed receiver includes much more than just a MIMO receiver. 
+There are synchronizers for time and frequency synchronization and the data is 
+maybe structured in different data blocks. This leads to very many situations 
+that are equal to a new beginning of a transmission and therefore to the argument of 1.).\n
+To handle this issue, I introduced stream tags to the decoder block, 
+tagging the start of a new data ‘block’ (= integer number of data sequences) 
+with the tag key 'start'. When a new block begins, 
+the decoder  consumes the first sequence without producing one, 
+only storing the sequence in his memory. For the following sequences of the block, 
+the decoder works data synchronously.
 
 \subsection mimo_differential_stbc_usage Usage
 
-The differential STBC does not require any CSI. The usage of this MIMO scheme is therefore as simple as inserting the gr::digital::diff_stbc_encoder_cc after the symbol mapping at the transmitter and the gr::digital::diff_stbc_decoder_cc before the symbol demapper at the receiver.
-To avoid the reception of erroneous sample, the usage of 'start' tags is highly recommended. For example, the tags can be set in the synchronizer, when it gets on track and produces synchronized samples.
+The differential STBC does not require any CSI. The usage of this MIMO scheme is 
+therefore as simple as inserting the gr::digital::diff_stbc_encoder_cc after the 
+symbol mapping at the transmitter and the gr::digital::diff_stbc_decoder_cc 
+before the symbol demapper at the receiver.
+To avoid the reception of erroneous sample, the usage of 'start' tags is highly recommended. 
+For example, the tags can be set in the synchronizer, 
+when it gets on track and produces synchronized samples.
 
 \section mimo_references References
 
-[1] Andrea Goldsmith. 2005. Wireless Communications. Cambridge University Press, New York, NY, USA.
+[1] Andrea Goldsmith. 2005. Wireless Communications. 
+Cambridge University Press, New York, NY, USA.
 
-[2] Vahid Tarokh; Nambi Seshadri & A. R. Calderbank (March 1998). “Space–time codes for high data rate wireless communication: Performance analysis and code construction”. IEEE Transactions on Information Theory. 44 (2): 744–765. doi: 10.1109/18.661517.
+[2] Vahid Tarokh; Nambi Seshadri & A. R. Calderbank (March 1998). 
+“Space–time codes for high data rate wireless communication: 
+Performance analysis and code construction”. 
+IEEE Transactions on Information Theory. 44 (2): 744–765. doi: 10.1109/18.661517.
 
-[3] V. Tarokh, H. Jafarkhani and A. R. Calderbank, “Space-time block codes from orthogonal designs,” in IEEE Transactions on Information Theory, vol. 45, no. 5, pp. 1456-1467, Jul 1999. doi: 10.1109/18.771146
+[3] V. Tarokh, H. Jafarkhani and A. R. Calderbank, 
+“Space-time block codes from orthogonal designs,” in 
+IEEE Transactions on Information Theory, vol. 45, no. 5, pp. 1456-1467, 
+Jul 1999. doi: 10.1109/18.771146
 
-[4] V. Tarokh and H. Jafarkhani, ”A differential detection scheme for transmit diversity,” in IEEE Journal on Selected Areas in Communications, vol. 18, no. 7, pp. 1169-1174, July 2000.
+[4] V. Tarokh and H. Jafarkhani, 
+”A differential detection scheme for transmit diversity,” in 
+IEEE Journal on Selected Areas in Communications, vol. 18, no. 7, 
+pp. 1169-1174, July 2000.
 */
