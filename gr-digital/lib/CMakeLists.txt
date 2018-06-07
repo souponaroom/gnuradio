@@ -135,6 +135,7 @@ list(APPEND digital_sources
     alamouti_encoder_cc_impl.cc
     alamouti_decoder_cc_impl.cc
     diversity_combiner_cc_impl.cc
+    vblast_encoder_cc_impl.cc
 )
 
 #Add Windows DLL resource file if using MSVC
