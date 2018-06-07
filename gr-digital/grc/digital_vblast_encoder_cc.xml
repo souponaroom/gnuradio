@@ -1,0 +1,21 @@
+<block>
+  <name>VBLAST encoder</name>
+  <key>digital_vblast_encoder_cc</key>
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.vblast_encoder_cc($num_outputs)</make>
+  <param>
+    <name>Number of Outputs</name>
+    <key>num_outputs</key>
+    <type>raw</type>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+    <nports>num_outputs</nports>
+  </source>
+</block>
