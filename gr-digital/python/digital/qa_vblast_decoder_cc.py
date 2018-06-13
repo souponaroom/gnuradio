@@ -24,6 +24,8 @@
 from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 import digital_swig as digital
+import numpy as np
+import pmt
 
 class qa_vblast_decoder_cc (gr_unittest.TestCase):
 
@@ -33,10 +35,69 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def test_001_t (self):
-        # set up fg
-        self.tb.run ()
-        # check data
+    def dice_csi_tags(self, data, num_inputs, num_tags, tag_pos):
+        tags = []
+        expected_result = np.empty([np.size(data, 0)*np.size(data,1)], dtype=complex)
+        for i in range(0, num_tags):
+            # Randomly generate CSI for one symbol.
+            csi = (np.random.randn(num_inputs, num_inputs) + 1j * np.random.randn(num_inputs, num_inputs))
+            # Assign the CSI vector to a PMT vector.
+            csi_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0))
+            for k, rx in enumerate(csi):
+                line_vector_pmt = pmt.make_c32vector(num_inputs, csi[k][0])
+                for l, tx in enumerate(csi[k]):
+                    pmt.c32vector_set(v=line_vector_pmt, k=l, x=csi[k][l])
+                pmt.vector_set(csi_pmt, k, line_vector_pmt)
+
+            # Append stream tags with CSI to data stream.
+            tags.append(gr.tag_utils.python_to_tag((tag_pos[i],
+                                                    pmt.string_to_symbol("csi"),
+                                                    csi_pmt,
+                                                    pmt.from_long(0))))
+
+            # Calculate expected result.
+            expected_result[tag_pos[i]*num_inputs::] = np.reshape(np.transpose(np.dot(np.linalg.inv(csi), data[::, tag_pos[i]::])), (np.size(data, 0)*(np.size(data,1)-tag_pos[i])))
+        return tags, expected_result
+
+# 5 tests validating the correct output of the decoder with random input data.
+    def test_001_t(self):
+        # Define test params.
+        data_length = 20
+        repetitions = 5
+        num_tags = 4
+        num_inputs = 2
+
+        for i in range(repetitions):
+            # Generate random input data.
+            data = np.random.randn(num_inputs, data_length) + 1j * np.random.randn(num_inputs, data_length)
+            # Generate random tag positions.
+            tag_pos = np.random.randint(low=0, high=data_length, size=num_tags)
+            tag_pos[0] = 0
+            tag_pos = np.sort(tag_pos)
+            # Calculate expected result.
+            tags, expected_result = self.dice_csi_tags(data,
+                                                       num_inputs,
+                                                       num_tags,
+                                                       tag_pos)
+
+            # Build up the test flowgraph.
+            src = []
+            src.append(blocks.vector_source_c(data=data[0],
+                                            repeat=False,
+                                            tags=tags))
+            for n in range(1, num_inputs):
+                src.append(blocks.vector_source_c(data=data[n],
+                                                  repeat=False))
+            vblast_decoder = digital.vblast_decoder_cc(num_inputs)
+            sink = blocks.vector_sink_c()
+            self.tb.connect(src[0], vblast_decoder, sink)
+            for n in range(1, num_inputs):
+                self.tb.connect(src[n], (vblast_decoder, n))
+            # Run flowgraph.
+            self.tb.run()
+
+            # Check if the expected result equals the actual result.
+            self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
 
 
 if __name__ == '__main__':
