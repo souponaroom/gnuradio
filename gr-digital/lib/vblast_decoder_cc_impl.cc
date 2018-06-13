@@ -24,8 +24,11 @@
 #include "config.h"
 #endif
 
+#include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "vblast_decoder_cc_impl.h"
+
+using namespace boost;
 
 namespace gr {
   namespace digital {
@@ -48,7 +51,11 @@ namespace gr {
               gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(gr_complex)), num_inputs),
         d_num_inputs(num_inputs)
-    {}
+    {
+      // Init CSI array and mimo_equalizer.
+      d_csi = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
+      d_mimo_equalizer = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
+    }
 
     /*
      * Our virtual destructor.
@@ -57,12 +64,49 @@ namespace gr {
     {
     }
 
+    void
+    vblast_decoder_cc_impl::update_mimo_equalizer() {
+      switch (d_num_inputs){
+        case 1: {
+          // SISO case.
+
+          break;
+        }
+        case 2: {
+          gr_complex c = d_csi[0][0]*d_csi[1][1] - d_csi[0][1]*d_csi[1][0];
+          d_mimo_equalizer[0][0] = d_csi[1][1]/c;
+          d_mimo_equalizer[0][1] = -d_csi[0][1]/c;
+          d_mimo_equalizer[1][0] = -d_csi[1][0]/c;
+          d_mimo_equalizer[1][1] = d_csi[0][0]/c;
+          break;
+        }
+        default: {
+
+        }
+      }
+    }
+
+    void
+    vblast_decoder_cc_impl::equalize_symbol(gr_vector_const_void_star input,
+                                            gr_complex* out,
+                                            uint32_t offset,
+                                            uint32_t length) {
+      std::fill(out, &out[length*d_num_inputs], 0.0);
+      for (int n = 0; n < d_num_inputs; ++n) {
+        gr_complex *in = &((gr_complex *) input[n])[offset/d_num_inputs];
+        for (unsigned int i = 0; i < length; ++i) {
+          for (int j = 0; j < d_num_inputs; ++j) {
+            out[i*d_num_inputs + j] += d_mimo_equalizer[j][n] * in[i];
+          }
+        }
+      }
+    }
+
     int
     vblast_decoder_cc_impl::work(int noutput_items,
         gr_vector_const_void_star &input_items,
         gr_vector_void_star &output_items)
     {
-      const gr_complex *in = (const gr_complex *) input_items[0];
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items.
 
@@ -74,30 +118,32 @@ namespace gr {
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
         symbol_length = noutput_items;
-        //TODO Process symbol.
+        equalize_symbol(input_items, out, nprocessed, symbol_length);
         nprocessed += symbol_length;
       } else { // Input buffer includes tags.
         if (tags[0].offset - nitems_read(0) > 0){
           /* There are items in the input buffer, before the first tag arrives,
            * which belong to the previous symbol. */
-          symbol_length = tags[0].offset - nitems_read(0);
-          //TODO Process_symbol.
+          symbol_length = (tags[0].offset - nitems_read(0))*d_num_inputs;
+          equalize_symbol(input_items, out, nprocessed, symbol_length);
           nprocessed += symbol_length;
         }
         // Iterate over tags in buffer.
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
-            symbol_length = tags[i + 1].offset - tags[i].offset;
+            symbol_length = (tags[i + 1].offset - tags[i].offset)*d_num_inputs;
           } else {
-            symbol_length = noutput_items - tags[i].offset + nitems_read(0);
+            symbol_length = noutput_items - (tags[i].offset - nitems_read(0))*d_num_inputs;
           }
           // Get CSI from tag.
-          d_csi = pmt::c32vector_elements(tags[i].value);
+          for (unsigned j = 0; j < pmt::length(tags[i].value); ++j) {
+              d_csi[j] = pmt::c32vector_elements(pmt::vector_ref(tags[i].value, j));
+          }
           // Calculate the weighting vector for the next symbol with the received CSI.
-          //TODO Calculate the weighting vector.
+          update_mimo_equalizer();
           // Process the symbol with the calculated weighting vector.
-          //TODO Process_symbol.
+          equalize_symbol(input_items, &out[nprocessed], nprocessed, symbol_length);
           nprocessed += symbol_length;
         }
       }
