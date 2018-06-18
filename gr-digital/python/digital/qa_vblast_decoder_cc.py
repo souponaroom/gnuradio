@@ -59,13 +59,16 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             expected_result[tag_pos[i]*num_inputs::] = np.reshape(np.transpose(np.dot(np.linalg.inv(csi), data[::, tag_pos[i]::])), (np.size(data, 0)*(np.size(data,1)-tag_pos[i])))
         return tags, expected_result
 
-# 5 tests validating the correct output of the decoder with random input data.
+    ''' 
+    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    and 2x2 MIMO scheme. '''
     def test_001_t(self):
         # Define test params.
         data_length = 20
         repetitions = 5
         num_tags = 4
         num_inputs = 2
+        equalizer_type = 'ZF'
 
         for i in range(repetitions):
             # Generate random input data.
@@ -88,7 +91,7 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             for n in range(1, num_inputs):
                 src.append(blocks.vector_source_c(data=data[n],
                                                   repeat=False))
-            vblast_decoder = digital.vblast_decoder_cc(num_inputs)
+            vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type)
             sink = blocks.vector_sink_c()
             self.tb.connect(src[0], vblast_decoder, sink)
             for n in range(1, num_inputs):

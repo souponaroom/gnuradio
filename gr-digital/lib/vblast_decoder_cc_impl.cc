@@ -24,6 +24,7 @@
 #include "config.h"
 #endif
 
+#include <string>
 #include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "vblast_decoder_cc_impl.h"
@@ -37,24 +38,26 @@ namespace gr {
     const pmt::pmt_t vblast_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
 
     vblast_decoder_cc::sptr
-    vblast_decoder_cc::make(uint16_t num_inputs)
+    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type)
     {
       return gnuradio::get_initial_sptr
-        (new vblast_decoder_cc_impl(num_inputs));
+        (new vblast_decoder_cc_impl(num_inputs, equalizer_type));
     }
 
     /*
      * The private constructor
      */
-    vblast_decoder_cc_impl::vblast_decoder_cc_impl(uint16_t num_inputs)
+    vblast_decoder_cc_impl::vblast_decoder_cc_impl(uint16_t num_inputs, std::string equalizer_type)
       : gr::sync_interpolator("vblast_decoder_cc",
               gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(gr_complex)), num_inputs),
-        d_num_inputs(num_inputs)
+        d_num_inputs(num_inputs),
+        d_equalizer_type(equalizer_type)
     {
       // Init CSI array and mimo_equalizer.
       d_csi = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
       d_mimo_equalizer = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
+      d_snr = std::vector<gr_complex>(num_inputs, 1.0);
     }
 
     /*
@@ -66,23 +69,53 @@ namespace gr {
 
     void
     vblast_decoder_cc_impl::update_mimo_equalizer() {
-      switch (d_num_inputs){
-        case 1: {
-          // SISO case.
+      if (d_equalizer_type.compare("ZF") == 0) {
+        // Zero forcing equalizer.
+        switch (d_num_inputs) {
+          case 1: {
+            // SISO case.
 
-          break;
-        }
-        case 2: {
-          gr_complex c = d_csi[0][0]*d_csi[1][1] - d_csi[0][1]*d_csi[1][0];
-          d_mimo_equalizer[0][0] = d_csi[1][1]/c;
-          d_mimo_equalizer[0][1] = -d_csi[0][1]/c;
-          d_mimo_equalizer[1][0] = -d_csi[1][0]/c;
-          d_mimo_equalizer[1][1] = d_csi[0][0]/c;
-          break;
-        }
-        default: {
+            break;
+          }
+          case 2: {
+            gr_complex c = d_csi[0][0] * d_csi[1][1] - d_csi[0][1] * d_csi[1][0];
+            d_mimo_equalizer[0][0] = d_csi[1][1] / c;
+            d_mimo_equalizer[0][1] = -d_csi[0][1] / c;
+            d_mimo_equalizer[1][0] = -d_csi[1][0] / c;
+            d_mimo_equalizer[1][1] = d_csi[0][0] / c;
+            break;
+          }
+          default: {
 
+          }
         }
+      } else if (d_equalizer_type.compare("MMSE") == 0){
+        // Minimum mean squared error equalizer.
+        switch (d_num_inputs) {
+          case 1: {
+            // SISO case.
+
+            break;
+          }
+          case 2: {
+            gr_complex a = std::norm(d_csi[0][0]) + std::norm(d_csi[1][0]) + (1/d_snr[0]);
+            gr_complex b = std::conj(d_csi[0][0])*d_csi[0][1] + std::conj(d_csi[1][0])*d_csi[1][1];
+            gr_complex c = std::conj(d_csi[0][1])*d_csi[0][0] + std::conj(d_csi[1][1])*d_csi[1][0];
+            gr_complex d = std::norm(d_csi[0][1]) + std::norm(d_csi[1][1]) + (1/d_snr[1]);
+            gr_complex e = 1/(a*d-b*c);
+
+            d_mimo_equalizer[0][0] = (std::conj(d_csi[0][0])*d - std::conj(d_csi[0][1])*b)*e;
+            d_mimo_equalizer[0][1] = (std::conj(d_csi[1][0])*d - std::conj(d_csi[1][1])*b)*e;
+            d_mimo_equalizer[1][0] = (std::conj(d_csi[0][1])*a - std::conj(d_csi[0][0])*c)*e;
+            d_mimo_equalizer[1][1] = (std::conj(d_csi[1][1])*a - std::conj(d_csi[1][0])*c)*e;
+            break;
+          }
+          default: {
+
+          }
+        }
+      } else{
+        // The selected equalizer type is not existing in this implementation.
       }
     }
 
