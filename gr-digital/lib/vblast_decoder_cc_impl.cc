@@ -57,7 +57,7 @@ namespace gr {
       // Init CSI array and mimo_equalizer.
       d_csi = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
       d_mimo_equalizer = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
-      d_snr = std::vector<gr_complex>(num_inputs, 1.0);
+      d_snr = std::vector<float>(num_inputs, 1.0);
     }
 
     /*
@@ -98,16 +98,16 @@ namespace gr {
             break;
           }
           case 2: {
-            gr_complex a = std::norm(d_csi[0][0]) + std::norm(d_csi[1][0]) + (1/d_snr[0]);
+            gr_complex a = std::norm(d_csi[0][0]) + std::norm(d_csi[1][0]) + 1./d_snr[0];
             gr_complex b = std::conj(d_csi[0][0])*d_csi[0][1] + std::conj(d_csi[1][0])*d_csi[1][1];
             gr_complex c = std::conj(d_csi[0][1])*d_csi[0][0] + std::conj(d_csi[1][1])*d_csi[1][0];
-            gr_complex d = std::norm(d_csi[0][1]) + std::norm(d_csi[1][1]) + (1/d_snr[1]);
-            gr_complex e = 1/(a*d-b*c);
+            gr_complex d = std::norm(d_csi[0][1]) + std::norm(d_csi[1][1]) + 1./d_snr[1];
+            gr_complex e = a*d-b*c;
 
-            d_mimo_equalizer[0][0] = (std::conj(d_csi[0][0])*d - std::conj(d_csi[0][1])*b)*e;
-            d_mimo_equalizer[0][1] = (std::conj(d_csi[1][0])*d - std::conj(d_csi[1][1])*b)*e;
-            d_mimo_equalizer[1][0] = (std::conj(d_csi[0][1])*a - std::conj(d_csi[0][0])*c)*e;
-            d_mimo_equalizer[1][1] = (std::conj(d_csi[1][1])*a - std::conj(d_csi[1][0])*c)*e;
+            d_mimo_equalizer[0][0] = (std::conj(d_csi[0][0])*d - std::conj(d_csi[0][1])*b)/e;
+            d_mimo_equalizer[0][1] = (std::conj(d_csi[1][0])*d - std::conj(d_csi[1][1])*b)/e;
+            d_mimo_equalizer[1][0] = (std::conj(d_csi[0][1])*a - std::conj(d_csi[0][0])*c)/e;
+            d_mimo_equalizer[1][1] = (std::conj(d_csi[1][1])*a - std::conj(d_csi[1][0])*c)/e;
             break;
           }
           default: {
@@ -143,8 +143,8 @@ namespace gr {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items.
 
-      // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+      // Collect all tags of the input buffer in the vector 'tags'.
+      get_tags_in_window(tags, 0, 0, noutput_items);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
@@ -165,16 +165,25 @@ namespace gr {
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
+            // This is not the last tag.
             symbol_length = (tags[i + 1].offset - tags[i].offset)*d_num_inputs;
           } else {
+            // This is the last tag.
             symbol_length = noutput_items - (tags[i].offset - nitems_read(0))*d_num_inputs;
           }
-          // Get CSI from tag.
-          for (unsigned j = 0; j < pmt::length(tags[i].value); ++j) {
+          // Check the key of the tag.
+          if (pmt::symbol_to_string(tags[i].key).compare("csi") == 0) {
+            // Get CSI from 'csi' tag.
+            for (unsigned j = 0; j < pmt::length(tags[i].value); ++j) {
               d_csi[j] = pmt::c32vector_elements(pmt::vector_ref(tags[i].value, j));
+            }
+            // Calculate the weighting vector for the next symbol with the received CSI.
+            update_mimo_equalizer();
+          } else if (pmt::symbol_to_string(tags[i].key).compare("snr") == 0 && d_equalizer_type.compare("MMSE") == 0) {
+            // 'snr' tag: Recalculate the weighting vector for the next symbol with the updated snr.
+            d_snr = pmt::f32vector_elements(tags[i].value);
+            update_mimo_equalizer();
           }
-          // Calculate the weighting vector for the next symbol with the received CSI.
-          update_mimo_equalizer();
           // Process the symbol with the calculated weighting vector.
           equalize_symbol(input_items, &out[nprocessed], nprocessed, symbol_length);
           nprocessed += symbol_length;
