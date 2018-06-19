@@ -155,6 +155,51 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 2)
 
+    ''' 
+    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    and MxM MIMO scheme with M in [3, 16]. '''
+    def test_003_t(self):
+        # Define test params.
+        data_length = 20
+        repetitions = 50
+        num_tags = 4
+        equalizer_type = 'ZF'
+
+        for i in range(repetitions):
+            # Generate random number of inputs.
+            num_inputs = np.random.randint(low=3, high=17)
+            # Generate random input data.
+            data = np.random.randn(num_inputs, data_length) + 1j * np.random.randn(num_inputs, data_length)
+            # Generate random tag positions.
+            tag_pos = np.random.randint(low=0, high=data_length, size=num_tags)
+            tag_pos[0] = 0
+            tag_pos = np.sort(tag_pos)
+            # Calculate expected result.
+            tags, expected_result = self.dice_csi_tags(data,
+                                                       'ZF',
+                                                       num_inputs,
+                                                       num_tags,
+                                                       tag_pos)
+
+            # Build up the test flowgraph.
+            src = []
+            src.append(blocks.vector_source_c(data=data[0],
+                                            repeat=False,
+                                            tags=tags))
+            for n in range(1, num_inputs):
+                src.append(blocks.vector_source_c(data=data[n],
+                                                  repeat=False))
+            vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type)
+            sink = blocks.vector_sink_c()
+            self.tb.connect(src[0], vblast_decoder, sink)
+            for n in range(1, num_inputs):
+                self.tb.connect(src[n], (vblast_decoder, n))
+            # Run flowgraph.
+            self.tb.run()
+
+            # Check if the expected result equals the actual result.
+            self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 2)
+
 
 if __name__ == '__main__':
     gr_unittest.run(qa_vblast_decoder_cc, "qa_vblast_decoder_cc.xml")
