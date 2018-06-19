@@ -67,18 +67,10 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             expected_result[tag_pos[i]*num_inputs::] = np.reshape(np.transpose(np.dot(np.linalg.inv(csi), data[::, tag_pos[i]::])), (np.size(data, 0)*(np.size(data,1)-tag_pos[i])))
         return tags, expected_result
 
-    ''' 
-    5 tests validating the correct output of the decoder with random input data, ZF equalizer
-    and 2x2 MIMO scheme. '''
-    def test_001_t(self):
-        # Define test params.
-        data_length = 20
-        repetitions = 5
-        num_tags = 4
-        num_inputs = 2
-        equalizer_type = 'ZF'
-
+    def build_and_run_flowgraph(self, repetitions, data_length, num_inputs_min, num_inputs_max, num_tags, equalizer_type):
         for i in range(repetitions):
+            # Generate random number of inputs.
+            num_inputs = np.random.randint(low=num_inputs_min, high=num_inputs_max+1)
             # Generate random input data.
             data = np.random.randn(num_inputs, data_length) + 1j * np.random.randn(num_inputs, data_length)
             # Generate random tag positions.
@@ -87,7 +79,7 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             tag_pos = np.sort(tag_pos)
             # Calculate expected result.
             tags, expected_result = self.dice_csi_tags(data,
-                                                       'ZF',
+                                                       equalizer_type,
                                                        num_inputs,
                                                        num_tags,
                                                        tag_pos)
@@ -109,96 +101,74 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             self.tb.run()
 
             # Check if the expected result equals the actual result.
-            self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+            self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 2)
+
+    ''' 
+    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    and 1x1 MIMO scheme. '''
+    def test_001_t(self):
+        self.build_and_run_flowgraph(repetitions=5,
+                                     data_length=20,
+                                     num_inputs_min=1,
+                                     num_inputs_max=1,
+                                     num_tags=4,
+                                     equalizer_type='ZF')
+
+    ''' 
+    5 tests validating the correct output of the decoder with random input data, MMSE equalizer
+    and 1x1 MIMO scheme. '''
+    def test_002_t(self):
+        self.build_and_run_flowgraph(repetitions=5,
+                                     data_length=20,
+                                     num_inputs_min=1,
+                                     num_inputs_max=1,
+                                     num_tags=4,
+                                     equalizer_type='MMSE')
+
+    ''' 
+    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    and 2x2 MIMO scheme. '''
+    def test_003_t(self):
+        self.build_and_run_flowgraph(repetitions=5,
+                                     data_length=20,
+                                     num_inputs_min=2,
+                                     num_inputs_max=2,
+                                     num_tags=4,
+                                     equalizer_type='ZF')
 
     ''' 
     5 tests validating the correct output of the decoder with random input data, MMSE equalizer
     and 2x2 MIMO scheme and an extremely high SNR regime (1/snr -> 0). '''
-    def test_002_t(self):
-        # Define test params.
-        data_length = 20
-        repetitions = 5
-        num_tags = 4
-        num_inputs = 2
-        equalizer_type = 'MMSE'
-
-        for i in range(repetitions):
-            # Generate random input data.
-            data = np.random.randn(num_inputs, data_length) + 1j * np.random.randn(num_inputs, data_length)
-            # Generate random tag positions.
-            tag_pos = np.random.randint(low=0, high=data_length, size=num_tags)
-            tag_pos[0] = 0
-            tag_pos = np.sort(tag_pos)
-            # Calculate expected result.
-            tags, expected_result = self.dice_csi_tags(data,
-                                                       'MMSE',
-                                                       num_inputs,
-                                                       num_tags,
-                                                       tag_pos)
-
-            # Build up the test flowgraph.
-            src = []
-            src.append(blocks.vector_source_c(data=data[0],
-                                            repeat=False,
-                                            tags=tags))
-            for n in range(1, num_inputs):
-                src.append(blocks.vector_source_c(data=data[n],
-                                                  repeat=False))
-            vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type)
-            sink = blocks.vector_sink_c()
-            self.tb.connect(src[0], vblast_decoder, sink)
-            for n in range(1, num_inputs):
-                self.tb.connect(src[n], (vblast_decoder, n))
-            # Run flowgraph.
-            self.tb.run()
-
-            # Check if the expected result equals the actual result.
-            self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 2)
+    def test_004_t(self):
+        self.build_and_run_flowgraph(repetitions=5,
+                                     data_length=20,
+                                     num_inputs_min=2,
+                                     num_inputs_max=2,
+                                     num_tags=4,
+                                     equalizer_type='MMSE')
 
     ''' 
     5 tests validating the correct output of the decoder with random input data, ZF equalizer
     and MxM MIMO scheme with M in [3, 16]. '''
-    def test_003_t(self):
-        # Define test params.
-        data_length = 20
-        repetitions = 50
-        num_tags = 4
-        equalizer_type = 'ZF'
+    def test_005_t(self):
+        self.build_and_run_flowgraph(repetitions=5,
+                                     data_length=20,
+                                     num_inputs_min=3,
+                                     num_inputs_max=16,
+                                     num_tags=4,
+                                     equalizer_type='ZF')
 
-        for i in range(repetitions):
-            # Generate random number of inputs.
-            num_inputs = np.random.randint(low=3, high=17)
-            # Generate random input data.
-            data = np.random.randn(num_inputs, data_length) + 1j * np.random.randn(num_inputs, data_length)
-            # Generate random tag positions.
-            tag_pos = np.random.randint(low=0, high=data_length, size=num_tags)
-            tag_pos[0] = 0
-            tag_pos = np.sort(tag_pos)
-            # Calculate expected result.
-            tags, expected_result = self.dice_csi_tags(data,
-                                                       'ZF',
-                                                       num_inputs,
-                                                       num_tags,
-                                                       tag_pos)
+    ''' 
+    5 tests validating the correct output of the decoder with random input data, MMSE equalizer
+    and MxM MIMO scheme with M in [3, 16]. '''
 
-            # Build up the test flowgraph.
-            src = []
-            src.append(blocks.vector_source_c(data=data[0],
-                                            repeat=False,
-                                            tags=tags))
-            for n in range(1, num_inputs):
-                src.append(blocks.vector_source_c(data=data[n],
-                                                  repeat=False))
-            vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type)
-            sink = blocks.vector_sink_c()
-            self.tb.connect(src[0], vblast_decoder, sink)
-            for n in range(1, num_inputs):
-                self.tb.connect(src[n], (vblast_decoder, n))
-            # Run flowgraph.
-            self.tb.run()
-
-            # Check if the expected result equals the actual result.
-            self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 2)
+    def test_006_t(self):
+        self.build_and_run_flowgraph(repetitions=5,
+                                     data_length=20,
+                                     num_inputs_min=3,
+                                     num_inputs_max=16,
+                                     num_tags=4,
+                                     equalizer_type='MMSE')
 
 
 if __name__ == '__main__':
