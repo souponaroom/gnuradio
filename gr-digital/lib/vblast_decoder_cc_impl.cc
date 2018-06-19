@@ -75,7 +75,7 @@ namespace gr {
         switch (d_num_inputs) {
           case 1: {
             // SISO case.
-
+            d_mimo_equalizer[0][0] = (gr_complex) 1./d_csi[0][0];
             break;
           }
           case 2: {
@@ -106,7 +106,7 @@ namespace gr {
         switch (d_num_inputs) {
           case 1: {
             // SISO case.
-
+            d_mimo_equalizer[0][0] = std::conj(d_csi[0][0]) / (std::norm(d_csi[0][0])+(gr_complex) 1./d_snr[0]);
             break;
           }
           case 2: {
