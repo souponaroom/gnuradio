@@ -40,7 +40,7 @@ namespace gr {
       pmt::pmt_t d_pmt_csi;
       std::vector<std::vector<gr_complex> > d_csi; /*!< Current channel matrix. */
       std::vector<std::vector<gr_complex> > d_mimo_equalizer;
-      std::vector<gr_complex> d_snr;
+      std::vector<float> d_snr;
 
       void update_mimo_equalizer();
 
