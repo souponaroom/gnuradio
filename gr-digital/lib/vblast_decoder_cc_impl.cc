@@ -28,6 +28,7 @@
 #include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "vblast_decoder_cc_impl.h"
+#include <eigen3/Eigen/Dense>
 
 using namespace boost;
 
@@ -86,7 +87,18 @@ namespace gr {
             break;
           }
           default: {
+            // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
+            Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
+            for (int i = 0; i < d_num_inputs; ++i) {
+              csi_matrix.row(i) = Eigen::VectorXcf::Map(&d_csi[i][0], d_csi[i].size());
+            }
+            // Calculate the inverse of the CSI matrix.
+            Eigen::MatrixXcf csi_inverse = csi_matrix.inverse();
 
+            // Map the inverse of the Eigen MatrixXcf to the 2-dim equalizer std::vector.
+            for (int i = 0; i < d_num_inputs; ++i) {
+              Eigen::VectorXcf::Map(&d_mimo_equalizer[i][0], csi_matrix.row(i).size()) = csi_inverse.row(i);
+            }
           }
         }
       } else if (d_equalizer_type.compare("MMSE") == 0){
