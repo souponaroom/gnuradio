@@ -30,11 +30,21 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
-     *
-     */
+/*! \brief VBLAST decoder.
+ * Decodes incoming MxM MIMO data by equalizing the received signals in order to extract the
+ * M different transmission signals. For the equalization, you can choose between a
+ * zero forcing (key='ZF') and a minimum mean squared error (key='MMSE') scheme. Both schemes require
+ * channel state information and MMSE additionally needs SNR information.
+ *
+ * The CSI and SNR information is transported via stream tags with key='csi' or 'snr', respectively.
+ * Initially the CSI is set to 1.0 + 0j for both branches and are updated
+ * with each incoming CSI. The SNR is initially set to 1.0e6; in this case is the MMSE equalizer equal
+ * to the ZF equalizer. The CSI and SNR tags are processed separately and they can therefore arrive
+ * at different positions of the stream and occur in different frequencies.
+ *
+ * For 1x1 and 2x2 MIMO schemes, the equalizer is calculated internally. For MxM schemes with M > 2,
+ * the C++ template library Eigen is used for the linear algebra operations.
+ */
     class DIGITAL_API vblast_decoder_cc : virtual public gr::sync_interpolator
     {
      public:

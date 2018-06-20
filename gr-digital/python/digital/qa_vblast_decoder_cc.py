@@ -87,8 +87,8 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             # Build up the test flowgraph.
             src = []
             src.append(blocks.vector_source_c(data=data[0],
-                                            repeat=False,
-                                            tags=tags))
+                                              repeat=False,
+                                              tags=tags))
             for n in range(1, num_inputs):
                 src.append(blocks.vector_source_c(data=data[n],
                                                   repeat=False))
@@ -104,72 +104,71 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
             self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 2)
 
     ''' 
-    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    2 tests validating the correct output of the decoder with random input data, ZF equalizer
     and 1x1 MIMO scheme. '''
     def test_001_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=1,
                                      num_inputs_max=1,
                                      num_tags=4,
                                      equalizer_type='ZF')
 
     ''' 
-    5 tests validating the correct output of the decoder with random input data, MMSE equalizer
+    2 tests validating the correct output of the decoder with random input data, MMSE equalizer
     and 1x1 MIMO scheme. '''
     def test_002_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=1,
                                      num_inputs_max=1,
                                      num_tags=4,
                                      equalizer_type='MMSE')
 
     ''' 
-    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    2 tests validating the correct output of the decoder with random input data, ZF equalizer
     and 2x2 MIMO scheme. '''
     def test_003_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=2,
                                      num_inputs_max=2,
                                      num_tags=4,
                                      equalizer_type='ZF')
 
     ''' 
-    5 tests validating the correct output of the decoder with random input data, MMSE equalizer
+    2 tests validating the correct output of the decoder with random input data, MMSE equalizer
     and 2x2 MIMO scheme and an extremely high SNR regime (1/snr -> 0). '''
     def test_004_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=2,
                                      num_inputs_max=2,
                                      num_tags=4,
                                      equalizer_type='MMSE')
 
     ''' 
-    5 tests validating the correct output of the decoder with random input data, ZF equalizer
+    2 tests validating the correct output of the decoder with random input data, ZF equalizer
     and MxM MIMO scheme with M in [3, 16]. '''
     def test_005_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=3,
                                      num_inputs_max=16,
                                      num_tags=4,
                                      equalizer_type='ZF')
 
     ''' 
-    5 tests validating the correct output of the decoder with random input data, MMSE equalizer
+    2 tests validating the correct output of the decoder with random input data, MMSE equalizer
     and MxM MIMO scheme with M in [3, 16]. '''
 
     def test_006_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=3,
                                      num_inputs_max=16,
                                      num_tags=4,
                                      equalizer_type='MMSE')
-
 
 if __name__ == '__main__':
     gr_unittest.run(qa_vblast_decoder_cc, "qa_vblast_decoder_cc.xml")

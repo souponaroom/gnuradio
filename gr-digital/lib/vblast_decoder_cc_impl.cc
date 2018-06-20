@@ -58,7 +58,7 @@ namespace gr {
       // Init CSI array and mimo_equalizer.
       d_csi = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
       d_mimo_equalizer = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
-      d_snr = std::vector<float>(num_inputs, 1.0);
+      d_snr = std::vector<float>(num_inputs, 1.0e6);
     }
 
     /*
