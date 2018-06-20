@@ -30,13 +30,11 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief VBLAST encoder.
-     * \ingroup digital
-     * Encodes a serial input data stream into a vertical transmission vector
-     * which is transmitted at once over multiple antennas.
-     *
-     */
+/*! \brief VBLAST encoder.
+ * Encodes a serial input data stream into a vertical transmission vector
+ * which is transmitted at once over multiple antennas.
+ * The functionality equals a multiplexing of the data.
+ */
     class DIGITAL_API vblast_encoder_cc : virtual public gr::sync_decimator
     {
      public:

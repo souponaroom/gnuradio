@@ -42,6 +42,9 @@ class qa_vblast_encoder_cc (gr_unittest.TestCase):
             output[m] = input[m::M]
         return output
 
+    ''' 
+    5 tests validating the correct output of the encoder with random input data
+    and random number of antennas M. '''
     def test_001_t (self):
         # Define test params.
         data_length = 20

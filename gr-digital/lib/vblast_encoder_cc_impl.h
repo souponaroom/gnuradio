@@ -30,6 +30,7 @@ namespace gr {
 /*! \brief VBLAST encoder.
  * Encodes a serial input data stream into a vertical transmission vector
  * which is transmitted at once over multiple antennas.
+ * The functionality equals a multiplexing of the data.
  */
     class vblast_encoder_cc_impl : public vblast_encoder_cc
     {
