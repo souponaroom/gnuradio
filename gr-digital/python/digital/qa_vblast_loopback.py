@@ -93,7 +93,7 @@ class qa_vblast_loopback (gr_unittest.TestCase):
 
     def test_001_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=20,
+                                     data_length=10,
                                      num_inputs_min=1,
                                      num_inputs_max=1,
                                      equalizer_type='ZF')
@@ -104,7 +104,7 @@ class qa_vblast_loopback (gr_unittest.TestCase):
 
     def test_002_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=20,
+                                     data_length=10,
                                      num_inputs_min=1,
                                      num_inputs_max=1,
                                      equalizer_type='MMSE')
@@ -115,7 +115,7 @@ class qa_vblast_loopback (gr_unittest.TestCase):
 
     def test_003_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=20,
+                                     data_length=10,
                                      num_inputs_min=2,
                                      num_inputs_max=2,
                                      equalizer_type='ZF')
@@ -126,29 +126,29 @@ class qa_vblast_loopback (gr_unittest.TestCase):
 
     def test_004_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=20,
+                                     data_length=10,
                                      num_inputs_min=2,
                                      num_inputs_max=2,
                                      equalizer_type='MMSE')
 
     ''' 
-    5 tests validating the correct output of the loopback with random input data, ZF equalizer
+    2 tests validating the correct output of the loopback with random input data, ZF equalizer
     and MxM MIMO scheme with M in [3, 16]. '''
 
     def test_005_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=3,
                                      num_inputs_max=16,
                                      equalizer_type='ZF')
 
     ''' 
-    5 tests validating the correct output of the loopback with random input data, MMSE equalizer
+    2 tests validating the correct output of the loopback with random input data, MMSE equalizer
     and MxM MIMO scheme with M in [3, 16]. '''
 
     def test_006_t(self):
-        self.build_and_run_flowgraph(repetitions=5,
-                                     data_length=20,
+        self.build_and_run_flowgraph(repetitions=2,
+                                     data_length=10,
                                      num_inputs_min=3,
                                      num_inputs_max=16,
                                      equalizer_type='MMSE')
