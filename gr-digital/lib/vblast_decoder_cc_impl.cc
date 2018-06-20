@@ -123,7 +123,22 @@ namespace gr {
             break;
           }
           default: {
+            // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
+            Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
+            for (int i = 0; i < d_num_inputs; ++i) {
+              csi_matrix.row(i) = Eigen::VectorXcf::Map(&d_csi[i][0], d_csi[i].size());
+            }
+            // Calculate the pseudo-inverse fo the CSI matrix.
+            Eigen::MatrixXcf snr_matrix = Eigen::MatrixXcf::Zero(d_num_inputs, d_num_inputs);
+            for (int j = 0; j < d_num_inputs; ++j) {
+              snr_matrix.coeffRef(j, j) = (gr_complex)(1.0 / d_snr[j]);
+            }
+            Eigen::MatrixXcf csi_pseudo_inverse = (csi_matrix.adjoint()*csi_matrix + snr_matrix).inverse() * csi_matrix.adjoint();
 
+            // Map the inverse of the Eigen MatrixXcf to the 2-dim equalizer std::vector.
+            for (int i = 0; i < d_num_inputs; ++i) {
+              Eigen::VectorXcf::Map(&d_mimo_equalizer[i][0], csi_matrix.row(i).size()) = csi_pseudo_inverse.row(i);
+            }
           }
         }
       } else{
