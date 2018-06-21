@@ -47,7 +47,7 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
         output[1::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*basis[1] + \
                        (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(basis[0])
 
-        # Iterate over tags and update the calculated output according to the diced CSI.
+        # Iterate over tags and update the calculated output according to the random CSI.
         tags = []
         for i in range(0, len(tag_pos)):
             # Assign the CSI vector to a PMT vector.

@@ -33,8 +33,7 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const std::string diff_stbc_decoder_cc_impl::s = "start";
-    const pmt::pmt_t diff_stbc_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
+    const pmt::pmt_t diff_stbc_decoder_cc_impl::d_key = pmt::string_to_symbol("start");
 
     diff_stbc_decoder_cc::sptr
     diff_stbc_decoder_cc::make(float phase_offset)
@@ -78,7 +77,7 @@ namespace gr {
                                                 const gr_complex *seq,
                                                 gr_complex *out,
                                                 uint32_t length) {
-      if(length > 0) {
+      if (length > 0) {
         // Calculate the dot product of the received input sequences with the new basis.
         gr_complex r_1 = seq[0] * std::conj(prev_seq[0]) + std::conj(seq[1]) * prev_seq[1];
         gr_complex r_2 = seq[0] * std::conj(prev_seq[1]) - std::conj(seq[1]) * prev_seq[0];

@@ -51,6 +51,9 @@ namespace gr {
  * to a wrong decoded first symbol. The following symbols are decoded correctly.
  * To avoid a wrong decoded first symbol, there must be a stream tag on the first
  * incoming sequence.
+ * You can set a correct stream tag in a C++ block like in the following example,
+ * where offset stands for the item position of the tag in the current output buffer of a call of the work function:
+ * add_item_tag(0, nitems_written(0) + offset, pmt::mp("start"), 0);
  *
  * The incoming samples are expected to be PSK modulated samples of any modulation order.
  * If the constellation is phase shifted, meaning that there is no constellation point

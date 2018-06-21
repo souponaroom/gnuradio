@@ -72,20 +72,42 @@ namespace gr {
     }
 
     void
-    diff_stbc_encoder_cc_impl::calculate_output(const gr_complex *in,
-                                        const gr_complex predecessor1,
-                                        const gr_complex predecessor2,
-                                        gr_complex *out1,
-                                        gr_complex *out2) {
+    diff_stbc_encoder_cc_impl::encode_data(const gr_complex *in,
+                                           const gr_complex predecessor1,
+                                           const gr_complex predecessor2,
+                                           gr_complex *out1,
+                                           gr_complex *out2) {
       // Transform input vector to new basis and calculate new coefficients.
       map_symbols(in);
       // Calculate the output of antenna 1.
-      out1[0] = d_mapping_coeffs[0]*predecessor1 - d_mapping_coeffs[1]*std::conj(predecessor2);
+      *out1 = d_mapping_coeffs[0] * predecessor1 - d_mapping_coeffs[1] * std::conj(predecessor2);
       // Calculate the output of antenna 2.
-      out2[0] = d_mapping_coeffs[0]*predecessor2 + d_mapping_coeffs[1]*std::conj(predecessor1);
+      *out2 = d_mapping_coeffs[0] * predecessor2 + d_mapping_coeffs[1] * std::conj(predecessor1);
       // Calculate the second element of the output sequence after the rules of Alamouti.
-      out1[1] = -std::conj(out2[0]);
-      out2[1] =  std::conj(out1[0]);
+      out1[1] = -std::conj(*out2);
+      out2[1] = std::conj(*out1);
+    }
+
+    void
+    diff_stbc_encoder_cc_impl::encode_data(const gr_complex *in,
+                                           gr_complex *out1,
+                                           gr_complex *out2,
+                                           uint32_t length) {
+      uint32_t count = 0;
+
+      while (count < length) {
+        // Transform input vector to new basis and calculate new coefficients.
+        map_symbols(&in[count]);
+        // Calculate the output of antenna 1.
+        out1[count+2] = d_mapping_coeffs[0] * out1[count] - d_mapping_coeffs[1] * std::conj(out2[count]);
+        // Calculate the output of antenna 2.
+        out2[count+2] = d_mapping_coeffs[0] * out2[count] + d_mapping_coeffs[1] * std::conj(out1[count]);
+        // Calculate the second element of the output sequence after the rules of Alamouti.
+        out1[count+3] = -std::conj(out2[count+2]);
+        out2[count+3] = std::conj(out1[count+2]);
+
+        count += 2;
+      }
     }
 
     int
@@ -98,13 +120,11 @@ namespace gr {
       gr_complex *out2 = (gr_complex *) output_items[1];
 
       // Handle first sequence manually, because of a special predecessor assignment.
-      calculate_output(in, d_predecessor[0], d_predecessor[1], out1, out2);
+      encode_data(in, d_predecessor[0], d_predecessor[1], out1, out2);
 
-      // Iterate over the remaining input sequences.
-      for (int i = 1; i < noutput_items/2; ++i) {
-        // Calculate the output of both antennas.
-        calculate_output(&in[i*2], out1[(i-1)*2], out2[(i-1)*2], &out1[i*2], &out2[i*2]);
-      }
+      // Calculate the output of both antennas.
+      encode_data(&in[2], out1, out2, noutput_items-2);
+
       // Update predecessor for next call of work.
       if(noutput_items > 1) {
         d_predecessor[0] = out1[noutput_items - 2];

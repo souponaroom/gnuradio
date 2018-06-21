@@ -89,11 +89,16 @@ namespace gr {
        * @param out1 Complex pointer to first unwritten sample of output port 1.
        * @param out2 Complex pointer to first unwritten sample of output port 2.
        */
-      void calculate_output(const gr_complex* in,
-                            const gr_complex predecessor1,
-                            const gr_complex predecessor2,
-                            gr_complex* out1,
-                            gr_complex* out2);
+      void encode_data(const gr_complex* in,
+                       const gr_complex predecessor1,
+                       const gr_complex predecessor2,
+                       gr_complex* out1,
+                       gr_complex* out2);
+
+      void encode_data(const gr_complex* in,
+                       gr_complex* out1,
+                       gr_complex* out2,
+                       uint32_t length);
 
      public:
       diff_stbc_encoder_cc_impl(float phase_offset);
