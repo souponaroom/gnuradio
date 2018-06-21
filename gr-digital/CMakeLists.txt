@@ -53,6 +53,17 @@ SET(GR_PKG_DIGITAL_EXAMPLES_DIR ${GR_PKG_DATA_DIR}/examples/digital)
 if(ENABLE_GR_DIGITAL)
 
 ########################################################################
+# Find package Eigen3 (for optional MIMO features)
+########################################################################
+find_package(Eigen3)
+add_definitions(-DEIGEN3_ENABLED=${Eigen3_FOUND})
+if(Eigen3_FOUND)
+    message([STATUS] "Eigen3 found.")
+else()
+    message([STATUS] "Eigen3 not found. Eigen3 is required for MxM MIMO schemes with M>2.")
+endif(Eigen3_FOUND)
+
+########################################################################
 # Setup CPack components
 ########################################################################
 include(GrPackage)
