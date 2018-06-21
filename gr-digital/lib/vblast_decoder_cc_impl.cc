@@ -28,7 +28,10 @@
 #include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "vblast_decoder_cc_impl.h"
+
+#if (EIGEN3_ENABLED)
 #include <eigen3/Eigen/Dense>
+#endif
 
 using namespace boost;
 
@@ -87,6 +90,7 @@ namespace gr {
             break;
           }
           default: {
+#if (EIGEN3_ENABLED)
             // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
             Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
             for (int i = 0; i < d_num_inputs; ++i) {
@@ -99,6 +103,9 @@ namespace gr {
             for (int i = 0; i < d_num_inputs; ++i) {
               Eigen::VectorXcf::Map(&d_mimo_equalizer[i][0], csi_matrix.row(i).size()) = csi_inverse.row(i);
             }
+#else
+            throw std::runtime_error("Required library Eigen3 for MxM MIMO schemes with M>2 not installed.");
+#endif
           }
         }
       } else if (d_equalizer_type.compare("MMSE") == 0){
@@ -123,6 +130,7 @@ namespace gr {
             break;
           }
           default: {
+#if (EIGEN3_ENABLED)
             // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
             Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
             for (int i = 0; i < d_num_inputs; ++i) {
@@ -139,6 +147,9 @@ namespace gr {
             for (int i = 0; i < d_num_inputs; ++i) {
               Eigen::VectorXcf::Map(&d_mimo_equalizer[i][0], csi_matrix.row(i).size()) = csi_pseudo_inverse.row(i);
             }
+#else
+            throw std::runtime_error("Required library Eigen3 for MxM MIMO schemes with M>2 not installed.");
+#endif
           }
         }
       } else{
