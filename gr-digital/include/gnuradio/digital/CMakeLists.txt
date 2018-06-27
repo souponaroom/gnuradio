@@ -126,6 +126,7 @@ install(FILES
     diff_stbc_decoder_cc.h 
     vblast_encoder_cc.h 
     vblast_encoder_cc.h
-    vblast_decoder_cc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
+    vblast_decoder_cc.h
+    mimo_channel_estimator_cc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
     COMPONENT "digital_devel"
 )
