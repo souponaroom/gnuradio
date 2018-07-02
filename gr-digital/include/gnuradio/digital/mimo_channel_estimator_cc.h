@@ -48,7 +48,7 @@ namespace gr {
        * class. digital::mimo_channel_estimator_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t num_inputs, std::vector<std::vector<gr_complex> > training_sequence);
+      static sptr make(uint16_t M, uint16_t N, std::vector<std::vector<gr_complex> > training_sequence);
     };
 
   } // namespace digital
