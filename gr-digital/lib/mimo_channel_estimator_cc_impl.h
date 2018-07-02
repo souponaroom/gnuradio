@@ -31,11 +31,13 @@ namespace gr {
     class mimo_channel_estimator_cc_impl : public mimo_channel_estimator_cc
     {
      private:
-      uint16_t d_num_inputs;
+      uint16_t d_M;
+      uint16_t d_N;
       std::vector<std::vector<gr_complex> > d_training_sequence;
       uint16_t d_training_length;
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
+      std::vector<std::vector<gr_complex> > d_csi;
 
       void copy_symbols(gr_vector_const_void_star &input_items,
                         gr_vector_void_star &output_items,
@@ -47,7 +49,7 @@ namespace gr {
                             uint32_t reading_offset);
 
      public:
-      mimo_channel_estimator_cc_impl(uint16_t num_inputs, std::vector<std::vector<gr_complex> > training_sequence);
+      mimo_channel_estimator_cc_impl(uint16_t M, uint16_t N, std::vector<std::vector<gr_complex> > training_sequence);
       ~mimo_channel_estimator_cc_impl();
 
       // Where all the action really happens

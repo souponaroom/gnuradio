@@ -26,7 +26,7 @@
 
 #include <gnuradio/io_signature.h>
 #include "mimo_channel_estimator_cc_impl.h"
-
+#include <pmt/pmt.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -40,21 +40,20 @@ namespace gr {
     const pmt::pmt_t mimo_channel_estimator_cc_impl::d_key = pmt::string_to_symbol("pilot");
 
     mimo_channel_estimator_cc::sptr
-    mimo_channel_estimator_cc::make(uint16_t num_inputs, std::vector<std::vector<gr_complex> > training_sequence)
+    mimo_channel_estimator_cc::make(uint16_t M, uint16_t N, std::vector<std::vector<gr_complex> > training_sequence)
     {
       return gnuradio::get_initial_sptr
-        (new mimo_channel_estimator_cc_impl(num_inputs, training_sequence));
+        (new mimo_channel_estimator_cc_impl(M, N, training_sequence));
     }
 
     /*
      * The private constructor
      */
-    mimo_channel_estimator_cc_impl::mimo_channel_estimator_cc_impl(uint16_t num_inputs, std::vector<std::vector<gr_complex> > training_sequence)
+    mimo_channel_estimator_cc_impl::mimo_channel_estimator_cc_impl(uint16_t M, uint16_t N, std::vector<std::vector<gr_complex> > training_sequence)
       : gr::block("mimo_channel_estimator_cc",
-              gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)),
-              gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex))),
-        d_num_inputs(num_inputs),
-        d_training_sequence(training_sequence)
+              gr::io_signature::make(N, N, sizeof(gr_complex)),
+              gr::io_signature::make(N, N, sizeof(gr_complex))),
+        d_M(M), d_N(N), d_training_sequence(training_sequence)
     {
       d_training_length = d_training_sequence[0].size();
     }
@@ -78,7 +77,7 @@ namespace gr {
                                                  uint32_t symbol_length,
                                                  uint32_t reading_offset,
                                                  uint32_t writing_offset) {
-      for (int i = 0; i < d_num_inputs; ++i) {
+      for (int i = 0; i < d_N; ++i) {
         const gr_complex *in = (const gr_complex *) input_items[i];
         gr_complex *out = (gr_complex *) output_items[i];
         memcpy(&out[writing_offset], &in[reading_offset], symbol_length);
@@ -88,7 +87,7 @@ namespace gr {
     void
     mimo_channel_estimator_cc_impl::estimate_channel(gr_vector_const_void_star &input_items,
                                                      uint32_t reading_offset) {
-      switch (d_num_inputs) {
+      switch (d_N) {
         case 1: {
           // Init CSI vector.
           std::vector<std::vector<gr_complex> > csi (1, std::vector<gr_complex> (1, 0.0));
@@ -96,6 +95,7 @@ namespace gr {
           for (int i = 0; i < d_training_length; ++i) {
             csi[0][0] += ((const gr_complex *) input_items[0])[i];
           }
+          // TODO Integrate SNR in factor!!!
           csi[0][0] *= 1./ d_training_length;
           break;
         }
@@ -118,7 +118,30 @@ namespace gr {
           break;
         }
         default: {
+#if (EIGEN3_ENABLED)
+          // TODO calculate pseudo-inverse in constructor
+          // Map training sequence and received sequence 2-dimensional std::vector to Eigen MatrixXcf.
+          Eigen::MatrixXcf training_matrix(d_M, d_training_length);
+          Eigen::MatrixXcf received_training_matrix(d_N, d_training_length);
+          for (int i = 0; i < d_M; ++i) {
+              training_matrix.row(i) = Eigen::VectorXcf::Map(&d_training_sequence[i][0], d_training_length);
+          }
+          for (int i = 0; i < d_N; ++i) {
+              received_training_matrix.row(i) = Eigen::VectorXcf::Map((const gr_complex *) input_items[i], d_training_length);
+          }
+          // Calculate the Maximum Likelihood estimation for the channel matrix.
+          Eigen::MatrixXcf csi = received_training_matrix * training_matrix.adjoint() * (training_matrix*training_matrix.adjoint()).inverse();
 
+           // Map the CSI Eigen MatrixXcf to a 2-dim std::vector.
+          for (int i = 0; i < d_N; ++i) {
+            Eigen::VectorXcf::Map(&d_csi[i][0], d_M) = csi.row(i);
+          }
+
+
+
+#else
+          throw std::runtime_error("Required library Eigen3 for MxM MIMO schemes with M>2 not installed.");
+#endif
         }
       }
     }
@@ -163,10 +186,22 @@ namespace gr {
           }
           // Copy symbols to output.
           copy_symbols(input_items, output_items, symbol_length, nconsumed, nwritten);
+
           // Estimate MIMO channel and write CSI tag to stream.
-          // TODO handel other previous training symbols (Schmidl & Cox) via pilot offset or dumping
           estimate_channel(input_items, nconsumed);
 
+          // Assign the CSI vector to a PMT vector.
+          pmt::pmt_t csi_pmt = pmt::make_vector(d_N, pmt::make_c32vector(d_M, d_csi[0][0]));
+          for (int i = 0; i < d_N; ++i){
+            pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_M, d_csi[i][0]);
+            for (int j = 0; j < d_M; ++j) {
+              pmt::c32vector_set(csi_line_vector, i, d_csi[i][j]);
+            }
+            pmt::vector_set(csi_pmt, i, csi_line_vector);
+          }
+          // Append stream tags with CSI to data stream.
+          add_item_tag(0, nitems_written(0) + nconsumed, pmt::mp("csi"), csi_pmt);
+// TODO handel other previous training symbols (Schmidl & Cox) via pilot offset or dumping
           nconsumed += symbol_length;
           nwritten += symbol_length - d_training_length;
         }
