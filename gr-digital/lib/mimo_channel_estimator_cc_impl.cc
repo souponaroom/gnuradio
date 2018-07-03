@@ -34,6 +34,9 @@
 #include <eigen3/Eigen/Dense>
 #endif
 
+#include <boost/format.hpp>
+using namespace boost;
+
 namespace gr {
   namespace digital {
 
@@ -56,6 +59,7 @@ namespace gr {
         d_M(M), d_N(N), d_training_sequence(training_sequence)
     {
       d_training_length = d_training_sequence[0].size();
+      d_csi = std::vector<std::vector<gr_complex> >(N, std::vector<gr_complex> (M, 1.0));
     }
 
     /*
@@ -95,12 +99,11 @@ namespace gr {
           for (int i = 0; i < d_training_length; ++i) {
             csi[0][0] += ((const gr_complex *) input_items[0])[i];
           }
-          // TODO Integrate SNR in factor!!!
           csi[0][0] *= 1./ d_training_length;
           break;
         }
         case 2: {
-          // Init CSI vector.
+          // Init csi vector.
           std::vector<std::vector<gr_complex> > csi (2, std::vector<gr_complex> (2, 0.0));
           // Fill CSI vector with precalculated ML channel estimation.
           for (int i = 0; i < d_training_length; ++i) {
@@ -110,11 +113,12 @@ namespace gr {
             csi[1][1] += ((const gr_complex *) input_items[1])[i] * (gr_complex) std::polar(1.0, 2*M_PI*i / d_training_length);
           }
           // Multiply with factor.
-          // TODO Integrate SNR in factor!!!
-          csi[0][0] *= M_SQRT2 / d_training_length;
-          csi[0][1] *= M_SQRT2 / d_training_length;
-          csi[1][0] *= M_SQRT2 / d_training_length;
-          csi[1][1] *= M_SQRT2 / d_training_length;
+          csi[0][0] *= 1./ d_training_length;
+          csi[0][1] *= 1./ d_training_length;
+          csi[1][0] *= 1./ d_training_length;
+          csi[1][1] *= 1./ d_training_length;
+          // Write local vector to class member.
+          d_csi = csi;
           break;
         }
         default: {
@@ -140,7 +144,7 @@ namespace gr {
 
 
 #else
-          throw std::runtime_error("Required library Eigen3 for MxM MIMO schemes with M>2 not installed.");
+          throw std::runtime_error("Required library Eigen3 for MxN MIMO schemes with M,N>2 not installed.");
 #endif
         }
       }
@@ -158,6 +162,8 @@ namespace gr {
       uint32_t nconsumed = 0; // Number of read items.
       uint32_t nwritten = 0; // Number of written items.
       uint32_t symbol_length; // Number of items in the current symbol.
+
+
 
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
@@ -192,15 +198,16 @@ namespace gr {
 
           // Assign the CSI vector to a PMT vector.
           pmt::pmt_t csi_pmt = pmt::make_vector(d_N, pmt::make_c32vector(d_M, d_csi[0][0]));
-          for (int i = 0; i < d_N; ++i){
-            pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_M, d_csi[i][0]);
-            for (int j = 0; j < d_M; ++j) {
-              pmt::c32vector_set(csi_line_vector, i, d_csi[i][j]);
+          for (int n = 0; n < d_N; ++n){
+            pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_M, d_csi[n][0]);
+            for (int m = 0; m < d_M; ++m) {
+              pmt::c32vector_set(csi_line_vector, m, d_csi[n][m]);
             }
-            pmt::vector_set(csi_pmt, i, csi_line_vector);
+            pmt::vector_set(csi_pmt, n, csi_line_vector);
           }
           // Append stream tags with CSI to data stream.
           add_item_tag(0, nitems_written(0) + nconsumed, pmt::mp("csi"), csi_pmt);
+
 // TODO handel other previous training symbols (Schmidl & Cox) via pilot offset or dumping
           nconsumed += symbol_length;
           nwritten += symbol_length - d_training_length;
