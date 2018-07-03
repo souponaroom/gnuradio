@@ -72,7 +72,9 @@ namespace gr {
     void
     mimo_channel_estimator_cc_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
-      ninput_items_required[0] = noutput_items;
+      for (int i = 0; i < d_N; ++i) {
+        ninput_items_required[i] = noutput_items;
+      }
     }
 
     void
@@ -145,9 +147,6 @@ namespace gr {
           for (int i = 0; i < d_N; ++i) {
             Eigen::VectorXcf::Map(&d_csi[i][0], d_M) = csi.row(i);
           }
-
-
-
 #else
           throw std::runtime_error("Required library Eigen3 for MxN MIMO schemes with M,N>2 not installed.");
 #endif
@@ -183,23 +182,23 @@ namespace gr {
           symbol_length = tags[0].offset - nitems_read(0);
           copy_symbols(input_items, output_items, symbol_length, 0, 0);
           nconsumed += symbol_length;
-          nwritten += symbol_length - d_training_length;
+          nwritten += symbol_length;
         }
         // Iterate over tags in buffer.
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
             // This is not the last tag in the buffer.
-            symbol_length = tags[i + 1].offset - nitems_read(0) - nwritten;
+            symbol_length = tags[i + 1].offset - nitems_read(0) - nconsumed - d_training_length;
           } else {
             // This is the last tag in the buffer.
-            symbol_length = noutput_items - nwritten;
+            symbol_length = noutput_items - nconsumed - d_training_length;
           }
-          // Copy symbols to output.
-          copy_symbols(input_items, output_items, symbol_length, nconsumed, nwritten);
-
           // Estimate MIMO channel and write CSI tag to stream.
           estimate_channel(input_items, nconsumed);
+
+          // Consume training symbols.
+          nconsumed += d_training_length;
 
           // Assign the CSI vector to a PMT vector.
           pmt::pmt_t csi_pmt = pmt::make_vector(d_N, pmt::make_c32vector(d_M, d_csi[0][0]));
@@ -210,21 +209,22 @@ namespace gr {
             }
             pmt::vector_set(csi_pmt, n, csi_line_vector);
           }
-          // Append stream tags with CSI to data stream.
-          add_item_tag(0, nitems_written(0) + nconsumed, pmt::mp("csi"), csi_pmt);
 
-// TODO handel other previous training symbols (Schmidl & Cox) via pilot offset or dumping
+          // Copy symbols to output.
+          copy_symbols(input_items, output_items, symbol_length, nconsumed, nwritten);
+          // Append stream tags with CSI to data stream.
+          add_item_tag(0, nitems_written(0) + nwritten, pmt::string_to_symbol(std::string("csi")), csi_pmt);
+
           nconsumed += symbol_length;
-          nwritten += symbol_length - d_training_length;
+          nwritten += symbol_length;
         }
       }
 
       // Tell runtime system how many input items we consumed on
       // each input stream.
-      consume_each (noutput_items);
-
+      consume_each (nconsumed);
       // Tell runtime system how many output items we produced.
-      return noutput_items;
+      return nwritten;
     }
 
   } /* namespace digital */
