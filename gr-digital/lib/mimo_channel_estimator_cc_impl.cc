@@ -91,32 +91,37 @@ namespace gr {
     void
     mimo_channel_estimator_cc_impl::estimate_channel(gr_vector_const_void_star &input_items,
                                                      uint32_t reading_offset) {
-      switch (d_N) {
+      switch (d_M) {
         case 1: {
           // Init CSI vector.
-          std::vector<std::vector<gr_complex> > csi (1, std::vector<gr_complex> (1, 0.0));
+          std::vector<std::vector<gr_complex> > csi (d_N, std::vector<gr_complex> (1, 0.0));
           // Fill CSI vector with precalculated ML channel estimation.
-          for (int i = 0; i < d_training_length; ++i) {
-            csi[0][0] += ((const gr_complex *) input_items[0])[i];
+          for (int n = 0; n < d_N; ++n) {
+            const gr_complex* in = (const gr_complex *) input_items[n];
+            for (int i = 0; i < d_training_length; ++i) {
+              csi[n][0] += in[i];
+            }
+            // Multiply elements with factor.
+            csi[n][0] *= 1./ d_training_length;
           }
-          csi[0][0] *= 1./ d_training_length;
+          // Write local vector to class member.
+          d_csi = csi;
           break;
         }
         case 2: {
           // Init csi vector.
-          std::vector<std::vector<gr_complex> > csi (2, std::vector<gr_complex> (2, 0.0));
+          std::vector<std::vector<gr_complex> > csi (d_N, std::vector<gr_complex> (2, 0.0));
           // Fill CSI vector with precalculated ML channel estimation.
-          for (int i = 0; i < d_training_length; ++i) {
-            csi[0][0] += ((const gr_complex *) input_items[0])[i];
-            csi[0][1] += ((const gr_complex *) input_items[0])[i] * (gr_complex) std::polar(1.0, 2*M_PI*i / d_training_length);
-            csi[1][0] += ((const gr_complex *) input_items[1])[i];
-            csi[1][1] += ((const gr_complex *) input_items[1])[i] * (gr_complex) std::polar(1.0, 2*M_PI*i / d_training_length);
+          for (int n = 0; n < d_N; ++n) {
+            const gr_complex* in = (const gr_complex *) input_items[n];
+            for (int i = 0; i < d_training_length; ++i) {
+              csi[n][0] += in[i];
+              csi[n][1] += in[i] * (gr_complex) std::polar(1.0, 2 * M_PI * i / d_training_length);
+            }
+            // Multiply elements with factor.
+            csi[n][0] *= 1./ d_training_length;
+            csi[n][1] *= 1./ d_training_length;
           }
-          // Multiply with factor.
-          csi[0][0] *= 1./ d_training_length;
-          csi[0][1] *= 1./ d_training_length;
-          csi[1][0] *= 1./ d_training_length;
-          csi[1][1] *= 1./ d_training_length;
           // Write local vector to class member.
           d_csi = csi;
           break;
