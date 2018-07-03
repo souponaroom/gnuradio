@@ -41,47 +41,98 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
             seq[m][i] = np.exp(-1j*2*np.pi*m*i/length)
         return seq
 
-    def test_001_t (self):
-        M = 2
-        N = 2
-        training_length = 9
-
-        training_sequence = self.produce_training_seq(M, training_length)
-        csi = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
-
-        print 'channel'
-        print csi
-        print 'training sequence'
-        print training_sequence
-
-        # Build flowgraph.
+    def run_flowgraph(self, M, N, training_sequence, channel_matrix):
+        # Produce tags.
         tags = [gr.tag_utils.python_to_tag((0,
                                             pmt.string_to_symbol("pilot"),
                                             pmt.from_long(0),
                                             pmt.from_long(0)))]
-        src = [blocks.vector_source_c(data=training_sequence[0],
-                                     repeat=False,
-                                     tags=tags)]
-        sink = [blocks.tag_debug_make(gr.sizeof_gr_complex, "debug1")]
+        # Build GNU Radio blocks.
+        data = np.random.randn(1) + 1j * np.random.randn(1)
+        src = [blocks.vector_source_c(data=np.append(training_sequence[0], data),
+                                      repeat=False,
+                                      tags=tags)]
+        sink = [blocks.vector_sink_c_make()]
         for m in range(1, M):
-            src.append(blocks.vector_source_c(training_sequence[m]))
+            src.append(blocks.vector_source_c(np.append(training_sequence[m], data)))
+        for n in range(1, N):
             sink.append(blocks.null_sink_make(gr.sizeof_gr_complex))
-        channel = blocks.multiply_matrix_cc_make(csi)
+        channel = blocks.multiply_matrix_cc_make(channel_matrix)
         estimator = digital.mimo_channel_estimator_cc(M, N, training_sequence)
+        # Connect everything.
         for m in range(0, M):
-            self.tb.connect(src[m], (channel, m), (estimator, m), sink[m])
-        self.tb.run()
-
-
-        estimation = pmt.to_python(sink[0].current_tags()[0].value)
-
-        # Check if the expected result equals the actual result.
+            self.tb.connect(src[m], (channel, m))
         for n in range(0, N):
-            self.assertComplexTuplesAlmostEqual(csi[n], estimation[n], 2)
+            self.tb.connect((channel, n), (estimator, n), sink[n])
+        # Run flowgraph.
+        self.tb.run()
+        # Read channel estimation and write from pmt to numpy array.
+        csi = np.empty(shape=[N, M], dtype=complex)
+        for n in range(0, N):
+            for m in range(0, M):
+                csi[n][m] = pmt.c32vector_ref(pmt.vector_ref(sink[0].tags()[0].value, n), m)
+        return csi
 
 
+    ''' 
+    2 tests validating the correct estimation of the channel coefficients with a random channel
+    and 1xN MIMO scheme. '''
+    def test_001_t (self):
+        # Test parameters.
+        M = 1
+        repetitions = 2
+        for i in range(0, repetitions):
+            N = np.random.randint(1, 65)
+            training_length = M
+            # Produce training sequence and random channel coefficients.
+            training_sequence = self.produce_training_seq(M, training_length)
+            channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
+            estimation = self.run_flowgraph(M, N, training_sequence, channel_matrix)
 
+            # Check if the expected result equals the actual result.
+            for n in range(0, N):
+                self.assertComplexTuplesAlmostEqual(channel_matrix[n], estimation[n], 2)
+
+    '''
+    2 tests validating the correct estimation of the channel coefficients with a random channel
+    and 2xN MIMO scheme. '''
+    def test_002_t (self):
+        # Test parameters.
+        M = 2
+        repetitions = 2
+        for i in range(0, repetitions):
+            N = np.random.randint(1, 64)
+            training_length = M#np.random.randint(M, 5)
+            # Produce training sequence and random channel coefficients.
+            training_sequence = self.produce_training_seq(M, training_length)
+            channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
+
+            estimation = self.run_flowgraph(M, N, training_sequence, channel_matrix)
+
+            # Check if the expected result equals the actual result.
+            for n in range(0, N):
+                self.assertComplexTuplesAlmostEqual(channel_matrix[n], estimation[n], 2)
+
+    '''
+    2 tests validating the correct estimation of the channel coefficients with a random channel
+    and MxN MIMO scheme (M>2). '''
+    def test_003_t (self):
+        # Test parameters.
+        M = 3#np.random.randint(5, 6)
+        repetitions = 2
+        for i in range(0, repetitions):
+            N = np.random.randint(1, 64)
+            training_length = M#np.random.randint(M, 10)
+            # Produce training sequence and random channel coefficients.
+            training_sequence = self.produce_training_seq(M, training_length)
+            channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
+
+            estimation = self.run_flowgraph(M, N, training_sequence, channel_matrix)
+
+            # Check if the expected result equals the actual result.
+            for n in range(0, N):
+                self.assertComplexTuplesAlmostEqual(channel_matrix[n], estimation[n], 2)
 
 if __name__ == '__main__':
     gr_unittest.run(qa_mimo_channel_estimator_cc, "qa_mimo_channel_estimator_cc.xml")
