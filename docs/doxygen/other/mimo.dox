@@ -392,6 +392,55 @@ To avoid the reception of erroneous sample, the usage of 'start' tags is highly 
 For example, the tags can be set in the synchronizer, 
 when it gets on track and produces synchronized samples.
 
+\section mimo_mux Spatial Multiplexing
+
+So far we used the mulitple antennas of a MIMO system to achieve diversity and therefore decreasing the error rate of the communication system. An other possibilty for the exploitation of the mulitple antennas is spatial multiplexing. The premise is the transmission of M independent symbols per time slot over M transmit antennas, therefore increasing the data rate instead of the transmission quality. An easy way to do so offers parallel encoding which simply demultiplexes the data stream into M parallel streams. One of the Bell Labs Layered Space Time (BLAST) architectures does exactly that: Encoding serial data into a vertical vector which gives the algorithm its name: Vertical-BLAST or short V-BLAST [1].
+
+\section mimo_vblast V-BLAST
+
+\subsection mimo_vblast_encoder Encoder
+The task of the V-BLAST encoder is pretty simple: At each time slot, take a sequence of M complex input symbols and distribute them to M output ports. The encoder block is therefore a decimator with decimation rate M.
+
+\subsection mimo_vblast_decoder Decoder
+The decoder has to demultiplex the parallel data streams again by separating the M parallel symbols which are sent from one transmitting antenna, respectively, to each of the N receiving antennas. For this task, we have N received signals, which all contain a different weighted sum of all the transmitted symbols. Furthermore, we assume channel knowledge in form of a NxM CSI matrix:
+
+\f[ 
+\mathbf{H} = \begin{pmatrix}
+h_{11} & h_{12} & \dots & h_{1M} \\
+h_{21} & h_{22} & \dots & h_{2M} \\
+\vdots & \vdots & \ddots & \vdots \\
+h_{N1} & h_{N2} & \dots & h_{NM}
+\end{pmatrix}
+\f]
+
+
+By simply solving the linear system
+\f[
+\mathbf{y} = \mathbf{Hx} \quad \Leftrightarrow \quad \mathbf{x} = \mathbf{H^{-1}y}
+\f]
+we can gain the coefficients of \f$\mathbf{x}\f$. The only requirement for this operation is the invertibility of \f$\mathbf{H}\f$. This leads to the demands:
+
+- <b>H must have full rank:</b> This requirement is satisfied by the fact that the magnitude of the elements of H are Rayleigh distributed. Assuming a discrete time and limited observation window, the magnitude of the channel coefficients almost surely (in mathematical terms) is not equal to zero. This leads to the statement that the rank of H is almost surely full in our assumed model.
+- <b>H must be quadratic</b>: At this time, we did not state any relationship between M and N, yet. At first we can observe, that N ≥ M must be fulfilled to gain enough linear equations to solve the system. Most textbooks solve this issue by introducing the Moore-Penrose inverse (or pseudo inverse) which doesn’t require a quadratic matrix.
+\f[
+\mathbf{W} = (\mathbf{H^*H)^{-1}H^*}
+\f]
+The calculation of the pseudo inverse \f$ W \f$ has a more complex calculation complexity. Instead of one inversion, it requires 2 adjunctions, 1 inversion and 2 more matrix multiplications. To avoid this increase of decoder complexity, the decoder calculates the inverse instead of the pseudo-inverse, therefore setting the number of receive antennas fixed to N=M. This, however, is not a restriction to the V-BLAST algorithm in general. For a NxM MIMO setup with  N > M, the maximum increase of the data rate is min{M, N}. This data rate is limited by M for N ≥ M. The remaining N-M transmitter antennas are used to apply a diversity gain. This means for our system, that we have to reduce the number of streams at the receiver from N to M, by combining some streams with the diversity combining block.
+
+#TODO: explain MMSE equalizer
+
+\subsection Usage
+The inversion (or pseudo-inversion) of a possibly large channel matrix can quickly get a very complex problem which needs a lot of computation power, especially if it is recalculated frequently, for example each micro second when assuming a coherence time of 1μs and therefore a CSI update rate of 1MHz. To avoid the decoder getting a performance bottleneck, it uses the LU decomposition as an efficient algorithm for the matrix inversion. This algorithm is provided by the linear algebra template library <a href="http://eigen.tuxfamily.org/index.php?title=Main_Page"> Eigen</a>.
+The Eigen3 library is a requirement for MxM schemes with M>2. In order to use Eigen3, you just need to include a directory with <a href="https://github.com/OPM/eigen3/tree/master/Eigen"> Eigen header files</a> to the prgraom or install them via your package management system.
+\code
+sudo apt install libeigen3-dev
+\endcode
+for Ubuntu or
+\code
+sudo dnf install eigen3-devel
+\endcode
+for Fedora.
+
 \section mimo_references References
 
 [1] Andrea Goldsmith. 2005. Wireless Communications. 
