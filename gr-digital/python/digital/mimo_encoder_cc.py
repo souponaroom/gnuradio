@@ -22,23 +22,38 @@
 # 
 
 from gnuradio import gr
-from gnuradio import digital
+from gnuradio import blocks, digital
 
 class mimo_encoder_cc(gr.hier_block2):
     """
-    docstring for block mimo_encoder_cc
+    Hierarchical MIMO encoder block of the following structure:
+    -1 input port
+    -encoder block with selected MIMO algorithm (default 'none' is no block at all)
+    -insertion of training_sequence as pilot, at each MIMO output respectively
+    -M output ports
+
+    For mimo_technique='none' and M>1, the encoder block copies the input data to each output stream.
     """
 
-    def __init__(self, M=1, mimo_technique='none', training_sequence=[]):
+    def __init__(self, symbol_length, M=1, mimo_technique='none', training_sequence=[]):
         gr.hier_block2.__init__(self,
             "mimo_encoder_cc",
             gr.io_signature(1, 1, gr.sizeof_gr_complex),  # Input signature
             gr.io_signature(M, M, gr.sizeof_gr_complex)) # Output signature
 
+        # Dictionary translating mimo algorithm keys into encoder blocks.
         mimo_algorithm = {'none' : self,
-                          'alamouti' : digital.alamouti_encoder_cc_make()}
+                          'alamouti' : digital.alamouti_encoder_cc_make(),
+                          'diff_stbc' : digital.diff_stbc_encoder_cc_make(),
+                          'vblast' : digital.vblast_encoder_cc_make(M)}
+        # Check if M = 2 for Alamouti-like schemes.
+        if M != 2 and mimo_technique == ('alamouti' or 'diff_stbc'):
+            log = gr.logger("MIMO_logger")
+            log.set_level("INFO")
+            log.debug("M is fixed to 2 for alamouti-like MIMO schemes. Setting M=2.")
+            M = 2
 
-        # Connect input to MIMO algorithm
+        # Connect everything.
         if mimo_technique != 'none':
             mimo_encoder = mimo_algorithm[mimo_technique]
             self.connect(self, mimo_encoder)
@@ -47,7 +62,7 @@ class mimo_encoder_cc(gr.hier_block2):
 
         if len(training_sequence) > 0:
             for m in range(0, M):
-                self.connect(mimo_encoder, insert_pilot, (self, m))
+                self.connect(mimo_encoder, (blocks.vector_insert_b_make(training_sequence, symbol_length), m), (self, m))
         else:
-            for m in range(0, M)
+            for m in range(0, M):
                 self.connect(mimo_encoder, (self, m))
