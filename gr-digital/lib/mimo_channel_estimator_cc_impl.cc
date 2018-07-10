@@ -60,6 +60,8 @@ namespace gr {
     {
       d_training_length = d_training_sequence[0].size();
       d_csi = std::vector<std::vector<gr_complex> >(N, std::vector<gr_complex> (M, 1.0));
+      // Set the minimum size for the input buffer to the training length.
+      set_min_noutput_items(d_training_length);
     }
 
     /*
@@ -189,16 +191,32 @@ namespace gr {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
             // This is not the last tag in the buffer.
-            symbol_length = tags[i + 1].offset - nitems_read(0) - nconsumed - d_training_length;
+            symbol_length = tags[i + 1].offset - nitems_read(0) - nconsumed;
+            // Check if the symbol length is smaller than the training length
+            if (symbol_length < d_training_length){
+              // We have to ignore this symbol in this case.
+              nconsumed += symbol_length;
+              GR_LOG_INFO(d_logger, format("The symbol length (%d) is smaller than the training length (%d)."
+                                           "No estimation possible. Dumping symbol.")
+                                    %symbol_length %d_training_length);
+              continue;
+            }
           } else {
             // This is the last tag in the buffer.
-            symbol_length = noutput_items - nconsumed - d_training_length;
+            symbol_length = noutput_items - nconsumed;
+            // Check if the training sequence of this last symbol is completely in this buffer.
+
+            if (symbol_length < d_training_length){
+              // We consume the whole training sequence in the next buffer and don't consume it now.
+              break;
+            }
           }
           // Estimate MIMO channel and write CSI tag to stream.
           estimate_channel(input_items, nconsumed);
 
           // Consume training symbols.
           nconsumed += d_training_length;
+          symbol_length -= d_training_length;
 
           // Assign the CSI vector to a PMT vector.
           pmt::pmt_t csi_pmt = pmt::make_vector(d_N, pmt::make_c32vector(d_M, d_csi[0][0]));
@@ -219,9 +237,7 @@ namespace gr {
           nwritten += symbol_length;
         }
       }
-
-      // Tell runtime system how many input items we consumed on
-      // each input stream.
+      // Tell runtime system how many input items we consumed on each input stream.
       consume_each (nconsumed);
       // Tell runtime system how many output items we produced.
       return nwritten;
