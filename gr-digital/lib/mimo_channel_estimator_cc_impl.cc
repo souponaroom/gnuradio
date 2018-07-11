@@ -105,7 +105,7 @@ namespace gr {
             for (int i = 0; i < d_training_length; ++i) {
               csi[n][0] += in[i];
             }
-            // Multiply elements with factor.
+            // Normalize elements referring the training length.
             csi[n][0] *= 1./ d_training_length;
           }
           // Write local vector to class member.
@@ -122,7 +122,7 @@ namespace gr {
               csi[n][0] += in[i];
               csi[n][1] += in[i] * (gr_complex) std::polar(1.0, 2 * M_PI * i / d_training_length);
             }
-            // Multiply elements with factor.
+            // Normalize elements referring the training length.
             csi[n][0] *= 1./ d_training_length;
             csi[n][1] *= 1./ d_training_length;
           }
@@ -169,11 +169,10 @@ namespace gr {
       uint32_t nwritten = 0; // Number of written items.
       uint32_t symbol_length; // Number of items in the current symbol.
 
-
-
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
         symbol_length = noutput_items;
+        // Copy the data to the output buffer.
         copy_symbols(input_items, output_items, symbol_length, 0, 0);
         nconsumed = noutput_items;
         nwritten = noutput_items;
@@ -182,6 +181,7 @@ namespace gr {
           /* There are items in the input buffer, before the first tag arrives,
 +          * which belong to the previous symbol. */
           symbol_length = tags[0].offset - nitems_read(0);
+          // Copy the data to the output buffer.
           copy_symbols(input_items, output_items, symbol_length, 0, 0);
           nconsumed += symbol_length;
           nwritten += symbol_length;
@@ -194,7 +194,7 @@ namespace gr {
             symbol_length = tags[i + 1].offset - nitems_read(0) - nconsumed;
             // Check if the symbol length is smaller than the training length
             if (symbol_length < d_training_length){
-              // We have to ignore this symbol in this case.
+              // We ignore this unfinished training sequence and dump it without any estimation.
               nconsumed += symbol_length;
               GR_LOG_INFO(d_logger, format("The symbol length (%d) is smaller than the training length (%d)."
                                            "No estimation possible. Dumping symbol.")
@@ -205,16 +205,16 @@ namespace gr {
             // This is the last tag in the buffer.
             symbol_length = noutput_items - nconsumed;
             // Check if the training sequence of this last symbol is completely in this buffer.
-
             if (symbol_length < d_training_length){
-              // We consume the whole training sequence in the next buffer and don't consume it now.
+              /* We consume the whole training sequence in the next buffer and don't consume it now
+               * in order to do the estimation at once. */
               break;
             }
           }
           // Estimate MIMO channel and write CSI tag to stream.
           estimate_channel(input_items, nconsumed);
 
-          // Consume training symbols.
+          // Consume training symbols. We don't copy them to the output buffer.
           nconsumed += d_training_length;
           symbol_length -= d_training_length;
 
@@ -228,11 +228,9 @@ namespace gr {
             pmt::vector_set(csi_pmt, n, csi_line_vector);
           }
 
-          // Copy symbols to output.
+          // Copy symbols to output and append stream tags with CSI to the beginning of this symbol.
           copy_symbols(input_items, output_items, symbol_length, nconsumed, nwritten);
-          // Append stream tags with CSI to data stream.
           add_item_tag(0, nitems_written(0) + nwritten, pmt::string_to_symbol(std::string("csi")), csi_pmt);
-
           nconsumed += symbol_length;
           nwritten += symbol_length;
         }

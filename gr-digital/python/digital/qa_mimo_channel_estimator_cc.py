@@ -57,8 +57,10 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
             src.append(blocks.vector_source_c(np.append(training_sequence[m], data)))
         for n in range(1, N):
             sink.append(blocks.null_sink_make(gr.sizeof_gr_complex))
+        # Use a matrix multiplier as a static channel model.
         channel = blocks.multiply_matrix_cc_make(channel_matrix)
         estimator = digital.mimo_channel_estimator_cc(M, N, training_sequence)
+        # Use a head block to terminate the flowgraph.
         head = blocks.head_make(gr.sizeof_gr_complex, training_length)
         # Connect everything.
         for m in range(0, M):

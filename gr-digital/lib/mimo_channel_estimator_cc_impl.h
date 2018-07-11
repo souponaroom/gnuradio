@@ -27,17 +27,37 @@
 
 namespace gr {
   namespace digital {
-
+    /*! \brief Estimates a MIMO channel matrix.
+     *
+     * The block estimates the channel matrix of a MIMO scheme with the help of
+     * training sequences. The training sequence for each transmitting antenna
+     * equals one subvector/row of the 2-dimensional vector training_sequence.
+     * The training sequence should be appended as a pilot to the data at the transmitter.
+     * The beginning of the pilot must be tagged at the receiver with the key 'pilot'.
+     * This tag can be set from a preceding sync block, for example.
+     *
+     * This block has N inports and N outports. It estimates the channel matrix which each incoming
+     * 'pilot' tag, dumps the pilot symbol of each stream and passes the rest of the data through without
+     * changing anything. A tag is set at the beginning of each symbol (= a data sequence between to training sequences)
+     * with the key 'csi' that contains the estimated MxN channel matrix.
+     *
+     * For 1xN and 2xN MIMO schemes, the equalizer is calculated internally. For MxN schemes with M > 2,
+     * the C++ template library Eigen is used for the linear algebra operations
+     * and is a requirement in this case.
+     * The training_length is not bounded above, but the minimum length is M
+     * (to avoid an underdetermined equation system).
+     */
     class mimo_channel_estimator_cc_impl : public mimo_channel_estimator_cc
     {
      private:
-      uint16_t d_M;
-      uint16_t d_N;
+      uint16_t d_M; /*!< Number of transmitting antennas. */
+      uint16_t d_N; /*!< Number of receiving antennas. */
       std::vector<std::vector<gr_complex> > d_training_sequence;
-      uint16_t d_training_length;
+      /*!< Training matrix: Each subvector/row is sent through one of the M transmit antennas. */
+      uint16_t d_training_length; /*!< Length of the training sequence. */
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      std::vector<std::vector<gr_complex> > d_csi;
+      std::vector<std::vector<gr_complex> > d_csi; /*!< Currently estimated CSI. */
 
       void copy_symbols(gr_vector_const_void_star &input_items,
                         gr_vector_void_star &output_items,

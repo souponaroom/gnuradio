@@ -30,10 +30,25 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
+    /*! \brief Estimates a MIMO channel matrix.
      *
+     * The block estimates the channel matrix of a MIMO scheme with the help of
+     * training sequences. The training sequence for each transmitting antenna
+     * equals one subvector/row of the 2-dimensional vector training_sequence.
+     * The training sequence should be appended as a pilot to the data at the transmitter.
+     * The beginning of the pilot must be tagged at the receiver with the key 'pilot'.
+     * This tag can be set from a preceding sync block, for example.
+     *
+     * This block has N inports and N outports. It estimates the channel matrix which each incoming
+     * 'pilot' tag, dumps the pilot symbol of each stream and passes the rest of the data through without
+     * changing anything. A tag is set at the beginning of each symbol (= a data sequence between to training sequences)
+     * with the key 'csi' that contains the estimated MxN channel matrix.
+     *
+     * For 1xN and 2xN MIMO schemes, the equalizer is calculated internally. For MxN schemes with M > 2,
+     * the C++ template library Eigen is used for the linear algebra operations
+     * and is a requirement in this case.
+     * The training_length is not bounded above, but the minimum length is M
+     * (to avoid an underdetermined equation system).
      */
     class DIGITAL_API mimo_channel_estimator_cc : virtual public gr::block
     {
