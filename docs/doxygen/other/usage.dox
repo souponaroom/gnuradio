@@ -40,6 +40,7 @@ more tutorials on using the software system and examples.
 \li \subpage page_pfb
 \li \subpage page_ofdm
 \li \subpage page_packet_data
+\li \subpage page_mimo
 
 <b>Out-of-tree Modules</b>
 
