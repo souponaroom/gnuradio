@@ -22,7 +22,8 @@
 # 
 
 from gnuradio import gr
-from gnuradio import blocks, digital
+from gnuradio import blocks
+import digital_swig as digital
 
 class mimo_decoder_cc(gr.hier_block2):
     """

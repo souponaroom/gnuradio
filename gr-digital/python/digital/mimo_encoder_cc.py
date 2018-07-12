@@ -22,7 +22,9 @@
 # 
 
 from gnuradio import gr
-from gnuradio import blocks, digital
+from gnuradio import blocks
+import digital_swig as digital
+import pmt
 
 class mimo_encoder_cc(gr.hier_block2):
     """
@@ -35,7 +37,7 @@ class mimo_encoder_cc(gr.hier_block2):
     For mimo_technique='none' and M>1, the encoder block copies the input data to each output stream.
     """
 
-    def __init__(self, symbol_length, M=1, mimo_technique='none', training_sequence=[]):
+    def __init__(self, M=1, mimo_technique='none', length_tag_name='length', training_sequence=[[]]):
         gr.hier_block2.__init__(self,
             "mimo_encoder_cc",
             gr.io_signature(1, 1, gr.sizeof_gr_complex),  # Input signature
@@ -46,6 +48,7 @@ class mimo_encoder_cc(gr.hier_block2):
                           'alamouti' : digital.alamouti_encoder_cc_make(),
                           'diff_stbc' : digital.diff_stbc_encoder_cc_make(),
                           'vblast' : digital.vblast_encoder_cc_make(M)}
+
         # Check if M = 2 for Alamouti-like schemes.
         if M != 2 and mimo_technique == ('alamouti' or 'diff_stbc'):
             log = gr.logger("MIMO_logger")
@@ -61,8 +64,23 @@ class mimo_encoder_cc(gr.hier_block2):
             mimo_encoder = self
 
         if len(training_sequence) > 0:
+            mux = []
+            training_src = []
             for m in range(0, M):
-                self.connect(mimo_encoder, (blocks.vector_insert_b_make(training_sequence, symbol_length), m), (self, m))
+                mux.append(blocks.tagged_stream_mux_make(itemsize=gr.sizeof_gr_complex,
+                                                         lengthtagname=length_tag_name,
+                                                         tag_preserve_head_pos=1))
+                tag = [gr.tag_utils.python_to_tag((0,
+                                            pmt.string_to_symbol(length_tag_name),
+                                            pmt.from_long(len(training_sequence)),
+                                            pmt.from_long(0)))]
+
+                self.connect(blocks.vector_source_c_make(data=training_sequence[m],
+                                                         repeat=True,
+                                                         vlen=1,
+                                                         tags=tag),
+                             (mux[m], 0))
+                self.connect((mimo_encoder, m), (mux[m], 1), (self, m))
         else:
             for m in range(0, M):
                 self.connect(mimo_encoder, (self, m))
