@@ -394,7 +394,7 @@ when it gets on track and produces synchronized samples.
 
 \section mimo_mux Spatial Multiplexing
 
-So far we used the mulitple antennas of a MIMO system to achieve diversity and therefore decreasing the error rate of the communication system. An other possibilty for the exploitation of the mulitple antennas is spatial multiplexing. The premise is the transmission of M independent symbols per time slot over M transmit antennas, therefore increasing the data rate instead of the transmission quality. An easy way to do so offers parallel encoding which simply demultiplexes the data stream into M parallel streams. One of the Bell Labs Layered Space Time (BLAST) architectures does exactly that: Encoding serial data into a vertical vector which gives the algorithm its name: Vertical-BLAST or short V-BLAST [1].
+So far we used the multiple antennas of a MIMO system to achieve diversity and therefore decreasing the error rate of the communication system. An other possibilty for the exploitation of the mulitple antennas is spatial multiplexing. The premise is the transmission of M independent symbols per time slot over M transmit antennas, therefore increasing the data rate instead of the transmission quality. An easy way to do so offers parallel encoding which simply demultiplexes the data stream into M parallel streams. One of the Bell Labs Layered Space Time (BLAST) architectures does exactly that: Encoding serial data into a vertical vector which gives the algorithm its name: Vertical-BLAST or short V-BLAST [1].
 
 \section mimo_vblast V-BLAST
 
@@ -425,9 +425,26 @@ we can gain the coefficients of \f$\mathbf{x}\f$. The only requirement for this 
 \f[
 \mathbf{W} = (\mathbf{H^*H)^{-1}H^*}
 \f]
-The calculation of the pseudo inverse \f$ W \f$ has a more complex calculation complexity. Instead of one inversion, it requires 2 adjunctions, 1 inversion and 2 more matrix multiplications. To avoid this increase of decoder complexity, the decoder calculates the inverse instead of the pseudo-inverse, therefore setting the number of receive antennas fixed to N=M. This, however, is not a restriction to the V-BLAST algorithm in general. For a NxM MIMO setup with  N > M, the maximum increase of the data rate is min{M, N}. This data rate is limited by M for N ≥ M. The remaining N-M transmitter antennas are used to apply a diversity gain. This means for our system, that we have to reduce the number of streams at the receiver from N to M, by combining some streams with the diversity combining block.
+The calculation of the pseudo inverse \f$ W \f$ has a higher calculation complexity. Instead of one inversion, it requires 2 adjunctions, 1 inversion and 2 more matrix multiplications. To avoid this increase of decoder complexity, the decoder calculates the inverse instead of the pseudo-inverse, therefore setting the number of receive antennas fixed to N=M. This, however, is not a restriction to the V-BLAST algorithm in general. For a NxM MIMO setup with  N > M, the maximum increase of the data rate is min{M, N}. This data rate is limited by M for N ≥ M. The remaining N-M transmitter antennas are used to apply a diversity gain. This means for our system, that we have to reduce the number of streams at the receiver from N to M, by combining some streams with the diversity combining block.
 
-#TODO: explain MMSE equalizer
+The method of using the inverse of the channel matrix as an equalizer is called <b>Zero Forcing (ZF)</b>. As the name states, it strictly reverses the effect of the transmission channel. This technique therefore provides a perfect separation of the different MIMO branches and seems to be perfect for our purposes. A big downside of the Zero Forcing equalization reveal itself when we include the AWGN noise vector \f$ n \f$ into our channel model:
+
+\f[
+\mathbf{y} = \mathbf{Hx}+\mathbf{n} \quad \Leftrightarrow \quad \mathbf{x} = \mathbf{H^{-1}y} - \mathbf{H^{-1}n}
+\f]
+The error vector of the equalized signal is \f$ \mathbf{H^{-1}n} \f$. The elements of the error vector get big for small channel coefficients. The Zero Forcing equalizer reverses the effect of the channel by amlifying attenuated paths but it additionally amplifies the noise which leads to a lot of distorting. 
+The final goal of the equalization is the minimization of the error between the equalized and the transmitted signal. Choosing the mean squared error as a quality criterion leads to the <b>Minimum Mean Squared Error (MMSE)</b> equalizer. It uses a pseudo inverse which is additionally weighted with the SNR:
+
+\f[
+\mathbf{x} = \mathbf{W y} \quad \text{with} \quad  \mathbf{W} = \mathbf{(H^*H + \gamma )^{-1} H^*} \quad \text{with} \quad \mathbf{\gamma} =
+
+\begin{pmatrix}
+\frac{1}{\text{SNR}_1} & 0 & \dots & 0 \\
+0 & \frac{1}{\text{SNR}_2} & \dots & 0 \\
+\vdots & \vdots & \ddots & \vdots \\
+0 & 0 & \dots & \frac{1}{\text{SNR}_N} 
+\end{pmatrix}
+\f]
 
 \subsection Usage
 The inversion (or pseudo-inversion) of a possibly large channel matrix can quickly get a very complex problem which needs a lot of computation power, especially if it is recalculated frequently, for example each micro second when assuming a coherence time of 1μs and therefore a CSI update rate of 1MHz. To avoid the decoder getting a performance bottleneck, it uses the LU decomposition as an efficient algorithm for the matrix inversion. This algorithm is provided by the linear algebra template library <a href="http://eigen.tuxfamily.org/index.php?title=Main_Page"> Eigen</a>.
@@ -440,6 +457,11 @@ for Ubuntu or
 sudo dnf install eigen3-devel
 \endcode
 for Fedora.
+
+The gr::digital::vblast_decoder_cc provides both introduced equalization schemes.
+The keys for the input argument gr::digital::vblast::decoder_cc::equalizer_type are the following strings:
+- 'ZF' for  Zero-Forcing
+- 'MMSE' for Minimum Mean Squared Error
 
 \section mimo_references References
 
