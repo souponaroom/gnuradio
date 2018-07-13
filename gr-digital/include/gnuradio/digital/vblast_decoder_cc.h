@@ -37,10 +37,10 @@ namespace gr {
  * channel state information and MMSE additionally needs SNR information.
  *
  * The CSI and SNR information is transported via stream tags with key='csi' or 'snr', respectively.
- * Initially the CSI is set to 1.0 + 0j for both branches and are updated
+ * Initially the CSI is set to 1.0 + 0j for all branches and are updated
  * with each incoming CSI. The SNR is initially set to 1.0e6; in this case is the MMSE equalizer equal
  * to the ZF equalizer. The CSI and SNR tags are processed separately and they can therefore arrive
- * at different positions of the stream and occur in different frequencies.
+ * at different positions of the stream and occur at different frequencies.
  *
  * For 1x1 and 2x2 MIMO schemes, the equalizer is calculated internally. For MxM schemes with M > 2,
  * the C++ template library Eigen is used for the linear algebra operations.
