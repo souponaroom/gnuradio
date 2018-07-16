@@ -35,44 +35,71 @@ class qa_mimo_encoder_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def run_test(self, M, mimo_technique):
-        payload_length = 6
-        payload = np.random.randn(payload_length) + 1j * np.random.randn(payload_length)
-        # Produce tags.
-        tags = [gr.tag_utils.python_to_tag((0,
-                                            pmt.string_to_symbol("length"),
-                                            pmt.from_long(payload_length),
-                                            pmt.from_long(0)))]
+    def run_test(self, M, mimo_technique, data_length):
+        payload = np.random.randn(data_length) + 1j * np.random.randn(data_length)
         # Build GNU Radio blocks.
-        training_length = 4
+        training_length = 2
         training_sequence = np.random.randn(M, training_length)
 
-        src = blocks.vector_source_c(data=np.append(training_sequence[0], payload),
-                                      repeat=False,
-                                      tags=tags)
+        src = blocks.vector_source_c(data=payload,
+                                     repeat=False)
         encoder = digital.mimo_encoder_cc(M=M,
                                           mimo_technique=mimo_technique,
+                                          payload_length=2,
                                           length_tag_name='length',
                                           training_sequence=training_sequence)
         self.tb.connect(src, encoder)
+
         sink = []
         for m in range(0, M):
             sink.append(blocks.vector_sink_c_make())
             self.tb.connect((encoder, m), sink[m])
         # Run flowgraph.
         self.tb.run()
-        # Check if the training sequences were inserted correctly at each outport.
         for m in range(0, M):
-            self.assertComplexTuplesAlmostEqual(training_sequence[m], sink[m].data()[0:len(training_sequence)], 2)
+            self.assertComplexTuplesAlmostEqual(training_sequence[m], sink[m].data()[0:len(training_sequence[0])], 2)
 
 
+    ''' 
+    3 tests validating the correct output of the hierarchical MIMO encoder block with V-BLAST scheme.
+    This test only checks the correct structure of the output and the training sequence 
+    but not the actual encoded data itelf. This is already done by a separate qa test.
+    '''
     def test_001_t (self):
         # Test parameters.
-        M = 2
-        repetitions = 2
+        repetitions = 3
         for i in range(0, repetitions):
-            self.run_test(M, 'alamouti')
+            M = np.random.randint(1, 17)
+            payload_length = 2
+            code_rate = M
+            input_data_length = payload_length * code_rate
+            self.run_test(M, 'vblast', input_data_length)
 
+    ''' 
+    1 test validating the correct output of the hierarchical MIMO encoder block with Alamouti scheme.
+    This test only checks the correct structure of the output and the training sequence 
+    but not the actual encoded data itelf. This is already done by a separate qa test.
+    '''
+    def test_002_t (self):
+        # Test parameters.
+        M = 2
+        payload_length = 2
+        code_rate = 1
+        input_data_length = payload_length * code_rate
+        self.run_test(M, 'alamouti', input_data_length)
+
+    ''' 
+    1 test validating the correct output of the hierarchical MIMO encoder block with differential STBC scheme.
+    This test only checks the correct structure of the output and the training sequence 
+    but not the actual encoded data itelf. This is already done by a separate qa test.
+    '''
+    def test_003_t(self):
+        # Test parameters.
+        M = 2
+        payload_length = 2
+        code_rate = 1
+        input_data_length = payload_length * code_rate
+        self.run_test(M, 'alamouti', input_data_length)
 
 
 if __name__ == '__main__':

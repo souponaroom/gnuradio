@@ -34,53 +34,58 @@ class mimo_encoder_cc(gr.hier_block2):
     -insertion of training_sequence as pilot, at each MIMO output respectively
     -M output ports
 
-    For mimo_technique='none' and M>1, the encoder block copies the input data to each output stream.
+    For unknown key of mimo_technique and M<2, the
     """
 
-    def __init__(self, M=1, mimo_technique='none', length_tag_name='length', training_sequence=[[]]):
+    def __init__(self, M=2, mimo_technique='none', payload_length=0, length_tag_name='length', training_sequence=[[]]):
         gr.hier_block2.__init__(self,
             "mimo_encoder_cc",
             gr.io_signature(1, 1, gr.sizeof_gr_complex),  # Input signature
             gr.io_signature(M, M, gr.sizeof_gr_complex)) # Output signature
 
         # Dictionary translating mimo algorithm keys into encoder blocks.
-        mimo_algorithm = {'none' : self,
-                          'alamouti' : digital.alamouti_encoder_cc_make(),
+        mimo_algorithm = {'alamouti' : digital.alamouti_encoder_cc_make(),
                           'diff_stbc' : digital.diff_stbc_encoder_cc_make(),
                           'vblast' : digital.vblast_encoder_cc_make(M)}
+
+        # Check for forbidden input arguments.
+        if M < 2:
+            raise ValueError('MIMO block must have M >= 2 (M=%d) selected).' % (M))
+        if mimo_technique not in mimo_algorithm:
+            raise ValueError('MIMO algorithm %s unknown.' % (mimo_technique))
 
         # Check if M = 2 for Alamouti-like schemes.
         if M != 2 and mimo_technique == ('alamouti' or 'diff_stbc'):
             log = gr.logger("MIMO_logger")
-            log.set_level("INFO")
+            log.set_level("WARN")
             log.debug("M is fixed to 2 for alamouti-like MIMO schemes. Setting M=2.")
             M = 2
 
         # Connect everything.
-        if mimo_technique != 'none':
-            mimo_encoder = mimo_algorithm[mimo_technique]
-            self.connect(self, mimo_encoder)
-        else:
-            mimo_encoder = self
+        mimo_encoder = mimo_algorithm[mimo_technique]
+        self.connect(self, mimo_encoder)
 
-        if len(training_sequence) > 0:
-            mux = []
-            training_src = []
-            for m in range(0, M):
+        mux = []
+        training_src = []
+        tagger = []
+        for m in range(0, M):
+            tagger.append(blocks.stream_to_tagged_stream_make(itemsize=gr.sizeof_gr_complex,
+                                                              vlen=1,
+                                                              packet_len=payload_length,
+                                                              len_tag_key=length_tag_name))
+            if len(training_sequence[0]) > 0:
                 mux.append(blocks.tagged_stream_mux_make(itemsize=gr.sizeof_gr_complex,
                                                          lengthtagname=length_tag_name,
                                                          tag_preserve_head_pos=1))
                 tag = [gr.tag_utils.python_to_tag((0,
-                                            pmt.string_to_symbol(length_tag_name),
-                                            pmt.from_long(len(training_sequence)),
-                                            pmt.from_long(0)))]
+                                                   pmt.string_to_symbol(length_tag_name),
+                                                   pmt.from_long(len(training_sequence[0])),
+                                                   pmt.from_long(0)))]
+                training_src.append(blocks.vector_source_c_make(data=training_sequence[m],
+                                                                repeat=True,
+                                                                vlen=1,
+                                                                tags=tag))
 
-                self.connect(blocks.vector_source_c_make(data=training_sequence[m],
-                                                         repeat=True,
-                                                         vlen=1,
-                                                         tags=tag),
-                             (mux[m], 0))
-                self.connect((mimo_encoder, m), (mux[m], 1), (self, m))
-        else:
-            for m in range(0, M):
-                self.connect(mimo_encoder, (self, m))
+                self.connect(training_src[m], (mux[m], 0))
+                self.connect((mimo_encoder, m), tagger[m], (mux[m], 1))
+                self.connect(mux[m], (self, m))
