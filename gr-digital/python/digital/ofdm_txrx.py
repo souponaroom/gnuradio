@@ -31,6 +31,7 @@ to form an OFDM Tx/Rx--simply use these.
 import numpy
 from gnuradio import gr
 import digital_swig as digital
+from mimo_encoder_cc import mimo_encoder_cc
 from utils import tagged_streams
 
 try:
@@ -44,6 +45,8 @@ except ImportError:
     import blocks_swig as blocks
     import analog_swig as analog
 
+_def_m = 1
+_def_mimo_technique = 'none'
 _def_fft_len = 64
 _def_cp_len = 16
 _def_frame_length_tag_key = "frame_length"
@@ -60,6 +63,16 @@ _pilot_sym_scramble_seq = (
 )
 _def_pilot_symbols= tuple([(x, x, x, -x) for x in _pilot_sym_scramble_seq])
 _seq_seed = 42
+_walsh_sequences = [
+    [1, 1, 1, 1, 1, 1, 1, 1],
+    [1,-1, 1,-1, 1,-1, 1,-1],
+    [1, 1,-1,-1, 1, 1,-1,-1],
+    [1,-1,-1, 1, 1,-1,-1, 1],
+    [1, 1, 1, 1,-1,-1,-1,-1],
+    [1,-1, 1,-1,-1, 1,-1, 1],
+    [1, 1,-1,-1,-1,-1, 1, 1],
+    [1,-1,-1, 1,-1, 1, 1,-1]
+]
 
 
 def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
@@ -152,21 +165,26 @@ class ofdm_tx(gr.hier_block2):
                  sync_word2=None,
                  rolloff=0,
                  debug_log=False,
-                 scramble_bits=False
+                 scramble_bits=False,
+                 m=_def_m, mimo_technique=_def_mimo_technique
                  ):
         gr.hier_block2.__init__(self, "ofdm_tx",
                     gr.io_signature(1, 1, gr.sizeof_char),
-                    gr.io_signature(1, 1, gr.sizeof_gr_complex))
+                    gr.io_signature(m, m, gr.sizeof_gr_complex))
         ### Param init / sanity check ########################################
         self.fft_len           = fft_len
         self.cp_len            = cp_len
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
+        self.m                 = m
+        self.mimo_technique    = mimo_technique
         self.pilot_carriers    = pilot_carriers
         self.pilot_symbols     = pilot_symbols
         self.bps_header        = bps_header
         self.bps_payload       = bps_payload
         self.sync_word1 = sync_word1
+        if m < 1:
+            raise ValueError("A negative number of antennas (m=%d) is not valid." % m)
         if sync_word1 is None:
             self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
         else:
@@ -235,30 +253,75 @@ class ofdm_tx(gr.hier_block2):
             (header_payload_mux, 1)
         )
         ### Create OFDM frame ################################################
-        allocator = digital.ofdm_carrier_allocator_cvc(
-            self.fft_len,
-            occupied_carriers=self.occupied_carriers,
-            pilot_carriers=self.pilot_carriers,
-            pilot_symbols=self.pilot_symbols,
-            sync_words=self.sync_words,
-            len_tag_key=self.packet_length_tag_key
-        )
-        ffter = fft.fft_vcc(
+        if self.m == 1:
+            # SISO case.
+            allocator = digital.ofdm_carrier_allocator_cvc(
                 self.fft_len,
-                False, # Inverse FFT
-                (), # No window
-                True # Shift
-        )
-        cyclic_prefixer = digital.ofdm_cyclic_prefixer(
-            self.fft_len,
-            self.fft_len+self.cp_len,
-            rolloff,
-            self.packet_length_tag_key
-        )
-        self.connect(header_payload_mux, allocator, ffter, cyclic_prefixer, self)
-        if debug_log:
-            self.connect(allocator,       blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'tx-post-allocator.dat'))
-            self.connect(cyclic_prefixer, blocks.file_sink(gr.sizeof_gr_complex,           'tx-signal.dat'))
+                occupied_carriers=self.occupied_carriers,
+                pilot_carriers=self.pilot_carriers,
+                pilot_symbols=self.pilot_symbols,
+                sync_words=self.sync_words,
+                len_tag_key=self.packet_length_tag_key
+            )
+            ffter = fft.fft_vcc(
+                    self.fft_len,
+                    False, # Inverse FFT
+                    (), # No window
+                    True # Shift
+            )
+            cyclic_prefixer = digital.ofdm_cyclic_prefixer(
+                self.fft_len,
+                self.fft_len+self.cp_len,
+                rolloff,
+                self.packet_length_tag_key
+            )
+            self.connect(header_payload_mux, allocator, ffter, cyclic_prefixer, self)
+            if debug_log:
+                self.connect(allocator,       blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'tx-post-allocator.dat'))
+                self.connect(cyclic_prefixer, blocks.file_sink(gr.sizeof_gr_complex,           'tx-signal.dat'))
+        else:
+            # MIMO case.
+            mimo_encoder = mimo_encoder_cc(
+                M=self.m,
+                mimo_technique=self.mimo_technique
+            )
+            self.connect(header_payload_mux, mimo_encoder)
+            allocator = []
+            ffter = []
+            cyclic_prefixer = []
+            for i in range(0, self.m):
+                mimo_pilot_symbols = numpy.repeat(_walsh_sequences[self.m][:self.m], 4).reshape((self.m, 4))
+                allocator.append(
+                    digital.ofdm_carrier_allocator_cvc(
+                        self.fft_len,
+                        occupied_carriers=self.occupied_carriers,
+                        pilot_carriers=self.pilot_carriers,
+                        pilot_symbols=mimo_pilot_symbols,
+                        sync_words=self.sync_words,
+                        len_tag_key=self.packet_length_tag_key
+                    )
+                )
+                ffter.append(
+                    fft.fft_vcc(
+                        self.fft_len,
+                        False,  # Inverse FFT
+                        (),  # No window
+                        True  # Shift
+                    )
+                )
+                cyclic_prefixer.append(
+                    digital.ofdm_cyclic_prefixer(
+                        self.fft_len,
+                        self.fft_len + self.cp_len,
+                        rolloff,
+                        self.packet_length_tag_key
+                    )
+                )
+                self.connect((mimo_encoder, i),
+                             allocator[i],
+                             ffter[i],
+                             cyclic_prefixer[i],
+                             (self, i))
 
 
 class ofdm_rx(gr.hier_block2):
