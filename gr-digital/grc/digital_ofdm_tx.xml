@@ -25,7 +25,8 @@
 	  bps_payload=$payload_mod.bps,
 	  rolloff=$rolloff,
 	  debug_log=$log,
-	  scramble_bits=$scramble_bits
+	  scramble_bits=$scramble_bits,
+          m=$m, mimo_technique=$mimo_technique
 	 )</make>
   <param>
     <name>FFT Length</name>
@@ -167,6 +168,43 @@
     </option>
   </param>
   <param>
+    <name>MIMO</name>
+    <key>mimo_technique</key>
+    <value>"siso"</value>
+    <type>enum</type>
+    <option>
+      <name>SISO</name>
+      <key>"siso"</key>
+      <opt>set_m:1</opt>
+      <opt>hide_m:all</opt>
+    </option>
+    <option>
+      <name>Alamouti</name>
+      <key>"alamouti"</key>
+      <opt>set_m:2</opt>
+      <opt>hide_m:none</opt>
+    </option>
+    <option>
+      <name>Differential Alamouti</name>
+      <key>"diff_stbc"</key>
+      <opt>set_m:2</opt>
+      <opt>hide_m:none</opt>
+    </option>
+    <option>
+      <name>V-BLAST</name>
+      <key>"vblast"</key>
+      <opt>set_m:2</opt>
+      <opt>hide_m:none</opt>
+    </option>
+  </param>
+  <param>
+    <name>M</name>
+    <key>m</key>
+    <value>1</value>
+    <type>int</type>
+    <hide>$mimo_technique.hide_m</hide>
+  </param>
+  <param>
     <name>Log Debug Info</name>
     <key>log</key>
     <value>False</value>
@@ -192,5 +230,6 @@
   <source>
     <name>out</name>
     <type>complex</type>
+    <nports>$m</nports>
   </source>
 </block>
