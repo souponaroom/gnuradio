@@ -56,6 +56,7 @@ from qam_constellations import *
 from constellation_map_generator import *
 from mimo_encoder_cc import *
 from mimo_decoder_cc import *
+from mimo_ofdm_rx_cb import mimo_ofdm_rx_cb
 
 import packet_utils
 import ofdm_packet_utils
