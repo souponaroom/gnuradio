@@ -77,6 +77,7 @@
 #include "gnuradio/digital/vblast_encoder_cc.h"
 #include "gnuradio/digital/vblast_decoder_cc.h"
 #include "gnuradio/digital/mimo_channel_estimator_cc.h"
+#include "gnuradio/digital/mimo_ofdm_channel_estimator_vcvc.h"
 %}
 
 %include "gnuradio/digital/binary_slicer_fb.h"
@@ -119,6 +120,7 @@
 %include "gnuradio/digital/vblast_encoder_cc.h"
 %include "gnuradio/digital/vblast_decoder_cc.h"
 %include "gnuradio/digital/mimo_channel_estimator_cc.h"
+%include "gnuradio/digital/mimo_ofdm_channel_estimator_vcvc.h"
 
 GR_SWIG_BLOCK_MAGIC2(digital, binary_slicer_fb);
 GR_SWIG_BLOCK_MAGIC2(digital, cma_equalizer_cc);
@@ -155,6 +157,7 @@ GR_SWIG_BLOCK_MAGIC2(digital, diversity_combiner_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, vblast_encoder_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, vblast_decoder_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, mimo_channel_estimator_cc);
+GR_SWIG_BLOCK_MAGIC2(digital, mimo_ofdm_channel_estimator_vcvc);
 
 GR_SWIG_BLOCK_MAGIC_FACTORY(digital, cpmmod_bc, gmskmod_bc);
 

@@ -124,6 +124,7 @@ install(FILES
     diversity_combiner_cc.h
     vblast_encoder_cc.h
     vblast_decoder_cc.h
-    mimo_channel_estimator_cc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
+    mimo_channel_estimator_cc.h
+    mimo_ofdm_channel_estimator_vcvc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
     COMPONENT "digital_devel"
 )
