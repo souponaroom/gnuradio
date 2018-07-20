@@ -41,14 +41,14 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
             seq[m][i] = np.exp(-1j*2*np.pi*m*i/length)
         return seq
 
-    def run_flowgraph(self, M, N, training_sequence, channel_matrix):
+    def run_flowgraph(self, M, N, training_sequence, training_length, channel_matrix):
         # Produce tags.
         tags = [gr.tag_utils.python_to_tag((0,
                                             pmt.string_to_symbol("pilot"),
                                             pmt.from_long(0),
                                             pmt.from_long(0)))]
         # Build GNU Radio blocks.
-        data = np.random.randn(1) + 1j * np.random.randn(1)
+        data = np.random.randn(training_length) + 1j * np.random.randn(training_length)
         src = [blocks.vector_source_c(data=np.append(training_sequence[0], data),
                                       repeat=False,
                                       tags=tags)]
@@ -57,12 +57,16 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
             src.append(blocks.vector_source_c(np.append(training_sequence[m], data)))
         for n in range(1, N):
             sink.append(blocks.null_sink_make(gr.sizeof_gr_complex))
+        # Use a matrix multiplier as a static channel model.
         channel = blocks.multiply_matrix_cc_make(channel_matrix)
         estimator = digital.mimo_channel_estimator_cc(M, N, training_sequence)
+        # Use a head block to terminate the flowgraph.
+        head = blocks.head_make(gr.sizeof_gr_complex, training_length)
         # Connect everything.
         for m in range(0, M):
             self.tb.connect(src[m], (channel, m))
-        for n in range(0, N):
+        self.tb.connect((channel, 0), (estimator, 0), head, sink[0])
+        for n in range(1, N):
             self.tb.connect((channel, n), (estimator, n), sink[n])
         # Run flowgraph.
         self.tb.run()
@@ -74,7 +78,7 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
         return csi
 
 
-    ''' 
+    '''
     2 tests validating the correct estimation of the channel coefficients with a random channel
     and 1xN MIMO scheme. '''
     def test_001_t (self):
@@ -83,12 +87,12 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
         repetitions = 2
         for i in range(0, repetitions):
             N = np.random.randint(1, 65)
-            training_length = M
+            training_length = np.random.randint(M, 65)
             # Produce training sequence and random channel coefficients.
             training_sequence = self.produce_training_seq(M, training_length)
             channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-            estimation = self.run_flowgraph(M, N, training_sequence, channel_matrix)
+            estimation = self.run_flowgraph(M, N, training_sequence, training_length, channel_matrix)
 
             # Check if the expected result equals the actual result.
             for n in range(0, N):
@@ -102,13 +106,13 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
         M = 2
         repetitions = 2
         for i in range(0, repetitions):
-            N = np.random.randint(1, 64)
-            training_length = M#np.random.randint(M, 5)
+            N = np.random.randint(1, 65)
+            training_length = np.random.randint(M, 65)
             # Produce training sequence and random channel coefficients.
             training_sequence = self.produce_training_seq(M, training_length)
             channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-            estimation = self.run_flowgraph(M, N, training_sequence, channel_matrix)
+            estimation = self.run_flowgraph(M, N, training_sequence, training_length, channel_matrix)
 
             # Check if the expected result equals the actual result.
             for n in range(0, N):
@@ -119,16 +123,16 @@ class qa_mimo_channel_estimator_cc (gr_unittest.TestCase):
     and MxN MIMO scheme (M>2). '''
     def test_003_t (self):
         # Test parameters.
-        M = 3#np.random.randint(5, 6)
+        M = np.random.randint(3, 65)
         repetitions = 2
         for i in range(0, repetitions):
-            N = np.random.randint(1, 64)
-            training_length = M#np.random.randint(M, 10)
+            N = np.random.randint(1, 65)
+            training_length = np.random.randint(M, 65)
             # Produce training sequence and random channel coefficients.
             training_sequence = self.produce_training_seq(M, training_length)
             channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-            estimation = self.run_flowgraph(M, N, training_sequence, channel_matrix)
+            estimation = self.run_flowgraph(M, N, training_sequence, training_length, channel_matrix)
 
             # Check if the expected result equals the actual result.
             for n in range(0, N):
