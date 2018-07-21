@@ -37,7 +37,7 @@ namespace gr {
       std::vector<int> d_pilot_carriers;
       std::vector<std::vector<std::vector<gr_complex> > > d_channel_state;
 
-      gr_complex correlate_pilots(const gr_complex* in, std::vector<gr_complex> pilot, uint32_t distance);
+      gr_complex correlate_pilots(const gr_complex* in, std::vector<gr_complex> pilot, uint32_t distance, uint16_t pilot_offset);
       void interpolate_channel_state();
 
      public:
