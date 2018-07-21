@@ -62,7 +62,9 @@ _pilot_sym_scramble_seq = (
         -1,-1,-1,-1, -1,1,-1,1, 1,-1,1,-1, 1,1,1,-1, -1,1,-1,-1, -1,1,1,1, -1,-1,-1,-1, -1,-1,-1
 )
 _def_pilot_symbols= tuple([(x, x, x, -x) for x in _pilot_sym_scramble_seq])
+
 _seq_seed = 42
+
 _walsh_sequences = [
     [1, 1, 1, 1, 1, 1, 1, 1],
     [1,-1, 1,-1, 1,-1, 1,-1],
@@ -275,7 +277,8 @@ class ofdm_tx(gr.hier_block2):
                 rolloff,
                 self.packet_length_tag_key
             )
-            self.connect(header_payload_mux, allocator, ffter, cyclic_prefixer, self)
+            self.normalize = blocks.multiply_const_cc(1.0/numpy.sqrt(fft_len))
+            self.connect(header_payload_mux, allocator, ffter, cyclic_prefixer, self.normalize, self)
             if debug_log:
                 self.connect(allocator,       blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'tx-post-allocator.dat'))
                 self.connect(cyclic_prefixer, blocks.file_sink(gr.sizeof_gr_complex,           'tx-signal.dat'))
@@ -289,8 +292,9 @@ class ofdm_tx(gr.hier_block2):
             allocator = []
             ffter = []
             cyclic_prefixer = []
+            normalize = []
             for i in range(0, self.m):
-                mimo_pilot_symbols = numpy.repeat(_walsh_sequences[self.m][:self.m], 4).reshape((self.m, 4))
+                mimo_pilot_symbols = numpy.repeat(_walsh_sequences[i][:self.m], 4).reshape((self.m, 4))
                 allocator.append(
                     digital.ofdm_carrier_allocator_cvc(
                         self.fft_len,
@@ -317,10 +321,12 @@ class ofdm_tx(gr.hier_block2):
                         self.packet_length_tag_key
                     )
                 )
+                normalize.append(blocks.multiply_const_cc(1.0 / numpy.sqrt(fft_len)))
                 self.connect((mimo_encoder, i),
                              allocator[i],
                              ffter[i],
                              cyclic_prefixer[i],
+                             normalize[i],
                              (self, i))
 
 
