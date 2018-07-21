@@ -31,13 +31,31 @@ namespace gr {
     class mimo_ofdm_channel_estimator_vcvc_impl : public mimo_ofdm_channel_estimator_vcvc
     {
      private:
-      uint16_t d_n;
-      uint32_t d_fft_len;
+      uint16_t d_n; /*!< Number of receiving and transmitting antennas. */
+      uint32_t d_fft_len; /*!< FFT length = Number of OFDM sub-carriers. */
+      /*!< 2-dim vector of the dimensions NxN, containing the training pilot symbols
+       * for each MIMO channel. */
       std::vector<std::vector<gr_complex> > d_pilot_symbols;
-      std::vector<int> d_pilot_carriers;
+      std::vector<int> d_pilot_carriers; /*!< OFDM sub-carriers, where the pilot symbols are located. */
+      /*!< 3-dimensional vector, storing the MIMO CSI from the current OFDM symbol for
+       * each sub-carrier.
+       * The dimensions are fft_len, N, N.
+       */
       std::vector<std::vector<std::vector<gr_complex> > > d_channel_state;
 
+      /*!< Correlates the received pilot symbols with the actual ones.
+       *
+       * @param in Pointer to the first one of the received pilot symbols.
+       * @param pilot Vector with the transmitted pilot symbols.
+       * @param distance Distance between 2 pilot symbols of one sequence. In most cases, the
+       * distance is equal to fft_len.
+       * @param pilot_offset Shift of the pilot training sequence, to properly correlate with the first received symbol.
+       * @return
+       */
       gr_complex correlate_pilots(const gr_complex* in, std::vector<gr_complex> pilot, uint32_t distance, uint16_t pilot_offset);
+      /*!< Linear interpolation over OFDM sub-carriers.
+           The carriers beyond the edge pilot carriers hold the value of the nearest sampling points.
+       */
       void interpolate_channel_state();
 
      public:
