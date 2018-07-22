@@ -60,7 +60,8 @@ namespace gr {
         d_pilot_symbols(pilot_symbols),
         d_pilot_carriers(pilot_carriers)
     {
-      d_channel_state = std::vector<std::vector<std::vector<gr_complex> > > (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (n, 1.0)));
+      d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
+              (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (n, 1.0)));
     }
 
     /*
@@ -82,9 +83,10 @@ namespace gr {
                                                             uint32_t distance,
                                                             uint16_t pilot_offset) {
       gr_complex correlation = 0.0;
-      for (unsigned int i = 0; i < d_n; ++i) { //TODO dont imply pilot symbol length = n
+      for (unsigned int i = 0; i < d_n; ++i) {
         correlation += in[i*distance] * std::conj(pilot[(i+pilot_offset)%d_n]);
       }
+      // Return correlation after normalization.
       return correlation/(gr_complex)d_n;
     }
 
@@ -126,7 +128,6 @@ namespace gr {
         memcpy(out, in, sizeof(gr_complex)*d_fft_len*noutput_items);
       }
 
-
       for (int s = 0; s < noutput_items; ++s) { // Iterate over OFDM symbols.
         for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) { // Iterate over pilot carriers
           for (int i = 0; i < d_n; ++i) { // Iterate over N MIMO input streams.
@@ -135,9 +136,10 @@ namespace gr {
             for (int j = 0; j < d_n; ++j) { // Iterate over N MIMO pilot sequences.
               // Correlate received pilot symbols with reference. The result is the path coefficient h_ij.
               d_channel_state[d_pilot_carriers[c] + d_fft_len / 2][i][j] = correlate_pilots(
-                      &in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * s], d_pilot_symbols[j],
-                      d_fft_len, s%d_n); //TODO formulate more general, what if not synced?!
-              GR_LOG_DEBUG(d_logger, format("Channel state sym %d, carrier %d, i %d, j %d: %d") %s %d_pilot_carriers[c] %i %j %d_channel_state[d_pilot_carriers[c] + d_fft_len / 2][i][j]);
+                      &in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * s],
+                      d_pilot_symbols[j],
+                      d_fft_len,
+                      s%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
             }
           }
         }

@@ -30,11 +30,6 @@
 namespace gr {
   namespace digital {
 
-<<<<<<< HEAD
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
-     *
     /*! \brief Estimates a MIMO channel matrix.
      *
      * The block estimates the channel matrix of a MIMO scheme with the help of

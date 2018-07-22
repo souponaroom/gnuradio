@@ -180,5 +180,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         for i in range(0, self.n):
             self.connect((self, i), (add, i))
         self.connect(add, sum_sync_detect)
-        self.connect((sum_sync_detect, 0), blocks.null_sink(gr.sizeof_float))
+        self.connect((sum_sync_detect, 0), sum_oscillator, sum_mixer,  blocks.null_sink(gr.sizeof_gr_complex))
         self.connect((sum_sync_detect, 1), self)
+        self.connect(add, sum_delay, (sum_mixer, 1))

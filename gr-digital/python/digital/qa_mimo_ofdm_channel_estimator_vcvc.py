@@ -29,17 +29,6 @@ from gnuradio.digital.ofdm_txrx import ofdm_tx
 import numpy as np
 import pmt
 
-_walsh_sequences = [
-    [1, 1, 1, 1, 1, 1, 1, 1],
-    [1,-1, 1,-1, 1,-1, 1,-1],
-    [1, 1,-1,-1, 1, 1,-1,-1],
-    [1,-1,-1, 1, 1,-1,-1, 1],
-    [1, 1, 1, 1,-1,-1,-1,-1],
-    [1,-1, 1,-1,-1, 1,-1, 1],
-    [1, 1,-1,-1,-1,-1, 1, 1],
-    [1,-1,-1, 1,-1, 1, 1,-1]
-]
-
 class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
 
     def setUp (self):
@@ -56,9 +45,17 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
         cp_len = fft_len/4
         N=2
         M=2
-        channel_matrix = np.array([[1j, -2], [1, 2+2j]])#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
-        print 'channel'
-        print channel_matrix
+        channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
+        self.walsh_sequences = np.array([
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, -1, 1, -1, 1, -1, 1, -1],
+            [1, 1, -1, -1, 1, 1, -1, -1],
+            [1, -1, -1, 1, 1, -1, -1, 1],
+            [1, 1, 1, 1, -1, -1, -1, -1],
+            [1, -1, 1, -1, -1, 1, -1, 1],
+            [1, 1, -1, -1, -1, -1, 1, 1],
+            [1, -1, -1, 1, -1, 1, 1, -1]
+        ])
 
         src = blocks.vector_source_b(range(packet_len), True, 1, ())
         s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
@@ -77,7 +74,10 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
         static_channel = blocks.multiply_matrix_cc(channel_matrix)
         fft1 = fft.fft_vcc(fft_len, True, (), True)
         fft2 = fft.fft_vcc(fft_len, True, (), True)
-        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(N, fft_len, _walsh_sequences, [-21, -7, 7, 21])
+        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
+                                                               fft_len=fft_len,
+                                                               pilot_symbols=self.walsh_sequences[:N, :N],
+                                                               pilot_carriers=[-21, -7, 7, 21])
         dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
         dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
         dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
@@ -114,9 +114,9 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
             for n in range(0, N):
                 for m in range(0, M):
                     csi[k][n][m] = pmt.c32vector_ref(pmt.vector_ref(pmt.vector_ref(sink1.tags()[0].value, k), n), m)
-        print 'csi'
-        print csi
-
+        for c in range(0, fft_len):
+            for n in range(0, N):
+                self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 2)
 
 if __name__ == '__main__':
     gr_unittest.run(qa_mimo_ofdm_channel_estimator_vcvc, "qa_mimo_ofdm_channel_estimator_vcvc.xml")
