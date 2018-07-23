@@ -141,6 +141,7 @@ list(APPEND digital_sources
     vblast_decoder_cc_impl.cc
     mimo_channel_estimator_cc_impl.cc
     mimo_ofdm_channel_estimator_vcvc_impl.cc
+    mimo_ofdm_synchronizer_fbcvc_impl.cc
 )
 
 #Add Windows DLL resource file if using MSVC
