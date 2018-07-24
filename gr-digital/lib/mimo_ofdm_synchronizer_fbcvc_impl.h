@@ -31,20 +31,27 @@ namespace gr {
     class mimo_ofdm_synchronizer_fbcvc_impl : public mimo_ofdm_synchronizer_fbcvc
     {
      private:
-      uint16_t d_n;
-      uint16_t d_cp_len;
-      uint16_t d_fft_len;
-      uint16_t d_symbol_len;
-      uint8_t d_sync_sym_count;
-      float d_phase;
+      uint16_t d_n; /*!< Number of receiving antennas N. */
+      uint16_t d_fft_len; /*!< FFT length. */
+      uint16_t d_cp_len; /*!< Cyclic prefix length. */
+      uint16_t d_symbol_len; /*!< FFT length + cyclic prefic length */
+      uint8_t d_sync_sym_count; /*!< Counter for the sync symbols after the start of an OFDM frame. */
+      float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
 
+      /*! \brief Rotates the phase of a complex pointer
+       * by a phase shift per sample which calculates itself out of the frequency offset.
+       *
+       * @param fine_freq_off Pointer to buffer with fine frequency offsets per sample.
+       * @param rotation_length Number of samples to rotate over.
+       */
       void rotate_phase(const float *fine_freq_off, uint16_t rotation_length);
 
      public:
-      mimo_ofdm_synchronizer_fbcvc_impl(const std::vector<gr_complex> &sync_symbol1,
-                                        const std::vector<gr_complex> &sync_symbol2,
+      mimo_ofdm_synchronizer_fbcvc_impl(uint16_t n,
+                                        uint16_t fft_len,
                                         uint16_t cp_len,
-                                        uint16_t n);
+                                        const std::vector<gr_complex> &sync_symbol1,
+                                        const std::vector<gr_complex> &sync_symbol2);
       ~mimo_ofdm_synchronizer_fbcvc_impl();
 
       // Where all the action really happens
