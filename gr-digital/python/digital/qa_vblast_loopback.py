@@ -35,21 +35,24 @@ class qa_vblast_loopback (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def build_and_run_flowgraph(self, repetitions, data_length, num_inputs_min, num_inputs_max, equalizer_type):
+    def build_and_run_flowgraph(self, repetitions, data_length, num_inputs_min, num_inputs_max, equalizer_type, vlen=1):
         for n in range(repetitions):
             num_inputs = np.random.randint(low=num_inputs_min, high=num_inputs_max+1)
             # Generate random input data.
             data = np.random.randn(data_length*num_inputs) + 1j * np.random.randn(data_length*num_inputs)
 
             # Randomly generate CSI for one symbol.
-            csi = (np.random.randn(num_inputs, num_inputs) + 1j * np.random.randn(num_inputs, num_inputs))
+            csi = (np.random.randn(vlen, num_inputs, num_inputs) + 1j * np.random.randn(vlen, num_inputs, num_inputs))
             # Assign the CSI vector to a PMT vector.
-            csi_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0))
-            for k, rx in enumerate(csi):
-                line_vector_pmt = pmt.make_c32vector(num_inputs, csi[k][0])
-                for l, tx in enumerate(csi[k]):
-                    pmt.c32vector_set(v=line_vector_pmt, k=l, x=csi[k][l])
-                pmt.vector_set(csi_pmt, k, line_vector_pmt)
+            csi_pmt = pmt.make_vector(vlen, pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0)))
+            for k, carrier in enumerate(csi):
+                carrier_vector_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, csi[k][0][0]))
+                for l, rx in enumerate(csi[k]):
+                    line_vector_pmt = pmt.make_c32vector(num_inputs, csi[k][l][0])
+                    for m, tx in enumerate(csi[k][l]):
+                        pmt.c32vector_set(v=line_vector_pmt, k=m, x=csi[k][l][m])
+                    pmt.vector_set(carrier_vector_pmt, l, line_vector_pmt)
+                pmt.vector_set(csi_pmt, k, carrier_vector_pmt)
 
             # Append stream tags with CSI to data stream.
 
@@ -71,7 +74,7 @@ class qa_vblast_loopback (gr_unittest.TestCase):
                                          tags=tags)
             vblast_encoder = digital.vblast_encoder_cc(num_inputs)
             # Simulate channel with matrix multiplication.
-            channel = blocks.multiply_matrix_cc_make(csi)
+            channel = blocks.multiply_matrix_cc_make(csi[0])
             vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type)
             sink = blocks.vector_sink_c()
             self.tb.connect(src, vblast_encoder)
