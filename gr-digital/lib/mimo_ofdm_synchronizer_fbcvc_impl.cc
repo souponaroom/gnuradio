@@ -67,7 +67,10 @@ namespace gr {
         d_fft_len(fft_len),
         d_cp_len(cp_len),
         d_sync_sym_count(0),
-        d_phase(0.)
+        d_phase(0.),
+        d_corr_v(sync_symbol2),
+        d_first_active_carrier(0),
+        d_last_active_carrier(sync_symbol2.size()-1)
     {
       // Check if both sync symbols have the length fft_len
       if (sync_symbol1.size() != sync_symbol2.size()) {
@@ -77,6 +80,12 @@ namespace gr {
         throw std::invalid_argument("sync symbols must have length fft_len.");
       }
       d_symbol_len = d_fft_len + d_cp_len;
+      // Set up coarse freq estimation info
+      // Allow all possible values:
+      d_max_neg_carr_offset = -d_first_active_carrier;
+      d_max_pos_carr_offset = d_fft_len - d_last_active_carrier - 1;
+      d_rec_sync_symbol1 = std::vector<gr_complex> (fft_len, 0.0);
+      d_rec_sync_symbol2 = std::vector<gr_complex> (fft_len, 0.0);
     }
 
     /*
@@ -102,6 +111,29 @@ namespace gr {
       }
       // Place the phase in [0, pi)
       d_phase = std::fmod(d_phase, 2.*M_PI);
+    }
+
+    int
+    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const std::vector<gr_complex> &sync_sym1,
+                                                       const std::vector<gr_complex> &sync_sym2)
+    {
+      int carr_offset = 0;
+      // Use Schmidl & Cox method
+      float Bg_max = 0;
+      // g here is 2g in the paper
+      for (int g = d_max_neg_carr_offset; g <= d_max_pos_carr_offset; g += 2) {
+        gr_complex tmp = gr_complex(0, 0);
+        for (int k = 0; k < d_fft_len; k++) {
+          if (d_corr_v[k] != gr_complex(0, 0)) {
+            tmp += std::conj(sync_sym1[k+g]) * std::conj(d_corr_v[k]) * sync_sym2[k+g];
+          }
+        }
+        if (std::abs(tmp) > Bg_max) {
+          Bg_max = std::abs(tmp);
+          carr_offset = g;
+        }
+      }
+      return carr_offset;
     }
 
     int
@@ -182,24 +214,44 @@ namespace gr {
           // No triggers were found in the next symbol, check if there is a trigger at the beginning.
           if (trigger[nconsumed] == 1){
             // There is a trigger at the beginning of the symbol.
-            // We dump the first of 2 sync symbols and rotate the phase.
-            rotate_phase(&fine_freq_off[nconsumed], d_symbol_len);
-            nconsumed += d_symbol_len;
+            // We write the first of 2 sync symbols of the reference signal in a separate buffer and rotate the phase.
+            rotate_phase(&fine_freq_off[nconsumed], d_cp_len);
+            nconsumed += d_cp_len;
+            for (int j = 0; j < d_fft_len; ++j) {
+              // Calculate the modulated signal for fine frequency correction.
+              gr_complex fine_freq_corr = std::polar((float)1.0, -d_phase);
+              d_rec_sync_symbol1[j] = ref_sig[nconsumed+j] * fine_freq_corr;
+              rotate_phase(&fine_freq_off[nconsumed+j], 1);
+            }
+            nconsumed += d_fft_len;
             d_sync_sym_count = 1;
           } else if(d_sync_sym_count == 1){
             // There is no trigger at the beginning of the symbol but there was one at the beginning of the previous symbol.
-            // We dump the second of the 2 sync symbols and rotate the phase.
-            rotate_phase(&fine_freq_off[nconsumed], d_symbol_len);
-            nconsumed += d_symbol_len;
+            // We write the second of 2 sync symbols of the reference signal in a separate buffer and rotate the phase.
+            rotate_phase(&fine_freq_off[nconsumed], d_cp_len);
+            nconsumed += d_cp_len;
+            for (int j = 0; j < d_fft_len; ++j) {
+              // Calculate the modulated signal for fine frequency correction.
+              gr_complex fine_freq_corr = std::polar((float)1.0, -d_phase);
+              d_rec_sync_symbol2[j] = ref_sig[nconsumed+j] * fine_freq_corr;
+              rotate_phase(&fine_freq_off[nconsumed+j], 1);
+            }
+            nconsumed += d_fft_len;
             d_sync_sym_count = 2;
           } else {
             // Check if this is the first symbol after the 2 sync symbols.
             if (d_sync_sym_count == 2){
               // Set start tag on this symbol.
               add_item_tag(0,
-                           (nitems_written(0) + nwritten)/d_fft_len,
+                           nitems_written(0) + nwritten/d_fft_len,
                            pmt::mp("start_of_frame"),
                            pmt::from_long(0));
+              // Calculate frequency integer carrier offset and tag it.
+              int carr_offset = get_carr_offset(d_rec_sync_symbol1, d_rec_sync_symbol2);
+              add_item_tag(0,
+                           nitems_written(0) + nwritten/d_fft_len,
+                           pmt::mp("ofdm_sync_carr_offset"),
+                           pmt::from_long(carr_offset));
               // Reset sync symbol counter.
               d_sync_sym_count = 0;
             }

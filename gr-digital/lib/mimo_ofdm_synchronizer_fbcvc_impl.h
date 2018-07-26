@@ -38,6 +38,18 @@ namespace gr {
       uint8_t d_sync_sym_count; /*!< Counter for the sync symbols after the start of an OFDM frame. */
       float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
 
+      std::vector<gr_complex> d_corr_v;
+      std::vector<gr_complex> d_rec_sync_symbol1;
+      std::vector<gr_complex> d_rec_sync_symbol2;
+      //! The index of the first carrier with data (index 0 is not DC here, but the lowest frequency)
+      int d_first_active_carrier;
+      //! The index of the last carrier with data
+      int d_last_active_carrier;
+      //! Maximum carrier offset (negative value!)
+      int d_max_neg_carr_offset;
+      //! Maximum carrier offset (positive value!)
+      int d_max_pos_carr_offset;
+
       /*! \brief Rotates the phase of a complex pointer
        * by a phase shift per sample which calculates itself out of the frequency offset.
        *
@@ -45,6 +57,10 @@ namespace gr {
        * @param rotation_length Number of samples to rotate over.
        */
       void rotate_phase(const float *fine_freq_off, uint16_t rotation_length);
+
+      /*! Calculate the coarse frequency offset in number of carriers. */
+      int get_carr_offset(const std::vector<gr_complex> &sync_sym1,
+                          const std::vector<gr_complex> &sync_sym2);
 
      public:
       mimo_ofdm_synchronizer_fbcvc_impl(uint16_t n,
