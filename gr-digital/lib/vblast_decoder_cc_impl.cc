@@ -179,7 +179,7 @@ namespace gr {
                                             uint32_t length) {
       std::fill(out, &out[length*d_vlen*d_num_inputs], 0.0);
       for (int n = 0; n < d_num_inputs; ++n) {
-        gr_complex *in = &((gr_complex *) input[n])[offset/(d_vlen*d_num_inputs)];
+        gr_complex *in = &((gr_complex *) input[n])[offset/(d_num_inputs)];
         for (unsigned int i = 0; i < length; ++i) {
           for (int k = 0; k < d_vlen; ++k) {
             for (int j = 0; j < d_num_inputs; ++j) {

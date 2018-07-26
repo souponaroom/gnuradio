@@ -35,16 +35,17 @@ class qa_vblast_loopback (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def build_and_run_flowgraph(self, repetitions, data_length, num_inputs_min, num_inputs_max, equalizer_type, vlen=1):
-        for n in range(repetitions):
+    def build_and_run_flowgraph(self, repetitions, data_length, num_inputs_min, num_inputs_max, equalizer_type, vlen=[1, 1]):
+        for a in range(repetitions):
             num_inputs = np.random.randint(low=num_inputs_min, high=num_inputs_max+1)
             # Generate random input data.
-            data = np.random.randn(data_length*num_inputs) + 1j * np.random.randn(data_length*num_inputs)
+            data = np.random.randn(data_length*num_inputs*vlen[a]) + 1j * np.random.randn(data_length*num_inputs*vlen[a])
 
             # Randomly generate CSI for one symbol.
-            csi = (np.random.randn(vlen, num_inputs, num_inputs) + 1j * np.random.randn(vlen, num_inputs, num_inputs))
+            csi = (np.random.randn(vlen[a], num_inputs, num_inputs) + 1j * np.random.randn(vlen[a], num_inputs, num_inputs))
+
             # Assign the CSI vector to a PMT vector.
-            csi_pmt = pmt.make_vector(vlen, pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0)))
+            csi_pmt = pmt.make_vector(vlen[a], pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0)))
             for k, carrier in enumerate(csi):
                 carrier_vector_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, csi[k][0][0]))
                 for l, rx in enumerate(csi[k]):
@@ -73,14 +74,28 @@ class qa_vblast_loopback (gr_unittest.TestCase):
                                          repeat=False,
                                          tags=tags)
             vblast_encoder = digital.vblast_encoder_cc(num_inputs)
-            # Simulate channel with matrix multiplication.
-            channel = blocks.multiply_matrix_cc_make(csi[0])
-            vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type)
+            demux = []
+            channels = []
+            for i in range(0, vlen[a]):
+                for j in range(0, num_inputs):
+                    demux.append(blocks.keep_m_in_n(gr.sizeof_gr_complex, 1, vlen[a], i))
+                # Simulate channel with matrix multiplication.
+                channels.append(blocks.multiply_matrix_cc_make(csi[i]))
+            mux = []
+            s2v = []
+            for i in range(0, num_inputs):
+                mux.append(blocks.stream_mux(gr.sizeof_gr_complex, [1]*vlen[a]))
+                s2v.append(blocks.stream_to_vector(gr.sizeof_gr_complex, vlen[a]))
+
+            vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type, vlen[a])
             sink = blocks.vector_sink_c()
             self.tb.connect(src, vblast_encoder)
             for n in range(0, num_inputs):
-                self.tb.connect((vblast_encoder, n), (channel, n))
-                self.tb.connect((channel, n), (vblast_decoder, n))
+                for i in range(0, vlen[a]):
+                    self.tb.connect((vblast_encoder, n), demux[i*num_inputs+n], (channels[i], n))
+                    self.tb.connect((channels[i], n), (mux[n], i))
+                self.tb.connect(mux[n], s2v[n], (vblast_decoder, n))
+
             self.tb.connect(vblast_decoder, sink)
             # Run flowgraph.
             self.tb.run()
@@ -90,71 +105,77 @@ class qa_vblast_loopback (gr_unittest.TestCase):
             we do a loopback) equals the actual result. '''
             self.assertComplexTuplesAlmostEqual(data, sink.data(), 2)
 
-    ''' 
-    2 tests validating the correct output of the loopback with random input data, ZF equalizer
-    and 1x1 MIMO scheme. '''
+    '''
+    2 tests validating the correct output of the loopback with random input data, ZF equalizer,
+    1x1 MIMO scheme and vector lengths {1,[2,16]}. '''
 
     def test_001_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=10,
+                                     data_length=4,
                                      num_inputs_min=1,
                                      num_inputs_max=1,
-                                     equalizer_type='ZF')
+                                     equalizer_type='ZF',
+                                     vlen=[1, np.random.randint(2,17)])
 
-    ''' 
-    2 tests validating the correct output of the loopback with random input data, MMSE equalizer
-    and 1x1 MIMO scheme. '''
+    '''
+    2 tests validating the correct output of the loopback with random input data, MMSE equalizer,
+    1x1 MIMO scheme, vector lengths {1,[2,16]} and an extremely high SNR regime (1/snr -> 0). '''
 
     def test_002_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=10,
+                                     data_length=4,
                                      num_inputs_min=1,
                                      num_inputs_max=1,
-                                     equalizer_type='MMSE')
+                                     equalizer_type='MMSE',
+                                     vlen=[1, np.random.randint(2, 17)])
 
-    ''' 
-    2 tests validating the correct output of the loopback with random input data, ZF equalizer
-    and 2x2 MIMO scheme. '''
+    '''
+    2 tests validating the correct output of the loopback with random input data, ZF equalizer,
+    1x1 MIMO scheme and vector lengths {1,[2,16]}. '''
 
     def test_003_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=10,
+                                     data_length=4,
                                      num_inputs_min=2,
                                      num_inputs_max=2,
-                                     equalizer_type='ZF')
+                                     equalizer_type='ZF',
+                                     vlen=[1, np.random.randint(2, 17)])
 
-    ''' 
-    2 tests validating the correct output of the loopback with random input data, MMSE equalizer
-    and 2x2 MIMO scheme and an extremely high SNR regime (1/snr -> 0). '''
+    '''
+    2 tests validating the correct output of the loopback with random input data, MMSE equalizer,
+    1x1 MIMO scheme, vector lengths {1,[2,16]} and an extremely high SNR regime (1/snr -> 0). '''
 
     def test_004_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=10,
+                                     data_length=4,
                                      num_inputs_min=2,
                                      num_inputs_max=2,
-                                     equalizer_type='MMSE')
+                                     equalizer_type='MMSE',
+                                     vlen=[1, np.random.randint(2, 17)])
 
-    ''' 
-    2 tests validating the correct output of the loopback with random input data, ZF equalizer
-    and MxM MIMO scheme with M in [3, 16]. '''
+    '''
+    2 tests validating the correct output of the loopback with random input data, ZF equalizer,
+    1x1 MIMO scheme and vector lengths {1,2}. '''
 
     def test_005_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=10,
+                                     data_length=4,
                                      num_inputs_min=3,
                                      num_inputs_max=16,
-                                     equalizer_type='ZF')
+                                     equalizer_type='ZF',
+                                     vlen=[1, 2])
 
-    ''' 
-    2 tests validating the correct output of the loopback with random input data, MMSE equalizer
-    and MxM MIMO scheme with M in [3, 16]. '''
+    '''
+    2 tests validating the correct output of the loopback with random input data, MMSE equalizer,
+    1x1 MIMO scheme, vector lengths {1,2} and an extremely high SNR regime (1/snr -> 0). '''
 
     def test_006_t(self):
         self.build_and_run_flowgraph(repetitions=2,
-                                     data_length=10,
+                                     data_length=4,
                                      num_inputs_min=3,
                                      num_inputs_max=16,
-                                     equalizer_type='MMSE')
+                                     equalizer_type='MMSE',
+                                     vlen=[1, 2])
 
 if __name__ == '__main__':
     gr_unittest.run(qa_vblast_loopback, "qa_vblast_loopback.xml")
