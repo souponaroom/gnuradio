@@ -34,6 +34,10 @@ namespace gr {
  * channel state information and MMSE additionally needs SNR information.
  *
  * The CSI and SNR information is transported via stream tags with key='csi' or 'snr', respectively.
+ * The CSI must be a 3-dimensional vector with the dimensions vlen, num_inputs, num_inputs. For vlen>1
+ * there is provided a separate channel matrix for each vector element. Set vlen>1 if you use a
+ * multicarrier system like OFDM (in this case it would be vlen=number of occupied sub-carriers).
+ * To generate a proper CSI tag, use the pmt structure pmt_vector(pmt_vector(pmt_c32vector))).
  * Initially the CSI is set to 1.0 + 0j for both branches and are updated
  * with each incoming CSI. The SNR is initially set to 1.0e6; in this case is the MMSE equalizer equal
  * to the ZF equalizer. The CSI and SNR tags are processed separately and they can therefore arrive
@@ -48,11 +52,12 @@ namespace gr {
       uint16_t d_num_inputs; /*!< Number of inputs ports. This equals the interpolation rate.*/
       std::string d_equalizer_type; /*!< Equalization technique zero forcing 'ZF' or
  * minimum mean squared error 'MMSE'. */
+      uint16_t d_vlen; /*!< Vector length of the incoming items. */
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const std::string s; /*!< String that matches the key of the CSI tags. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      std::vector<std::vector<gr_complex> > d_csi; /*!< Current channel matrix. */
-      std::vector<std::vector<gr_complex> > d_mimo_equalizer; /*!< Equalizer matrix.
+      std::vector<std::vector<std::vector<gr_complex> > > d_csi; /*!< Current channel matrix. */
+      std::vector<std::vector<std::vector<gr_complex> > > d_mimo_equalizer; /*!< Equalizer matrix.
  * The left-sided matrix multiplication of the mimo_equalizer with the reception vector produces
  * the decoded data vector.
  */
@@ -74,7 +79,7 @@ namespace gr {
       void equalize_symbol(gr_vector_const_void_star input, gr_complex* out, uint32_t offset, uint32_t length);
 
      public:
-      vblast_decoder_cc_impl(uint16_t num_inputs, std::string equalizer_type);
+      vblast_decoder_cc_impl(uint16_t num_inputs, std::string equalizer_type, uint16_t vlen);
       ~vblast_decoder_cc_impl();
 
       // Where all the action really happens

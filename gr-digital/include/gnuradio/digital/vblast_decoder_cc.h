@@ -37,6 +37,10 @@ namespace gr {
  * channel state information and MMSE additionally needs SNR information.
  *
  * The CSI and SNR information is transported via stream tags with key='csi' or 'snr', respectively.
+ * The CSI must be a 3-dimensional vector with the dimensions vlen, num_inputs, num_inputs. For vlen>1
+ * there is provided a separate channel matrix for each vector element. Set vlen>1 if you use a
+ * multicarrier system like OFDM (in this case it would be vlen=number of occupied sub-carriers).
+ * To generate a proper CSI tag, use the pmt structure pmt_vector(pmt_vector(pmt_c32vector))).
  * Initially the CSI is set to 1.0 + 0j for both branches and are updated
  * with each incoming CSI. The SNR is initially set to 1.0e6; in this case is the MMSE equalizer equal
  * to the ZF equalizer. The CSI and SNR tags are processed separately and they can therefore arrive
@@ -58,7 +62,7 @@ namespace gr {
        * class. digital::vblast_decoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t num_inputs, std::string equalizer_type);
+      static sptr make(uint16_t num_inputs, std::string equalizer_type, uint16_t vlen=1);
     };
 
   } // namespace digital

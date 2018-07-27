@@ -35,7 +35,7 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def dice_csi_tags(self, data, type, num_inputs, num_tags, tag_pos):
+    def dice_csi_tags(self, data, type, num_inputs, num_tags, tag_pos, vlen=1):
         tags = []
         expected_result = np.empty([np.size(data, 0)*np.size(data,1)], dtype=complex)
 
@@ -48,14 +48,17 @@ class qa_vblast_decoder_cc (gr_unittest.TestCase):
 
         for i in range(0, num_tags):
             # Randomly generate CSI for one symbol.
-            csi = (np.random.randn(num_inputs, num_inputs) + 1j * np.random.randn(num_inputs, num_inputs))
+            csi = (np.random.randn(vlen, num_inputs, num_inputs) + 1j * np.random.randn(vlen, num_inputs, num_inputs))
             # Assign the CSI vector to a PMT vector.
-            csi_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0))
-            for k, rx in enumerate(csi):
-                line_vector_pmt = pmt.make_c32vector(num_inputs, csi[k][0])
-                for l, tx in enumerate(csi[k]):
-                    pmt.c32vector_set(v=line_vector_pmt, k=l, x=csi[k][l])
-                pmt.vector_set(csi_pmt, k, line_vector_pmt)
+            csi_pmt = pmt.make_vector(vlen, pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, 1.0)))
+            for k, carrier in enumerate(csi):
+                carrier_vector_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(num_inputs, csi[k][0][0]))
+                for l, rx in enumerate(csi[k]):
+                    line_vector_pmt = pmt.make_c32vector(num_inputs, csi[k][l][0])
+                    for m, tx in enumerate(csi[k][l]):
+                        pmt.c32vector_set(v=line_vector_pmt, k=m, x=csi[k][l][m])
+                    pmt.vector_set(carrier_vector_pmt, l, line_vector_pmt)
+                pmt.vector_set(csi_pmt, k, carrier_vector_pmt)
 
             # Append stream tags with CSI to data stream.
             tags.append(gr.tag_utils.python_to_tag((tag_pos[i],

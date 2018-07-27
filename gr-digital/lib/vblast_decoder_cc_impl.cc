@@ -42,25 +42,28 @@ namespace gr {
     const pmt::pmt_t vblast_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
 
     vblast_decoder_cc::sptr
-    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type)
+    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type, uint16_t vlen)
     {
       return gnuradio::get_initial_sptr
-        (new vblast_decoder_cc_impl(num_inputs, equalizer_type));
+        (new vblast_decoder_cc_impl(num_inputs, equalizer_type, vlen));
     }
 
     /*
      * The private constructor
      */
-    vblast_decoder_cc_impl::vblast_decoder_cc_impl(uint16_t num_inputs, std::string equalizer_type)
+    vblast_decoder_cc_impl::vblast_decoder_cc_impl(uint16_t num_inputs,
+                                                   std::string equalizer_type,
+                                                   uint16_t vlen)
       : gr::sync_interpolator("vblast_decoder_cc",
-              gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)),
-              gr::io_signature::make(1, 1, sizeof(gr_complex)), num_inputs),
+              gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)*vlen),
+              gr::io_signature::make(1, 1, sizeof(gr_complex)), num_inputs*vlen),
         d_num_inputs(num_inputs),
-        d_equalizer_type(equalizer_type)
+        d_equalizer_type(equalizer_type),
+        d_vlen(vlen)
     {
       // Init CSI array and mimo_equalizer.
-      d_csi = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
-      d_mimo_equalizer = std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0));
+      d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0)));
+      d_mimo_equalizer = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0)));
       d_snr = std::vector<float>(num_inputs, 1.0e6);
     }
 
@@ -78,30 +81,36 @@ namespace gr {
         switch (d_num_inputs) {
           case 1: {
             // SISO case.
-            d_mimo_equalizer[0][0] = (gr_complex) 1./d_csi[0][0];
+            for (int k = 0; k < d_vlen; ++k) {
+              d_mimo_equalizer[k][0][0] = (gr_complex) 1./d_csi[k][0][0];
+            }
             break;
           }
           case 2: {
-            gr_complex c = d_csi[0][0] * d_csi[1][1] - d_csi[0][1] * d_csi[1][0];
-            d_mimo_equalizer[0][0] = d_csi[1][1] / c;
-            d_mimo_equalizer[0][1] = -d_csi[0][1] / c;
-            d_mimo_equalizer[1][0] = -d_csi[1][0] / c;
-            d_mimo_equalizer[1][1] = d_csi[0][0] / c;
+            for (int k = 0; k < d_vlen; ++k) {
+              gr_complex c = d_csi[k][0][0] * d_csi[k][1][1] - d_csi[k][0][1] * d_csi[k][1][0];
+              d_mimo_equalizer[k][0][0] = d_csi[k][1][1] / c;
+              d_mimo_equalizer[k][0][1] = -d_csi[k][0][1] / c;
+              d_mimo_equalizer[k][1][0] = -d_csi[k][1][0] / c;
+              d_mimo_equalizer[k][1][1] = d_csi[k][0][0] / c;
+            }
             break;
           }
           default: {
 #if (EIGEN3_ENABLED)
-            // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
-            Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
-            for (int i = 0; i < d_num_inputs; ++i) {
-              csi_matrix.row(i) = Eigen::VectorXcf::Map(&d_csi[i][0], d_csi[i].size());
-            }
-            // Calculate the inverse of the CSI matrix.
-            Eigen::MatrixXcf csi_inverse = csi_matrix.inverse();
+            for (int k = 0; k < d_vlen; ++k){
+              // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
+              Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
+              for (int i = 0; i < d_num_inputs; ++i) {
+                csi_matrix.row(i) = Eigen::VectorXcf::Map(&d_csi[k][i][0], d_csi[k][i].size());
+              }
+              // Calculate the inverse of the CSI matrix.
+              Eigen::MatrixXcf csi_inverse = csi_matrix.inverse();
 
-            // Map the inverse of the Eigen MatrixXcf to the 2-dim equalizer std::vector.
-            for (int i = 0; i < d_num_inputs; ++i) {
-              Eigen::VectorXcf::Map(&d_mimo_equalizer[i][0], csi_matrix.row(i).size()) = csi_inverse.row(i);
+              // Map the inverse of the Eigen MatrixXcf to the 2-dim equalizer std::vector.
+              for (int i = 0; i < d_num_inputs; ++i) {
+                Eigen::VectorXcf::Map(&d_mimo_equalizer[k][i][0], csi_matrix.row(i).size()) = csi_inverse.row(i);
+              }
             }
 #else
             throw std::runtime_error("Required library Eigen3 for MxM MIMO schemes with M>2 not installed.");
@@ -113,39 +122,45 @@ namespace gr {
         switch (d_num_inputs) {
           case 1: {
             // SISO case.
-            d_mimo_equalizer[0][0] = std::conj(d_csi[0][0]) / (std::norm(d_csi[0][0])+(gr_complex) 1./d_snr[0]);
+            for (int k = 0; k < d_vlen; ++k) {
+              d_mimo_equalizer[k][0][0] = std::conj(d_csi[k][0][0]) / (std::norm(d_csi[k][0][0])+(gr_complex) 1./d_snr[0]);
+            }
             break;
           }
           case 2: {
-            gr_complex a = std::norm(d_csi[0][0]) + std::norm(d_csi[1][0]) + 1./d_snr[0];
-            gr_complex b = std::conj(d_csi[0][0])*d_csi[0][1] + std::conj(d_csi[1][0])*d_csi[1][1];
-            gr_complex c = std::conj(d_csi[0][1])*d_csi[0][0] + std::conj(d_csi[1][1])*d_csi[1][0];
-            gr_complex d = std::norm(d_csi[0][1]) + std::norm(d_csi[1][1]) + 1./d_snr[1];
-            gr_complex e = a*d-b*c;
+            for (int k = 0; k < d_vlen; ++k) {
+              gr_complex a = std::norm(d_csi[k][0][0]) + std::norm(d_csi[k][1][0]) + 1./d_snr[0];
+              gr_complex b = std::conj(d_csi[k][0][0])*d_csi[k][0][1] + std::conj(d_csi[k][1][0])*d_csi[k][1][1];
+              gr_complex c = std::conj(d_csi[k][0][1])*d_csi[k][0][0] + std::conj(d_csi[k][1][1])*d_csi[k][1][0];
+              gr_complex d = std::norm(d_csi[k][0][1]) + std::norm(d_csi[k][1][1]) + 1./d_snr[1];
+              gr_complex e = a*d-b*c;
 
-            d_mimo_equalizer[0][0] = (std::conj(d_csi[0][0])*d - std::conj(d_csi[0][1])*b)/e;
-            d_mimo_equalizer[0][1] = (std::conj(d_csi[1][0])*d - std::conj(d_csi[1][1])*b)/e;
-            d_mimo_equalizer[1][0] = (std::conj(d_csi[0][1])*a - std::conj(d_csi[0][0])*c)/e;
-            d_mimo_equalizer[1][1] = (std::conj(d_csi[1][1])*a - std::conj(d_csi[1][0])*c)/e;
+              d_mimo_equalizer[k][0][0] = (std::conj(d_csi[k][0][0])*d - std::conj(d_csi[k][0][1])*b)/e;
+              d_mimo_equalizer[k][0][1] = (std::conj(d_csi[k][1][0])*d - std::conj(d_csi[k][1][1])*b)/e;
+              d_mimo_equalizer[k][1][0] = (std::conj(d_csi[k][0][1])*a - std::conj(d_csi[k][0][0])*c)/e;
+              d_mimo_equalizer[k][1][1] = (std::conj(d_csi[k][1][1])*a - std::conj(d_csi[k][1][0])*c)/e;
+            }
             break;
           }
           default: {
 #if (EIGEN3_ENABLED)
-            // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
-            Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
-            for (int i = 0; i < d_num_inputs; ++i) {
-              csi_matrix.row(i) = Eigen::VectorXcf::Map(&d_csi[i][0], d_csi[i].size());
-            }
-            // Calculate the pseudo-inverse fo the CSI matrix.
-            Eigen::MatrixXcf snr_matrix = Eigen::MatrixXcf::Zero(d_num_inputs, d_num_inputs);
-            for (int j = 0; j < d_num_inputs; ++j) {
-              snr_matrix.coeffRef(j, j) = (gr_complex)(1.0 / d_snr[j]);
-            }
-            Eigen::MatrixXcf csi_pseudo_inverse = (csi_matrix.adjoint()*csi_matrix + snr_matrix).inverse() * csi_matrix.adjoint();
+            for (int k = 0; k < d_vlen; ++k){
+              // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
+              Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
+              for (int i = 0; i < d_num_inputs; ++i) {
+                csi_matrix.row(i) = Eigen::VectorXcf::Map(&d_csi[k][i][0], d_csi[k][i].size());
+              }
+              // Calculate the pseudo-inverse fo the CSI matrix.
+              Eigen::MatrixXcf snr_matrix = Eigen::MatrixXcf::Zero(d_num_inputs, d_num_inputs);
+              for (int j = 0; j < d_num_inputs; ++j) {
+                snr_matrix.coeffRef(j, j) = (gr_complex)(1.0 / d_snr[j]);
+              }
+              Eigen::MatrixXcf csi_pseudo_inverse = (csi_matrix.adjoint()*csi_matrix + snr_matrix).inverse() * csi_matrix.adjoint();
 
-            // Map the inverse of the Eigen MatrixXcf to the 2-dim equalizer std::vector.
-            for (int i = 0; i < d_num_inputs; ++i) {
-              Eigen::VectorXcf::Map(&d_mimo_equalizer[i][0], csi_matrix.row(i).size()) = csi_pseudo_inverse.row(i);
+              // Map the inverse of the Eigen MatrixXcf to the 2-dim equalizer std::vector.
+              for (int i = 0; i < d_num_inputs; ++i) {
+                Eigen::VectorXcf::Map(&d_mimo_equalizer[k][i][0], csi_matrix.row(i).size()) = csi_pseudo_inverse.row(i);
+              }
             }
 #else
             throw std::runtime_error("Required library Eigen3 for MxM MIMO schemes with M>2 not installed.");
@@ -162,12 +177,14 @@ namespace gr {
                                             gr_complex* out,
                                             uint32_t offset,
                                             uint32_t length) {
-      std::fill(out, &out[length*d_num_inputs], 0.0);
+      std::fill(out, &out[length*d_vlen*d_num_inputs], 0.0);
       for (int n = 0; n < d_num_inputs; ++n) {
-        gr_complex *in = &((gr_complex *) input[n])[offset/d_num_inputs];
+        gr_complex *in = &((gr_complex *) input[n])[offset/(d_num_inputs)];
         for (unsigned int i = 0; i < length; ++i) {
-          for (int j = 0; j < d_num_inputs; ++j) {
-            out[i*d_num_inputs + j] += d_mimo_equalizer[j][n] * in[i];
+          for (int k = 0; k < d_vlen; ++k) {
+            for (int j = 0; j < d_num_inputs; ++j) {
+              out[i*d_num_inputs*d_vlen + k*d_num_inputs + j] += d_mimo_equalizer[k][j][n] * in[i*d_vlen + k];
+            }
           }
         }
       }
@@ -188,32 +205,35 @@ namespace gr {
 
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
-        symbol_length = noutput_items;
+        symbol_length = noutput_items/(d_vlen*d_num_inputs);
         equalize_symbol(input_items, out, nprocessed, symbol_length);
-        nprocessed += symbol_length;
+        nprocessed += symbol_length*d_vlen*d_num_inputs;
       } else { // Input buffer includes tags.
         if (tags[0].offset - nitems_read(0) > 0){
           /* There are items in the input buffer, before the first tag arrives,
            * which belong to the previous symbol. */
-          symbol_length = (tags[0].offset - nitems_read(0))*d_num_inputs;
+          symbol_length = (tags[0].offset - nitems_read(0));
           equalize_symbol(input_items, out, nprocessed, symbol_length);
-          nprocessed += symbol_length;
+          nprocessed += symbol_length*d_vlen*d_num_inputs;
         }
         // Iterate over tags in buffer.
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
             // This is not the last tag.
-            symbol_length = (tags[i + 1].offset - tags[i].offset)*d_num_inputs;
+            symbol_length = (tags[i + 1].offset - tags[i].offset);
           } else {
             // This is the last tag.
-            symbol_length = noutput_items - (tags[i].offset - nitems_read(0))*d_num_inputs;
+            symbol_length = noutput_items - (tags[i].offset - nitems_read(0));
           }
           // Check the key of the tag.
           if (pmt::symbol_to_string(tags[i].key).compare("csi") == 0) {
             // Get CSI from 'csi' tag.
-            for (unsigned j = 0; j < pmt::length(tags[i].value); ++j) {
-              d_csi[j] = pmt::c32vector_elements(pmt::vector_ref(tags[i].value, j));
+            for (unsigned int k = 0; k < pmt::length(tags[i].value); ++k) {
+              pmt::pmt_t carrier_csi = pmt::vector_ref(tags[i].value, k);
+              for (unsigned int j = 0; j < pmt::length(carrier_csi); ++j) {
+                d_csi[k][j] = pmt::c32vector_elements(pmt::vector_ref(carrier_csi, j));
+              }
             }
             // Calculate the weighting vector for the next symbol with the received CSI.
             update_mimo_equalizer();
@@ -224,7 +244,7 @@ namespace gr {
           }
           // Process the symbol with the calculated weighting vector.
           equalize_symbol(input_items, &out[nprocessed], nprocessed, symbol_length);
-          nprocessed += symbol_length;
+          nprocessed += symbol_length*d_vlen*d_num_inputs;
         }
       }
 
