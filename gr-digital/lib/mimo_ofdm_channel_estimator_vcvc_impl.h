@@ -37,6 +37,8 @@ namespace gr {
        * for each MIMO channel. */
       std::vector<std::vector<gr_complex> > d_pilot_symbols;
       std::vector<int> d_pilot_carriers; /*!< OFDM sub-carriers, where the pilot symbols are located. */
+      std::vector<int> d_occupied_carriers;
+      uint32_t d_output_vlen;
       /*!< 3-dimensional vector, storing the MIMO CSI from the current OFDM symbol for
        * each sub-carrier.
        * The dimensions are fft_len, N, N.
@@ -62,7 +64,8 @@ namespace gr {
       mimo_ofdm_channel_estimator_vcvc_impl(uint16_t n,
                                             uint32_t fft_len,
                                             std::vector<std::vector<gr_complex> > pilot_symbols,
-                                            std::vector<int> pilot_carriers);
+                                            std::vector<int> pilot_carriers,
+                                            std::vector<int> occupied_carriers);
       ~mimo_ofdm_channel_estimator_vcvc_impl();
 
       // Where all the action really happens

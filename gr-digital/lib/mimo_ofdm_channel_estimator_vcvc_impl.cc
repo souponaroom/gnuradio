@@ -38,10 +38,15 @@ namespace gr {
     mimo_ofdm_channel_estimator_vcvc::make(uint16_t n,
                                            uint32_t fft_len,
                                            std::vector<std::vector<gr_complex> > pilot_symbols,
-                                           std::vector<int> pilot_carriers)
+                                           std::vector<int> pilot_carriers,
+                                           std::vector<int> occupied_carriers)
     {
       return gnuradio::get_initial_sptr
-        (new mimo_ofdm_channel_estimator_vcvc_impl(n, fft_len, pilot_symbols, pilot_carriers));
+        (new mimo_ofdm_channel_estimator_vcvc_impl(n,
+                                                   fft_len,
+                                                   pilot_symbols,
+                                                   pilot_carriers,
+                                                   occupied_carriers));
     }
 
     /*
@@ -51,14 +56,17 @@ namespace gr {
             uint16_t n, 
             uint32_t fft_len, 
             std::vector<std::vector<gr_complex> > pilot_symbols, 
-            std::vector<int> pilot_carriers)
+            std::vector<int> pilot_carriers,
+            std::vector<int> occupied_carriers)
       : gr::block("mimo_ofdm_channel_estimator_vcvc",
               gr::io_signature::make(n, n, sizeof(gr_complex)*fft_len),
-              gr::io_signature::make(n, n, sizeof(gr_complex)*fft_len)),
+              gr::io_signature::make(n, n, sizeof(gr_complex)*occupied_carriers.size())),
         d_n(n),
         d_fft_len(fft_len),
         d_pilot_symbols(pilot_symbols),
-        d_pilot_carriers(pilot_carriers)
+        d_pilot_carriers(pilot_carriers),
+        d_occupied_carriers(occupied_carriers),
+        d_output_vlen(occupied_carriers.size())
     {
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
               (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (n, 1.0)));
@@ -121,10 +129,15 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-      // Copy data to output.
+      // Copy data of occupied carriers to output.
       for (int i = 0; i < d_n; ++i) {
         const gr_complex *in = (const gr_complex *) input_items[i];
         gr_complex *out = (gr_complex *) output_items[i];
+        for (int j = 0; j < noutput_items; ++j) {
+          for (int k = 0; k < d_output_vlen; ++k) {
+            out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k]+d_fft_len/2];
+          }
+        }
         memcpy(out, in, sizeof(gr_complex)*d_fft_len*noutput_items);
       }
 
@@ -146,14 +159,14 @@ namespace gr {
         // We have estimated the CSI for the pilot carriers. Now, lets interpolate over all OFDM carriers.
         interpolate_channel_state();
 
-        // Assign the channel state vector to a PMT vector.
-        pmt::pmt_t csi_pmt = pmt::make_vector(d_fft_len, pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0])));
-        for (unsigned int k = 0; k < d_fft_len; ++k) {
+        // Assign the channel state vector to a PMT vector. Only take the occupied carriers.
+        pmt::pmt_t csi_pmt = pmt::make_vector(d_output_vlen, pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0])));
+        for (unsigned int k = 0; k < d_output_vlen; ++k) {
           pmt::pmt_t csi_per_carrier = pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0]));
           for (int i = 0; i < d_n; ++i){
             pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_n, d_channel_state[0][0][0]);
             for (int j = 0; j < d_n; ++j) {
-              pmt::c32vector_set(csi_line_vector, j, d_channel_state[k][i][j]);
+              pmt::c32vector_set(csi_line_vector, j, d_channel_state[d_occupied_carriers[k]+d_fft_len/2][i][j]);
             }
             pmt::vector_set(csi_per_carrier, i, csi_line_vector);
           }

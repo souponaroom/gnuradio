@@ -43,6 +43,8 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
         len_tag_key = 'packet_len'
         fft_len = 64
         cp_len = fft_len/4
+        pilot_carriers = [-21, -7, 7, 21]
+        occupied_carriers = range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22,27)
         N=2
         M=2
         channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
@@ -69,7 +71,7 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
             rolloff=0,
             debug_log=False,
             scramble_bits=False,
-            m=M, mimo_technique="alamouti"
+            m=M, mimo_technique="vblast"
         )
         static_channel = blocks.multiply_matrix_cc(channel_matrix)
         fft1 = fft.fft_vcc(fft_len, True, (), True)
@@ -77,14 +79,15 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
         channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
                                                                fft_len=fft_len,
                                                                pilot_symbols=self.walsh_sequences[:N, :N],
-                                                               pilot_carriers=[-21, -7, 7, 21])
+                                                               pilot_carriers=pilot_carriers,
+                                                               occupied_carriers=occupied_carriers)
         dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
         dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
         dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
         dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 6, 8, 2)
-        head = blocks.head(gr.sizeof_gr_complex * fft_len, 4)
-        sink1 = blocks.vector_sink_c(vlen=fft_len)
-        sink2 = blocks.vector_sink_c(vlen=fft_len)
+        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 4)
+        sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
+        sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
 
         self.tb.connect(src,
                         s2tagged_stream,
@@ -110,11 +113,11 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
         self.tb.run ()
         # check data
         csi = np.empty(shape=[fft_len, N, N], dtype=complex)
-        for k in range(0, fft_len):
+        for k in range(0, len(occupied_carriers)):
             for n in range(0, N):
                 for m in range(0, M):
                     csi[k][n][m] = pmt.c32vector_ref(pmt.vector_ref(pmt.vector_ref(sink1.tags()[0].value, k), n), m)
-        for c in range(0, fft_len):
+        for c in range(0, len(occupied_carriers)):
             for n in range(0, N):
                 self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 2)
 
