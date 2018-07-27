@@ -36,10 +36,11 @@ namespace gr {
     const pmt::pmt_t mimo_ofdm_header_reader_cc_impl::d_key = pmt::string_to_symbol("start");
 
     mimo_ofdm_header_reader_cc::sptr
-    mimo_ofdm_header_reader_cc::make(constellation_sptr constellation, uint16_t header_len)
+    mimo_ofdm_header_reader_cc::make(constellation_sptr constellation,
+                                     const gr::digital::packet_header_default::sptr &header_formatter)
     {
       return gnuradio::get_initial_sptr
-        (new mimo_ofdm_header_reader_cc_impl(constellation, header_len));
+        (new mimo_ofdm_header_reader_cc_impl(constellation, header_formatter));
     }
 
     /*
@@ -47,18 +48,18 @@ namespace gr {
      */
     mimo_ofdm_header_reader_cc_impl::mimo_ofdm_header_reader_cc_impl(
             constellation_sptr constellation,
-            uint16_t header_len)
+            const gr::digital::packet_header_default::sptr &header_formatter)
       : gr::block("mimo_ofdm_header_reader_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(gr_complex))),
         d_constellation(constellation),
         d_dim(constellation->dimensionality()),
-        d_header_len(header_len),
+        d_header_formatter(header_formatter),
         d_symbol_counter(0),
         d_frame_length(0),
         d_on_frame(false)
     {
-      d_header_data = std::vector<unsigned char>(header_len/d_dim, 0);
+      d_header_data = new unsigned char[header_formatter->header_len()/d_dim];
     }
 
     /*
@@ -99,7 +100,7 @@ namespace gr {
             nwritten = noutput_items;
             nconsumed = noutput_items;
           } else {
-            // The frame ends within this input buffer, but there is no tag afterwards.
+            // The frame ends within this input buffer and there is no tag afterwards.
             // Copy the rest of the frame and reset frame state.
             memcpy(out, in, sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
             nwritten = d_frame_length-d_symbol_counter;
@@ -108,7 +109,6 @@ namespace gr {
             // Dump the rest of the input buffer.
             nconsumed = noutput_items;
           }
-
         } else{
           // Dump complete input buffer, because we are not on a frame.
           nconsumed = noutput_items;
@@ -118,13 +118,12 @@ namespace gr {
           // There are items in the input buffer, before the first tag arrives.
           segment_length = tags[0].offset - nitems_read(0);
           if(d_on_frame){
-            if (segment_length > d_frame_length-d_symbol_counter){
+            if (segment_length >= d_frame_length-d_symbol_counter){
               // The frame ends within this input buffer, but there is no tag directly afterwards.
               // Copy the rest of the frame and reset frame state.
               memcpy(out, in, sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
               nwritten = d_frame_length-d_symbol_counter;
-              d_symbol_counter = 0;
-              d_on_frame = false;
+              d_symbol_counter = d_frame_length;
               // Dump the rest of the input buffer til the next tag position.
               nconsumed = segment_length;
             } else{
@@ -160,16 +159,26 @@ namespace gr {
             d_on_frame = true;
           }
           // Read header TODO check if whole header symbol is in this buffer !!!
-          for (int j = 0; j < d_header_len/d_dim; ++j) { //TODO check if header_len/dim always int and if demod really to packed bits
+          for (int j = 0; j < d_header_formatter->header_len()/d_dim; ++j) { //TODO check if header_len/dim always int and if demod really to packed bits
             d_header_data[j] = d_constellation->decision_maker(&(in[nconsumed + j*d_dim]));
           }
-          nconsumed += d_header_len;
-          d_frame_length = 0; // TODO Parse header and write frame length.
+          // Check header
+          std::vector<tag_t> tags;
+          if (!d_header_formatter->header_parser(const_cast<const unsigned char *>(d_header_data), tags)) {
+            GR_LOG_INFO(d_logger, boost::format("Detected an invalid packet at item %1%") % (nitems_read(0)+nconsumed));
+            d_frame_length = 0;
+            d_on_frame = false;
+          } else {
+            // Valid header.
+            d_frame_length = 0; // TODO read actual frame length.
+            d_on_frame = false; // TODO change to true, if frame length read. !!!
+            }
+          nconsumed += d_header_formatter->header_len();
           // Process frame.
-          if(segment_length > d_frame_length-d_symbol_counter){
-            // The frame ends within this input buffer, but there is no tag directly afterwards.
+          if(segment_length >= d_frame_length-d_symbol_counter){
+            // The frame ends within this input buffer, and there is no tag directly afterwards.
             // Copy the rest of the frame and reset frame state.
-            memcpy(out, in, sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
+            memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
             nwritten = d_frame_length-d_symbol_counter;
             d_symbol_counter = 0;
             d_on_frame = false;
@@ -184,8 +193,6 @@ namespace gr {
           }
         }
       }
-
-      //TODO: Demodulate header into private buffer with buffer[i] = d_constellation->decision_maker(&(in[i*d_dim]));
       // Tell runtime system how many input items we consumed on
       // each input stream.
       consume_each (noutput_items);

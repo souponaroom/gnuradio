@@ -26,6 +26,7 @@
 
 #include <gnuradio/digital/api.h>
 #include <gnuradio/digital/constellation.h>
+#include <gnuradio/digital/packet_header_default.h>
 #include <gnuradio/block.h>
 
 namespace gr {
@@ -49,7 +50,7 @@ namespace gr {
        * class. digital::mimo_ofdm_header_reader_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(constellation_sptr constellation, uint16_t header_len);
+      static sptr make(constellation_sptr constellation, const gr::digital::packet_header_default::sptr &header_formatter);
     };
 
   } // namespace digital

@@ -33,17 +33,18 @@ namespace gr {
      private:
       constellation_sptr d_constellation;
       unsigned int d_dim;
-      uint16_t d_header_len;
+      packet_header_default::sptr d_header_formatter;
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       uint16_t d_symbol_counter;
       uint16_t d_frame_length;
       bool d_on_frame;
-      std::vector<unsigned char> d_header_data;
+      unsigned char* d_header_data;
 
 
      public:
-      mimo_ofdm_header_reader_cc_impl(constellation_sptr constellation, uint16_t header_len);
+      mimo_ofdm_header_reader_cc_impl(constellation_sptr constellation,
+                                      const gr::digital::packet_header_default::sptr &header_formatter);
       ~mimo_ofdm_header_reader_cc_impl();
 
       // Where all the action really happens
