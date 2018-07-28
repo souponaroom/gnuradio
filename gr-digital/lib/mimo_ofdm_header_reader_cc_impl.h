@@ -37,6 +37,7 @@ namespace gr {
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       uint32_t d_symbol_counter;
+      uint32_t d_header_length;
       uint32_t d_packet_length;
       uint32_t d_frame_length;
       uint32_t d_packet_num;
@@ -47,7 +48,11 @@ namespace gr {
       pmt::pmt_t d_frame_len_tag_key;
       pmt::pmt_t d_num_tag_key;
 
+      std::vector<tag_t> d_header_tags;
 
+      void demod_header(const gr_complex *src, unsigned char *dest);
+      bool parse_header();
+      void add_tags(uint32_t offset);
 
      public:
       mimo_ofdm_header_reader_cc_impl(constellation_sptr constellation,

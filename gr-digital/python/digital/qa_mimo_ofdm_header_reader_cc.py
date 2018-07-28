@@ -52,102 +52,97 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
 
     def test_001_t (self):
         # Define test params.
-        packet_len = 51
-        len_tag_key = 'packet_len'
-        fft_len = 64
-        cp_len = fft_len/4
-        pilot_carriers = [-21, -7, 7, 21]
+        packet_lengths = np.array([8, 2, 6])
+        data_length = np.sum(packet_lengths)
         occupied_carriers = range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22,27)
-        N=2
-        M=2
-        channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
-        self.walsh_sequences = np.array([
-            [1, 1, 1, 1, 1, 1, 1, 1],
-            [1, -1, 1, -1, 1, -1, 1, -1],
-            [1, 1, -1, -1, 1, 1, -1, -1],
-            [1, -1, -1, 1, 1, -1, -1, 1],
-            [1, 1, 1, 1, -1, -1, -1, -1],
-            [1, -1, 1, -1, -1, 1, -1, 1],
-            [1, 1, -1, -1, -1, -1, 1, 1],
-            [1, -1, -1, 1, -1, 1, 1, -1]
-        ])
+        header_len = len(occupied_carriers)
+        print 'header len is ' + str(header_len)
+        bps_header = 1
+        bps_payload = 1
+        packet_len_tag_key = "packet_length"
 
-        src = blocks.vector_source_b(range(packet_len), True, 1, ())
-        s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
-                                                         packet_len,
-                                                         len_tag_key)
-        tx = ofdm_tx(
-            fft_len=fft_len, cp_len=cp_len,
-            packet_length_tag_key=len_tag_key,
-            bps_header=1,
-            bps_payload=1,
-            rolloff=0,
-            debug_log=False,
-            scramble_bits=False,
-            m=M, mimo_technique="vblast"
-        )
-        static_channel = blocks.multiply_matrix_cc(channel_matrix)
-        fft1 = fft.fft_vcc(fft_len, True, (), True)
-        fft2 = fft.fft_vcc(fft_len, True, (), True)
-        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
-                                                               fft_len=fft_len,
-                                                               pilot_symbols=self.walsh_sequences[:N, :N],
-                                                               pilot_carriers=pilot_carriers,
-                                                               occupied_carriers=occupied_carriers)
-        mimo_decoder = digital.vblast_decoder_cc(num_inputs=N,
-                                                 equalizer_type='ZF',
-                                                 vlen=len(occupied_carriers))
+        # Constellations.
+        header_constellation = self._get_constellation(bps_header)
+        payload_constellation = self._get_constellation(bps_payload)
 
-        header_constellation = self._get_constellation(1)
-        header_formatter = digital.packet_header_ofdm(
+        # Payload data.
+        data = np.random.randint(0, 100, data_length)
+        # Append stream tags to data.
+        tags = []
+        offset = 0
+        for i in range(0, packet_lengths.size):
+            tags.append(gr.tag_utils.python_to_tag((offset,
+                                                    pmt.string_to_symbol(packet_len_tag_key),
+                                                    pmt.from_long(packet_lengths[i]))))
+            offset += packet_lengths[i]
+        payload_src = blocks.vector_source_b(data=data, tags=tags)
+
+        # Generate header.
+        formatter_object_tx = digital.packet_header_ofdm(
+            occupied_carriers=[occupied_carriers], n_syms=1,
+            bits_per_header_sym=bps_header,
+            bits_per_payload_sym=bps_payload,
+            scramble_header=False)
+        header_gen = digital.packet_headergenerator_bb(formatter_object_tx.base(),
+                                                       packet_len_tag_key)
+
+        header_mod = digital.chunks_to_symbols_bc(header_constellation.points())
+        header_payload_mux = blocks.tagged_stream_mux(
+            itemsize=gr.sizeof_gr_complex * 1,
+            lengthtagname=packet_len_tag_key,
+            tag_preserve_head_pos=1)  # Head tags on the payload stream stay on the head
+        self.tb.connect(header_gen, header_mod, (header_payload_mux, 0))
+
+        # Payload modulation
+        payload_unpack = blocks.repack_bits_bb(
+            8,  # Unpack 8 bits per byte
+            bps_payload,
+            packet_len_tag_key)
+
+        payload_mod = digital.chunks_to_symbols_bc(payload_constellation.points())
+
+
+        self.tb.connect(payload_src, payload_unpack, payload_mod, (header_payload_mux, 1))
+        self.tb.connect(payload_src, header_gen)
+
+        # Header reader.
+        header_formatter_rx = digital.packet_header_ofdm(
             [occupied_carriers], 1,
             "packet_length",
             "frame_length",
             "packet_num",
-            1,
-            1
-        )
+            bps_header, bps_payload)
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
-                                                           header_formatter.formatter())
-
-        payload_constellation = self._get_constellation(2)
+                                                           header_formatter_rx.formatter())
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
-        payload_pack = blocks.repack_bits_bb(1, 8, "", True)
-        crc = digital.crc32_bb(True, "packet_length")
+        payload_pack = blocks.repack_bits_bb(bps_payload, 8, "", True)
+        sink = blocks.vector_sink_c()
+        self.tb.connect(header_payload_mux, sink)
+        self.tb.run()
 
-        dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
-        dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
-        dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
-        dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 6, 8, 2)
-        head = blocks.head(gr.sizeof_char, 10)
-        sink = blocks.vector_sink_b()
+        # Read data from sink and add 'start' tags.
+        rx_tags = []
+        offset = 0
+        for i in range(0, packet_lengths.size):
+            print 'offset = ' + str(offset)
+            rx_tags.append(gr.tag_utils.python_to_tag((offset,
+                                                       pmt.string_to_symbol("start"),
+                                                       pmt.from_long(0))))
+            offset += packet_lengths[i]*8/bps_payload + header_len
+        rx_src = blocks.vector_source_c(data=sink.data(),
+                                        tags=rx_tags)
+        sink_rx = blocks.vector_sink_b()
 
-        self.tb.connect(src,
-                        s2tagged_stream,
-                        tx,
-                        (static_channel, 0),
-                        dump_cp1,
-                        blocks.multiply_const_cc(1.0 / np.sqrt(fft_len)),
-                        blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len),
-                        fft1,
-                        dump_sync1,
-                        (channel_est, 0),
-                        (mimo_decoder, 0))
-        self.tb.connect((tx, 1),
-                        (static_channel, 1),
-                        dump_cp2,
-                        blocks.multiply_const_cc(1.0 / np.sqrt(fft_len)),
-                        blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len),
-                        fft2,
-                        dump_sync2,
-                        (channel_est, 1),
-                        (mimo_decoder, 1))
-        self.tb.connect(mimo_decoder, header_reader, payload_demod, payload_pack, head, sink)
+
+        self.tb.connect(rx_src, header_reader, payload_demod, payload_pack, sink_rx)
         self.tb.run ()
         # check data
-        print 'result'
-        print sink.data()
 
+        print 'restult'
+        print sink_rx.data()
+
+        print 'data'
+        print data
 
 if __name__ == '__main__':
     gr_unittest.run(qa_mimo_ofdm_header_reader_cc, "qa_mimo_ofdm_header_reader_cc.xml")
