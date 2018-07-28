@@ -42,7 +42,7 @@ namespace gr {
     const pmt::pmt_t vblast_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
 
     vblast_decoder_cc::sptr
-    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type, uint16_t vlen)
+    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type, uint32_t vlen)
     {
       return gnuradio::get_initial_sptr
         (new vblast_decoder_cc_impl(num_inputs, equalizer_type, vlen));
@@ -53,7 +53,7 @@ namespace gr {
      */
     vblast_decoder_cc_impl::vblast_decoder_cc_impl(uint16_t num_inputs,
                                                    std::string equalizer_type,
-                                                   uint16_t vlen)
+                                                   uint32_t vlen)
       : gr::sync_interpolator("vblast_decoder_cc",
               gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)*vlen),
               gr::io_signature::make(1, 1, sizeof(gr_complex)), num_inputs*vlen),
@@ -81,13 +81,13 @@ namespace gr {
         switch (d_num_inputs) {
           case 1: {
             // SISO case.
-            for (int k = 0; k < d_vlen; ++k) {
+            for (unsigned int k = 0; k < d_vlen; ++k) {
               d_mimo_equalizer[k][0][0] = (gr_complex) 1./d_csi[k][0][0];
             }
             break;
           }
           case 2: {
-            for (int k = 0; k < d_vlen; ++k) {
+            for (unsigned int k = 0; k < d_vlen; ++k) {
               gr_complex c = d_csi[k][0][0] * d_csi[k][1][1] - d_csi[k][0][1] * d_csi[k][1][0];
               d_mimo_equalizer[k][0][0] = d_csi[k][1][1] / c;
               d_mimo_equalizer[k][0][1] = -d_csi[k][0][1] / c;
@@ -98,7 +98,7 @@ namespace gr {
           }
           default: {
 #if (EIGEN3_ENABLED)
-            for (int k = 0; k < d_vlen; ++k){
+            for (unsigned int k = 0; k < d_vlen; ++k){
               // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
               Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
               for (int i = 0; i < d_num_inputs; ++i) {
@@ -122,13 +122,13 @@ namespace gr {
         switch (d_num_inputs) {
           case 1: {
             // SISO case.
-            for (int k = 0; k < d_vlen; ++k) {
+            for (unsigned int k = 0; k < d_vlen; ++k) {
               d_mimo_equalizer[k][0][0] = std::conj(d_csi[k][0][0]) / (std::norm(d_csi[k][0][0])+(gr_complex) 1./d_snr[0]);
             }
             break;
           }
           case 2: {
-            for (int k = 0; k < d_vlen; ++k) {
+            for (unsigned int k = 0; k < d_vlen; ++k) {
               gr_complex a = std::norm(d_csi[k][0][0]) + std::norm(d_csi[k][1][0]) + 1./d_snr[0];
               gr_complex b = std::conj(d_csi[k][0][0])*d_csi[k][0][1] + std::conj(d_csi[k][1][0])*d_csi[k][1][1];
               gr_complex c = std::conj(d_csi[k][0][1])*d_csi[k][0][0] + std::conj(d_csi[k][1][1])*d_csi[k][1][0];
@@ -144,7 +144,7 @@ namespace gr {
           }
           default: {
 #if (EIGEN3_ENABLED)
-            for (int k = 0; k < d_vlen; ++k){
+            for (unsigned int k = 0; k < d_vlen; ++k){
               // Map CSI 2-dimensional std::vector to Eigen MatrixXcf.
               Eigen::MatrixXcf csi_matrix(d_num_inputs, d_num_inputs);
               for (int i = 0; i < d_num_inputs; ++i) {
@@ -181,7 +181,7 @@ namespace gr {
       for (int n = 0; n < d_num_inputs; ++n) {
         gr_complex *in = &((gr_complex *) input[n])[offset/(d_num_inputs)];
         for (unsigned int i = 0; i < length; ++i) {
-          for (int k = 0; k < d_vlen; ++k) {
+          for (unsigned int k = 0; k < d_vlen; ++k) {
             for (int j = 0; j < d_num_inputs; ++j) {
               out[i*d_num_inputs*d_vlen + k*d_num_inputs + j] += d_mimo_equalizer[k][j][n] * in[i*d_vlen + k];
             }
@@ -196,10 +196,10 @@ namespace gr {
         gr_vector_void_star &output_items)
     {
       gr_complex *out = (gr_complex *) output_items[0];
-      uint16_t nprocessed = 0; // Number of read and written items.
+      uint32_t nprocessed = 0; // Number of read and written items.
 
       // Collect all tags of the input buffer in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items);
+      get_tags_in_window(tags, 0, 0, noutput_items/(d_vlen*d_num_inputs), pmt::string_to_symbol("csi"));
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
@@ -224,7 +224,7 @@ namespace gr {
             symbol_length = (tags[i + 1].offset - tags[i].offset);
           } else {
             // This is the last tag.
-            symbol_length = noutput_items - (tags[i].offset - nitems_read(0));
+            symbol_length = noutput_items/(d_vlen*d_num_inputs) - (tags[i].offset - nitems_read(0));
           }
           // Check the key of the tag.
           if (pmt::symbol_to_string(tags[i].key).compare("csi") == 0) {
@@ -246,6 +246,13 @@ namespace gr {
           equalize_symbol(input_items, &out[nprocessed], nprocessed, symbol_length);
           nprocessed += symbol_length*d_vlen*d_num_inputs;
         }
+      }
+      // Add start tag just for tests TODO remove again
+      if (nitems_written(0) == 0){
+        add_item_tag(0,
+                     0,
+                     pmt::mp("start"),
+                     pmt::from_long(0));
       }
 
       // Tell runtime system how many output items we produced.

@@ -62,7 +62,7 @@ namespace gr {
        * class. digital::vblast_decoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t num_inputs, std::string equalizer_type, uint16_t vlen=1);
+      static sptr make(uint16_t num_inputs, std::string equalizer_type, uint32_t vlen=1);
     };
 
   } // namespace digital

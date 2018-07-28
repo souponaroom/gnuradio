@@ -52,7 +52,7 @@ namespace gr {
       uint16_t d_num_inputs; /*!< Number of inputs ports. This equals the interpolation rate.*/
       std::string d_equalizer_type; /*!< Equalization technique zero forcing 'ZF' or
  * minimum mean squared error 'MMSE'. */
-      uint16_t d_vlen; /*!< Vector length of the incoming items. */
+      uint32_t d_vlen; /*!< Vector length of the incoming items. */
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const std::string s; /*!< String that matches the key of the CSI tags. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
@@ -79,7 +79,7 @@ namespace gr {
       void equalize_symbol(gr_vector_const_void_star input, gr_complex* out, uint32_t offset, uint32_t length);
 
      public:
-      vblast_decoder_cc_impl(uint16_t num_inputs, std::string equalizer_type, uint16_t vlen);
+      vblast_decoder_cc_impl(uint16_t num_inputs, std::string equalizer_type, uint32_t vlen);
       ~vblast_decoder_cc_impl();
 
       // Where all the action really happens
