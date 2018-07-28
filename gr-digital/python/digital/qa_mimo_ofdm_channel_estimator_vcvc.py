@@ -119,7 +119,31 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
                     csi[k][n][m] = pmt.c32vector_ref(pmt.vector_ref(pmt.vector_ref(sink1.tags()[0].value, k), n), m)
         for c in range(0, len(occupied_carriers)):
             for n in range(0, N):
-                self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 2)
+                self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 1)
+
+    def test_002_t(self):
+        N=2
+        fft_len = 4
+        length = 10
+        occupied_carriers = [-1]
+        data = np.random.randn(N, fft_len*10)
+        src1 = blocks.vector_source_c(data[0], vlen=fft_len)
+        src2 = blocks.vector_source_c(data[1], vlen=fft_len)
+        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
+                                                               fft_len=fft_len,
+                                                               pilot_symbols=[[1,1],[1,-1]],
+                                                               pilot_carriers=[0],
+                                                               occupied_carriers=occupied_carriers)
+        sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
+        sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
+        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 5)
+        self.tb.connect(src1, (channel_est, 0), head, sink1)
+        self.tb.connect(src2, (channel_est, 1), sink2)
+        self.tb.run()
+        self.assertComplexTuplesAlmostEqual(data[0][-1 + fft_len / 2:5 * fft_len:fft_len],
+            sink1.data()[0:len(occupied_carriers) * length / 2], 2)
+        self.assertComplexTuplesAlmostEqual(data[1][-1 + fft_len / 2:5 * fft_len:fft_len],
+            sink2.data()[0:len(occupied_carriers) * length / 2], 2)
 
 if __name__ == '__main__':
     gr_unittest.run(qa_mimo_ofdm_channel_estimator_vcvc, "qa_mimo_ofdm_channel_estimator_vcvc.xml")

@@ -134,11 +134,10 @@ namespace gr {
         const gr_complex *in = (const gr_complex *) input_items[i];
         gr_complex *out = (gr_complex *) output_items[i];
         for (int j = 0; j < noutput_items; ++j) {
-          for (int k = 0; k < d_output_vlen; ++k) {
+          for (unsigned int k = 0; k < d_output_vlen; ++k) {
             out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k]+d_fft_len/2];
           }
         }
-        memcpy(out, in, sizeof(gr_complex)*d_fft_len*noutput_items);
       }
 
       for (int s = 0; s < noutput_items; ++s) { // Iterate over OFDM symbols.
