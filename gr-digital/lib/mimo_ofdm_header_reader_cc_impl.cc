@@ -56,8 +56,13 @@ namespace gr {
         d_dim(constellation->dimensionality()),
         d_header_formatter(header_formatter),
         d_symbol_counter(0),
+        d_packet_length(0),
         d_frame_length(0),
-        d_on_frame(false)
+        d_packet_num(0),
+        d_on_frame(false),
+        d_len_tag_key(pmt::string_to_symbol("packet_length")),
+        d_frame_len_tag_key(pmt::string_to_symbol("frame_length")),
+        d_num_tag_key(pmt::string_to_symbol("packet_num"))
     {
       d_header_data = new unsigned char[header_formatter->header_len()/d_dim];
     }
@@ -163,15 +168,29 @@ namespace gr {
             d_header_data[j] = d_constellation->decision_maker(&(in[nconsumed + j*d_dim]));
           }
           // Check header
-          std::vector<tag_t> tags;
-          if (!d_header_formatter->header_parser(const_cast<const unsigned char *>(d_header_data), tags)) {
+          std::vector<tag_t> header_tags;
+          if (!d_header_formatter->header_parser(const_cast<const unsigned char *>(d_header_data), header_tags)) {
             GR_LOG_INFO(d_logger, format("Detected an invalid packet at item %1%") % (nitems_read(0)+nconsumed));
-            d_frame_length = 0;
+            d_packet_length = 0;
             d_on_frame = false;
           } else {
             // Valid header.
             GR_LOG_INFO(d_logger, format("Detected a valid packet at item %1%") % (nitems_read(0)+nconsumed));
-            d_frame_length = 0; // TODO read actual frame length.
+
+
+            for (unsigned int c = 0; c < header_tags.size(); c++) {
+              // Try the key in different keyholes.
+              if (pmt::equal(header_tags[c].key, d_len_tag_key)){
+                d_packet_length = pmt::to_long(header_tags[c].value);
+              } else if (pmt::equal(header_tags[c].key, d_frame_len_tag_key)){
+                d_frame_length = pmt::to_long(header_tags[c].value);
+              } else if (pmt::equal(header_tags[c].key, d_num_tag_key)){
+                d_packet_num = pmt::to_long(header_tags[c].value);
+              } else{
+                GR_LOG_INFO(d_logger, format("Unknown header tag %s")%pmt::symbol_to_string(header_tags[c].key));
+              }
+            }
+            GR_LOG_INFO(d_logger, format("Packet len = %d, Frame len = %d") %d_packet_length %d_frame_length);
             d_on_frame = false; // TODO change to true, if frame length read. !!!
             }
           nconsumed += d_header_formatter->header_len();

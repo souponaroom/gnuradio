@@ -36,10 +36,17 @@ namespace gr {
       packet_header_default::sptr d_header_formatter;
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      uint16_t d_symbol_counter;
-      uint16_t d_frame_length;
+      uint32_t d_symbol_counter;
+      uint32_t d_packet_length;
+      uint32_t d_frame_length;
+      uint32_t d_packet_num;
       bool d_on_frame;
       unsigned char* d_header_data;
+
+      pmt::pmt_t d_len_tag_key;
+      pmt::pmt_t d_frame_len_tag_key;
+      pmt::pmt_t d_num_tag_key;
+
 
 
      public:
