@@ -60,6 +60,7 @@
 #include "gnuradio/digital/packet_header_ofdm.h"
 #include "gnuradio/digital/packet_headergenerator_bb.h"
 #include "gnuradio/digital/packet_headerparser_b.h"
+#include "gnuradio/digital/mimo_ofdm_header_reader_cc.h"
 #include "gnuradio/digital/packet_sink.h"
 #include "gnuradio/digital/pfb_clock_sync_ccf.h"
 #include "gnuradio/digital/pfb_clock_sync_fff.h"
@@ -73,6 +74,7 @@
 #include "gnuradio/digital/symbol_sync_ff.h"
 #include "gnuradio/digital/ofdm_serializer_vcc.h"
 #include "gnuradio/digital/packet_headerparser_b.h"
+#include "gnuradio/digital/mimo_ofdm_header_reader_cc.h"
 #include "gnuradio/digital/header_payload_demux.h"
 %}
 
@@ -91,6 +93,7 @@
 %include "gnuradio/digital/packet_header_ofdm.h"
 %include "gnuradio/digital/packet_headergenerator_bb.h"
 %include "gnuradio/digital/packet_headerparser_b.h"
+%include "gnuradio/digital/mimo_ofdm_header_reader_cc.h"
 %include "gnuradio/digital/packet_sink.h"
 %include "gnuradio/digital/pfb_clock_sync_ccf.h"
 %include "gnuradio/digital/pfb_clock_sync_fff.h"
@@ -110,6 +113,7 @@ GR_SWIG_BLOCK_MAGIC2(digital, protocol_formatter_bb);
 GR_SWIG_BLOCK_MAGIC2(digital, protocol_parser_b);
 GR_SWIG_BLOCK_MAGIC2(digital, packet_headergenerator_bb);
 GR_SWIG_BLOCK_MAGIC2(digital, packet_headerparser_b);
+GR_SWIG_BLOCK_MAGIC2(digital, mimo_ofdm_header_reader_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, packet_sink);
 GR_SWIG_BLOCK_MAGIC2(digital, pfb_clock_sync_ccf);
 GR_SWIG_BLOCK_MAGIC2(digital, pfb_clock_sync_fff);

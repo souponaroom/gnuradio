@@ -165,11 +165,12 @@ namespace gr {
           // Check header
           std::vector<tag_t> tags;
           if (!d_header_formatter->header_parser(const_cast<const unsigned char *>(d_header_data), tags)) {
-            GR_LOG_INFO(d_logger, boost::format("Detected an invalid packet at item %1%") % (nitems_read(0)+nconsumed));
+            GR_LOG_INFO(d_logger, format("Detected an invalid packet at item %1%") % (nitems_read(0)+nconsumed));
             d_frame_length = 0;
             d_on_frame = false;
           } else {
             // Valid header.
+            GR_LOG_INFO(d_logger, format("Detected a valid packet at item %1%") % (nitems_read(0)+nconsumed));
             d_frame_length = 0; // TODO read actual frame length.
             d_on_frame = false; // TODO change to true, if frame length read. !!!
             }

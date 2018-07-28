@@ -37,6 +37,19 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
+    def _get_constellation(self, bps):
+        """ Returns a modulator block for a given number of bits per symbol """
+        constellation = {
+            1: digital.constellation_bpsk(),
+            2: digital.constellation_qpsk(),
+            3: digital.constellation_8psk()
+        }
+        try:
+            return constellation[bps]
+        except KeyError:
+            print 'Modulation not supported.'
+            exit(1)
+
     def test_001_t (self):
         # Define test params.
         packet_len = 50
@@ -81,15 +94,29 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
                                                                pilot_symbols=self.walsh_sequences[:N, :N],
                                                                pilot_carriers=pilot_carriers,
                                                                occupied_carriers=occupied_carriers)
-        mimo_decoder = digital.vblast_decoder(num_inputs=N, equalizer_type='ZF')
+        mimo_decoder = digital.vblast_decoder_cc(num_inputs=N,
+                                                 equalizer_type='ZF',
+                                                 vlen=len(occupied_carriers))
+
+        header_constellation = self._get_constellation(1)
+        header_formatter = digital.packet_header_ofdm(
+            [occupied_carriers], 1,
+            "packet_length",
+            "frame_length",
+            "packet_num",
+            1,
+            1
+        )
+        header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
+                                                           header_formatter.formatter())
+
 
         dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
         dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
         dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
         dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 6, 8, 2)
-        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 4)
-        sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-        sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
+        head = blocks.head(gr.sizeof_gr_complex, 10)
+        sink = blocks.vector_sink_c()
 
         self.tb.connect(src,
                         s2tagged_stream,
@@ -101,7 +128,7 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
                         fft1,
                         dump_sync1,
                         (channel_est, 0),
-                        sink1)
+                        (mimo_decoder, 0))
         self.tb.connect((tx, 1),
                         (static_channel, 1),
                         dump_cp2,
@@ -110,11 +137,12 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
                         fft2,
                         dump_sync2,
                         (channel_est, 1),
-                        head,
-                        sink2)
+                        (mimo_decoder, 1))
+        self.tb.connect(mimo_decoder, header_reader, head, sink)
         self.tb.run ()
         # check data
-
+        print 'result'
+        print sink.data()
 
 
 if __name__ == '__main__':
