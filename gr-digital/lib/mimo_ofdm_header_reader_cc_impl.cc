@@ -98,7 +98,7 @@ namespace gr {
 
       if(tags.size() == 0) { // Input buffer includes no tags at all.
         if(d_on_frame){
-          if(noutput_items < d_frame_length-d_symbol_counter){
+          if(noutput_items < d_packet_length-d_symbol_counter){
             // The whole input buffer is part of the current frame. We copy it to the output.
             memcpy(out, in, sizeof(gr_complex)*noutput_items);
             d_symbol_counter += noutput_items;
@@ -107,8 +107,8 @@ namespace gr {
           } else {
             // The frame ends within this input buffer and there is no tag afterwards.
             // Copy the rest of the frame and reset frame state.
-            memcpy(out, in, sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
-            nwritten = d_frame_length-d_symbol_counter;
+            memcpy(out, in, sizeof(gr_complex)*(d_packet_length-d_symbol_counter));
+            nwritten = d_packet_length-d_symbol_counter;
             d_symbol_counter = 0;
             d_on_frame = false;
             // Dump the rest of the input buffer.
@@ -123,12 +123,12 @@ namespace gr {
           // There are items in the input buffer, before the first tag arrives.
           segment_length = tags[0].offset - nitems_read(0);
           if(d_on_frame){
-            if (segment_length >= d_frame_length-d_symbol_counter){
+            if (segment_length >= d_packet_length-d_symbol_counter){
               // The frame ends within this input buffer, but there is no tag directly afterwards.
               // Copy the rest of the frame and reset frame state.
-              memcpy(out, in, sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
-              nwritten = d_frame_length-d_symbol_counter;
-              d_symbol_counter = d_frame_length;
+              memcpy(out, in, sizeof(gr_complex)*(d_packet_length-d_symbol_counter));
+              nwritten = d_packet_length-d_symbol_counter;
+              d_symbol_counter = d_packet_length;
               // Dump the rest of the input buffer til the next tag position.
               nconsumed = segment_length;
             } else{
@@ -147,7 +147,7 @@ namespace gr {
         for (unsigned int i = 0; i < tags.size(); ++i){
 
           // Check if the last frame is unfinished.
-          if (d_frame_length-d_symbol_counter > 0){
+          if (d_packet_length-d_symbol_counter > 0){
             /* The next tag comes before the current frame is finished.
                * We abort the current frame premature with a logger warning. */
             GR_LOG_WARN(d_logger, format("'start' tag before the end of the current frame. Aborting frame."));
@@ -191,15 +191,23 @@ namespace gr {
               }
             }
             GR_LOG_INFO(d_logger, format("Packet len = %d, Frame len = %d") %d_packet_length %d_frame_length);
-            d_on_frame = false; // TODO change to true, if frame length read. !!!
+            d_on_frame = true;
             }
           nconsumed += d_header_formatter->header_len();
+          //TODO ensure that there is data in the input data after the (dumped) header!!!
+          for (unsigned int c = 0; c < header_tags.size(); c++) {
+            add_item_tag(0,
+                         nitems_written(0)+nwritten,
+                         header_tags[c].key,
+                         header_tags[c].value);
+          }
+
           // Process frame.
-          if(segment_length >= d_frame_length-d_symbol_counter){
+          if(segment_length >= d_packet_length-d_symbol_counter){
             // The frame ends within this input buffer, and there is no tag directly afterwards.
             // Copy the rest of the frame and reset frame state.
-            memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex)*(d_frame_length-d_symbol_counter));
-            nwritten = d_frame_length-d_symbol_counter;
+            memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex)*(d_packet_length-d_symbol_counter));
+            nwritten = d_packet_length-d_symbol_counter;
             d_symbol_counter = 0;
             d_on_frame = false;
             // Dump the rest of the input buffer til the next tag position.

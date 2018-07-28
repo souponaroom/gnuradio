@@ -52,7 +52,7 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
 
     def test_001_t (self):
         # Define test params.
-        packet_len = 50
+        packet_len = 51
         len_tag_key = 'packet_len'
         fft_len = 64
         cp_len = fft_len/4
@@ -80,7 +80,7 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
             fft_len=fft_len, cp_len=cp_len,
             packet_length_tag_key=len_tag_key,
             bps_header=1,
-            bps_payload=2,
+            bps_payload=1,
             rolloff=0,
             debug_log=False,
             scramble_bits=False,
@@ -110,13 +110,17 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter())
 
+        payload_constellation = self._get_constellation(2)
+        payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
+        payload_pack = blocks.repack_bits_bb(1, 8, "", True)
+        crc = digital.crc32_bb(True, "packet_length")
 
         dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
         dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
         dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
         dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 6, 8, 2)
-        head = blocks.head(gr.sizeof_gr_complex, 10)
-        sink = blocks.vector_sink_c()
+        head = blocks.head(gr.sizeof_char, 10)
+        sink = blocks.vector_sink_b()
 
         self.tb.connect(src,
                         s2tagged_stream,
@@ -138,7 +142,7 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
                         dump_sync2,
                         (channel_est, 1),
                         (mimo_decoder, 1))
-        self.tb.connect(mimo_decoder, header_reader, head, sink)
+        self.tb.connect(mimo_decoder, header_reader, payload_demod, payload_pack, head, sink)
         self.tb.run ()
         # check data
         print 'result'
