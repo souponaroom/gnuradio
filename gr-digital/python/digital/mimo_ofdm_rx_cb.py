@@ -116,7 +116,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     """
     docstring for block mimo_ofdm_rx_cb
     """
-    def __init__(self, n=_def_n, fft_len=_def_fft_len, cp_len=_def_cp_len,
+    def __init__(self, n=_def_n, mimo_technique=_def_mimo_technique,
+                 fft_len=_def_fft_len, cp_len=_def_cp_len,
                  frame_length_tag_key=_def_frame_length_tag_key,
                  packet_length_tag_key=_def_packet_length_tag_key,
                  packet_num_tag_key=_def_packet_num_tag_key,
@@ -138,6 +139,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         """
         Parameter initalization
         """
+        self.n = n
+        self.mimo_technique = mimo_technique
         self.fft_len = fft_len
         self.cp_len = cp_len
         self.frame_length_tag_key = frame_length_tag_key
@@ -145,8 +148,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.occupied_carriers = occupied_carriers
         self.bps_header = bps_header
         self.bps_payload = bps_payload
-        self.n = 2
-        n_sync_words = 1
+
+
         if sync_word1 is None:
             self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
         else:
@@ -156,12 +159,10 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.sync_word2 = ()
         if sync_word2 is None:
             self.sync_word2 = _make_sync_word2(fft_len, occupied_carriers, pilot_carriers)
-            n_sync_words = 2
         elif len(sync_word2):
             if len(sync_word2) != fft_len:
                 raise ValueError("Length of sync sequence(s) must be FFT length.")
             self.sync_word2 = sync_word2
-            n_sync_words = 2
         if scramble_bits:
             self.scramble_seed = 0x7f
         else:
@@ -171,15 +172,63 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         """
         add = blocks.add_cc()
         sum_sync_detect = digital.ofdm_sync_sc_cfb(fft_len, cp_len)
-        sum_delay = blocks.delay(gr.sizeof_gr_complex, fft_len + cp_len)
-        sum_oscillator = analog.frequency_modulator_fc(-2.0 / fft_len)
-        sum_mixer = blocks.multiply_cc()
-        sum_fft = fft.fft_vcc(self.fft_len, True, (), True)
-        coarse_freq_est = digital.ofdm_chanest_vcvc(self.sync_word1, self.sync_word2, 1)
-
+        mimo_sync = digital.mimo_ofdm_synchronizer_fbcvc(self.n,
+                                                         self.fft_len,
+                                                         self.cp_len,
+                                                         self.sync_word1,
+                                                         self.sync_word2)
         for i in range(0, self.n):
             self.connect((self, i), (add, i))
+            self.connect((self, i), (mimo_sync, 3+i))
         self.connect(add, sum_sync_detect)
-        self.connect((sum_sync_detect, 0), sum_oscillator, sum_mixer,  blocks.null_sink(gr.sizeof_gr_complex))
-        self.connect((sum_sync_detect, 1), self)
-        self.connect(add, sum_delay, (sum_mixer, 1))
+        self.connect((sum_sync_detect, 0), (mimo_sync, 0))
+        self.connect((sum_sync_detect, 1), (mimo_sync, 1))
+        self.connect(add, (mimo_sync, 2))
+
+        """
+        OFDM demod and MIMO channel estimation
+        """
+        ofdm_demod = []
+        for i in range(0, self.n):
+            ofdm_demod[i] = fft.fft_vcc(self.fft_len, True, (), True)
+        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(
+            n=N,
+            fft_len=fft_len,
+            pilot_symbols=self.walsh_sequences[:self.n, :self.n],
+            pilot_carriers=pilot_carriers,
+            occupied_carriers=occupied_carriers)
+        for i in range(0, self.n):
+            self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i)) #TODO add coarse freq sync after FFT
+
+        """
+        MIMO decoder
+        """
+        mimo_decoder = mimo_decoder_cc(
+            N=self.n,
+            mimo_technique=self.mimo_technique,
+            vlen=self.fft_len)
+        for i in range(0, self.n):
+            self.connect((channel_est, i), (mimo_decoder, i))
+
+        """
+        Header reader
+        """
+        header_constellation = self._get_constellation(bps_header)
+        header_formatter = digital.packet_header_ofdm(
+            occupied_carriers, 1,
+            packet_length_tag_key,
+            frame_length_tag_key,
+            packet_num_tag_key,
+            bps_header, bps_payload)
+        header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
+                                                           header_formatter.formatter())
+        self.connect(mimo_decoder, header_reader)
+
+        """
+        Payload demod
+        """
+        payload_constellation = self._get_constellation(bps_payload)
+        payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
+        payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
+        crc = digital.crc32_bb(True, self.packet_length_tag_key)
+        self.connect(header_reader, payload_demod, payload_pack, crc, self)
