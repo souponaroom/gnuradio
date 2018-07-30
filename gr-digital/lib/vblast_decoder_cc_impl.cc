@@ -247,13 +247,6 @@ namespace gr {
           nprocessed += symbol_length*d_vlen*d_num_inputs;
         }
       }
-      // Add start tag just for tests TODO remove again
-      if (nitems_written(0) == 0){
-        add_item_tag(0,
-                     0,
-                     pmt::mp("start"),
-                     pmt::from_long(0));
-      }
 
       // Tell runtime system how many output items we produced.
       return noutput_items;

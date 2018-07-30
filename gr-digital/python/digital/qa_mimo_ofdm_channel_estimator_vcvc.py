@@ -85,7 +85,7 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
         dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
         dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
         dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 6, 8, 2)
-        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 4)
+        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 10)
         sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
         sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
 

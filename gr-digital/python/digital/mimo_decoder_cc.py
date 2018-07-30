@@ -34,7 +34,7 @@ class mimo_decoder_cc(gr.hier_block2):
     def __init__(self, N=2, mimo_technique='none', vlen=1):
         gr.hier_block2.__init__(self,
             "mimo_decoder_cc",
-            gr.io_signature(N, N, gr.sizeof_gr_complex),  # Input signature
+            gr.io_signature(N, N, gr.sizeof_gr_complex*vlen),  # Input signature
             gr.io_signature(1, 1, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into decoder blocks.

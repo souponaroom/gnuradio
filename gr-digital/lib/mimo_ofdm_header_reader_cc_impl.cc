@@ -143,7 +143,7 @@ namespace gr {
 
       // Collect all tags of the input buffer in the vector 'tags'.
       get_tags_in_window(tags, 0, 0, noutput_items, d_key);
-
+      GR_LOG_INFO(d_logger, format("Found %d tags.") %tags.size());
 
       uint16_t segment_length; // Number of items in the current segment.
 
@@ -300,7 +300,6 @@ namespace gr {
       }
       // Tell runtime system how many input items we consumed on
       // each input stream.
-      GR_LOG_INFO(d_logger, format("Finish work: noutput items %d nconsumed %d nwritten %d") %noutput_items %nconsumed %nwritten);
       consume_each (nconsumed);
 
       // Tell runtime system how many output items we produced.

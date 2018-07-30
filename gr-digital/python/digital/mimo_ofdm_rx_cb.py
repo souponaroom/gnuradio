@@ -23,6 +23,7 @@
 
 from gnuradio import gr
 import digital_swig as digital
+from gnuradio.digital.mimo_decoder_cc import mimo_decoder_cc
 
 try:
     # This will work when feature #505 is added.
@@ -35,7 +36,7 @@ except ImportError:
     import blocks_swig as blocks
     import analog_swig as analog
 
-import numpy
+import numpy as np
 
 _def_n = 2
 _def_mimo_technique = 'none'
@@ -55,6 +56,17 @@ _pilot_sym_scramble_seq = (
 )
 _def_pilot_symbols= tuple([(x, x, x, -x) for x in _pilot_sym_scramble_seq])
 _seq_seed = 42
+
+_walsh_sequences = np.array([
+    [1, 1, 1, 1, 1, 1, 1, 1],
+    [1,-1, 1,-1, 1,-1, 1,-1],
+    [1, 1,-1,-1, 1, 1,-1,-1],
+    [1,-1,-1, 1, 1,-1,-1, 1],
+    [1, 1, 1, 1,-1,-1,-1,-1],
+    [1,-1, 1,-1,-1, 1,-1, 1],
+    [1, 1,-1,-1,-1,-1, 1, 1],
+    [1,-1,-1, 1,-1, 1, 1,-1]
+])
 
 
 def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
@@ -80,10 +92,10 @@ def _make_sync_word1(fft_len, occupied_carriers, pilot_carriers):
     This means the sync algorithm has to check on odd carriers!
     """
     active_carriers = _get_active_carriers(fft_len, occupied_carriers, pilot_carriers)
-    numpy.random.seed(_seq_seed)
-    bpsk = {0: numpy.sqrt(2), 1: -numpy.sqrt(2)}
-    sw1 = [bpsk[numpy.random.randint(2)]  if x in active_carriers and x % 2 else 0 for x in range(fft_len)]
-    return numpy.fft.fftshift(sw1)
+    np.random.seed(_seq_seed)
+    bpsk = {0: np.sqrt(2), 1: -np.sqrt(2)}
+    sw1 = [bpsk[np.random.randint(2)]  if x in active_carriers and x % 2 else 0 for x in range(fft_len)]
+    return np.fft.fftshift(sw1)
 
 
 def _make_sync_word2(fft_len, occupied_carriers, pilot_carriers):
@@ -93,11 +105,11 @@ def _make_sync_word2(fft_len, occupied_carriers, pilot_carriers):
     Symbols are always BPSK symbols.
     """
     active_carriers = _get_active_carriers(fft_len, occupied_carriers, pilot_carriers)
-    numpy.random.seed(_seq_seed)
+    np.random.seed(_seq_seed)
     bpsk = {0: 1, 1: -1}
-    sw2 = [bpsk[numpy.random.randint(2)] if x in active_carriers else 0 for x in range(fft_len)]
+    sw2 = [bpsk[np.random.randint(2)] if x in active_carriers else 0 for x in range(fft_len)]
     sw2[0] = 0j
-    return numpy.fft.fftshift(sw2)
+    return np.fft.fftshift(sw2)
 
 def _get_constellation(bps):
     """ Returns a modulator block for a given number of bits per symbol """
@@ -123,7 +135,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                  packet_num_tag_key=_def_packet_num_tag_key,
                  occupied_carriers=_def_occupied_carriers,
                  pilot_carriers=_def_pilot_carriers,
-                 pilot_symbols=_def_pilot_symbols,
+                 pilot_symbols=_walsh_sequences,
                  bps_header=1,
                  bps_payload=1,
                  sync_word1=None,
@@ -146,6 +158,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.frame_length_tag_key = frame_length_tag_key
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
+        self.pilot_carriers =pilot_carriers,
+        self.pilot_symbols = pilot_symbols
         self.bps_header = bps_header
         self.bps_payload = bps_payload
 
@@ -177,28 +191,46 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                                                          self.cp_len,
                                                          self.sync_word1,
                                                          self.sync_word2)
-        for i in range(0, self.n):
-            self.connect((self, i), (add, i))
-            self.connect((self, i), (mimo_sync, 3+i))
-        self.connect(add, sum_sync_detect)
-        self.connect((sum_sync_detect, 0), (mimo_sync, 0))
-        self.connect((sum_sync_detect, 1), (mimo_sync, 1))
-        self.connect(add, (mimo_sync, 2))
+        # for i in range(0, self.n): TODO enable
+        #     self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (add, i))
+        #     self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (mimo_sync, 3+i))
+        # self.connect(add, sum_sync_detect)
+        # self.connect((sum_sync_detect, 0), (mimo_sync, 0))
+        # self.connect((sum_sync_detect, 1), (mimo_sync, 1))
+        # self.connect(add, (mimo_sync, 2))
+
+        ## Disable sync TODO disable
+        dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
+        dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
+        dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 1, 3, 2)
+        dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 1, 3, 2)
+        mult1 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
+        mult2 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
+        v2s1 = blocks.stream_to_vector(gr.sizeof_gr_complex, self.fft_len)
+        v2s2 = blocks.stream_to_vector(gr.sizeof_gr_complex, self.fft_len)
+        fft1 = fft.fft_vcc(self.fft_len, True, (), True)
+        fft2 = fft.fft_vcc(self.fft_len, True, (), True)
+        self.connect((self, 0), dump_cp1, mult1, v2s1, fft1, dump_sync1)
+        self.connect((self, 1), dump_cp2, mult2, v2s2, fft2, dump_sync2)
+
 
         """
         OFDM demod and MIMO channel estimation
         """
         ofdm_demod = []
         for i in range(0, self.n):
-            ofdm_demod[i] = fft.fft_vcc(self.fft_len, True, (), True)
+            ofdm_demod.append(fft.fft_vcc(self.fft_len, True, (), True))
         channel_est = digital.mimo_ofdm_channel_estimator_vcvc(
-            n=N,
+            n=self.n,
             fft_len=fft_len,
-            pilot_symbols=self.walsh_sequences[:self.n, :self.n],
-            pilot_carriers=pilot_carriers,
-            occupied_carriers=occupied_carriers)
-        for i in range(0, self.n):
-            self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i)) #TODO add coarse freq sync after FFT
+            pilot_symbols=self.pilot_symbols[:self.n, :self.n],
+            pilot_carriers=[-21, -7, 7, 21],
+            occupied_carriers=range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22, 27))
+        #for i in range(0, self.n): TODO enable
+        #    self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i)) #TODO add coarse freq sync after FFT
+        # TODO disable
+        self.connect(dump_sync1, (channel_est, 0))
+        self.connect(dump_sync2, (channel_est, 1))
 
         """
         MIMO decoder
@@ -206,14 +238,14 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         mimo_decoder = mimo_decoder_cc(
             N=self.n,
             mimo_technique=self.mimo_technique,
-            vlen=self.fft_len)
+            vlen=len(range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22, 27)))
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
 
         """
         Header reader
         """
-        header_constellation = self._get_constellation(bps_header)
+        header_constellation = _get_constellation(bps_header)
         header_formatter = digital.packet_header_ofdm(
             occupied_carriers, 1,
             packet_length_tag_key,
@@ -222,12 +254,16 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             bps_header, bps_payload)
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter())
-        self.connect(mimo_decoder, header_reader)
+        # TODO enable
+        # self.connect(mimo_decoder, header_reader)
+         # TODO disable
+        stream2tagged_stream1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 48+48, "start")
+        self.connect(mimo_decoder, stream2tagged_stream1, header_reader)
 
         """
         Payload demod
         """
-        payload_constellation = self._get_constellation(bps_payload)
+        payload_constellation = _get_constellation(bps_payload)
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
