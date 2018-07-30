@@ -31,12 +31,18 @@ namespace gr {
     class ofdm_correct_carrier_freq_offset_vcvc_impl : public ofdm_correct_carrier_freq_offset_vcvc
     {
      private:
-      uint32_t d_fft_len;
-      uint32_t d_cp_len;
-      std::string d_carrier_freq_offset_key;
+      uint32_t d_fft_len; /*!< Length of the FFT vectors and vlen of the items of this block. */
+      uint32_t d_cp_len; /*!< Cyclic prefix length. (Required to correct the frequency offset over time. */
+      std::string d_carrier_freq_offset_key; /*!< Key of the required tags which include the carrier frequency offset. */
       pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      int d_carrier_offset;
+      int d_carrier_offset; /*!< Local var which remembers the current carrier frequency offset. */
 
+      /*! \brief Writes the carrier frequency corrected fft vectors to the output.
+       *
+       * @param in Pointer to the input buffer.
+       * @param out Poiner to the output buffer.
+       * @param length Number of FFT vectors to process.
+       */
       void correct_offset(const gr_complex *in, gr_complex *out, uint32_t length);
 
      public:

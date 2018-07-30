@@ -44,9 +44,10 @@ namespace gr {
     /*
      * The private constructor
      */
-    ofdm_correct_carrier_freq_offset_vcvc_impl::ofdm_correct_carrier_freq_offset_vcvc_impl(uint32_t fft_len,
-                                                                                   uint32_t cp_len,
-                                                                                   std::string carrier_freq_offset_key)
+    ofdm_correct_carrier_freq_offset_vcvc_impl::ofdm_correct_carrier_freq_offset_vcvc_impl(
+            uint32_t fft_len,
+            uint32_t cp_len,
+            std::string carrier_freq_offset_key)
       : gr::sync_block("ofdm_correct_carrier_freq_offset_vcvc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)*fft_len),
               gr::io_signature::make(1, 1, sizeof(gr_complex)*fft_len)),
@@ -68,7 +69,7 @@ namespace gr {
     ofdm_correct_carrier_freq_offset_vcvc_impl::correct_offset(const gr_complex *in,
                                                            gr_complex *out,
                                                            uint32_t length) {
-      // Copy the fft vectors such that the symbols are shifted to the correct position
+      // Copy the fft vectors such that the symbols are shifted to the correct position.
       if (d_carrier_offset < 0) {
         memset((void *) out, 0x00, sizeof(gr_complex) * (-d_carrier_offset));
         memcpy((void *) &out[-d_carrier_offset], (void *) in,
@@ -79,7 +80,7 @@ namespace gr {
         memcpy((void *) out, (void *) (in+d_carrier_offset),
                 sizeof(gr_complex) * (d_fft_len * length - d_carrier_offset));
       }
-      // Correct the frequency shift on the symbols
+      // Correct the frequency shift on the symbols.
       gr_complex phase_correction;
       for (unsigned int i = 0; i < length; i++) {
         phase_correction = gr_expj(-M_TWOPI * d_carrier_offset * d_cp_len / d_fft_len * (i + 1));
@@ -118,6 +119,8 @@ namespace gr {
         }
         // Iterate over tags in buffer.
         for (unsigned int i = 0; i < tags.size(); ++i){
+          // Read the new carrier offset.
+          d_carrier_offset = pmt::to_long(tags[i].value);
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
             // This is not the last tag.
