@@ -22,52 +22,41 @@
 # 
 
 from gnuradio import gr
-from gnuradio import blocks
 import digital_swig as digital
 
 class mimo_decoder_cc(gr.hier_block2):
     """
     Hierarchical MIMO decoder block of the following structure:
     -N input ports
-    -channel estimator which produces stream tags with estimated channel matrix
     -decoder block with selected MIMO algorithm (default 'none' is no block at all)
     -1 output port
-
-    For mimo_technique='none' and N>1, the decoder block only takes the first input port as output port.
-    An estimated CSI is always tagged to the output stream, if a training sequence exists
-    (also for the mimo_technique='none' case).
     """
-    def __init__(self, M, N, mimo_technique='none', training_sequence=[]):
+    def __init__(self, N=2, mimo_technique='none', vlen=1):
         gr.hier_block2.__init__(self,
             "mimo_decoder_cc",
             gr.io_signature(N, N, gr.sizeof_gr_complex),  # Input signature
-            gr.io_signature(1, 1, gr.sizeof_gr_complex)) # Output signature
+            gr.io_signature(1, 1, gr.sizeof_gr_complex))  # Output signature
 
-        # Dictionary translating mimo algorithm keys into encoder blocks.
-        mimo_algorithm = {'none': self,
-                          'diversity_combining_SC' : digital.diversity_combiner_cc_make(N, 0, 'SC'),
-                          'diversity_combining_MRC' : digital.diversity_combiner_cc_make(N, 0, 'MRC'),
-                          'alamouti': digital.alamouti_decoder_cc_make(),
-                          'diff_stbc': digital.diff_stbc_decoder_cc_make(),
-                          'vblast': digital.vblast_decoder_cc_make(N, 'ZF')}
+        # Dictionary translating mimo algorithm keys into decoder blocks.
+        mimo_algorithm = {'alamouti' : digital.alamouti_decoder_cc_make(),
+                          'diff_stbc' : digital.diff_stbc_decoder_cc_make(),
+                          'vblast' : digital.vblast_decoder_cc_make(num_inputs=N,
+                                                                    equalizer_type='ZF',
+                                                                    vlen=vlen)}
 
-        if len(training_sequence) > 0:
-            channel_est = digital.mimo_channel_estimator_cc_make(M, N, training_sequence)
+        # Check for valid N.
+        if N < 1:
+            raise ValueError('MIMO block must have N >= 1 (N=%d) selected).' % N)
+        # Check for valid MIMO algorithm.
+        if mimo_technique not in mimo_algorithm:
+            raise ValueError('MIMO algorithm %s unknown.' % (mimo_technique))
+        # Check if N = 2 for Alamouti-like schemes.
+        if N != 2 and mimo_technique == ('alamouti' or 'diff_stbc'):
+            raise ValueError('For Alamouti-like schemes like %s, N must be 2.' % mimo_technique)
 
         # Connect everything.
-        if mimo_technique != 'none':
-            if len(training_sequence) > 0:
-                for n in range(0, N):
-                    self.connect((self, n), channel_est, (mimo_algorithm, n))
-            else:
-                for n in range(0, N):
-                    self.connect((self, n), (mimo_algorithm, n))
-            self.connect(mimo_algorithm, self)
-        else:
-            if len(training_sequence) > 0:
-                self.connect((self, 0), (channel_est, 0), (self, 0))
-                for n in range(1, N):
-                    self.connect((self, n), (channel_est, n), blocks.null_sink_make(gr.sizeof_gr_complex))
-            else:
-                self.connect(self, self)
+        mimo_decoder = mimo_algorithm[mimo_technique]
+        for i in range(0, N):
+            self.connect((self, i), (mimo_decoder, i))
+        self.connect(mimo_decoder, self)
 

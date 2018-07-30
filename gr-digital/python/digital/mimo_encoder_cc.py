@@ -22,7 +22,6 @@
 # 
 
 from gnuradio import gr
-from gnuradio import blocks
 import digital_swig as digital
 
 class mimo_encoder_cc(gr.hier_block2):
@@ -37,7 +36,7 @@ class mimo_encoder_cc(gr.hier_block2):
         gr.hier_block2.__init__(self,
             "mimo_encoder_cc",
             gr.io_signature(1, 1, gr.sizeof_gr_complex),  # Input signature
-            gr.io_signature(M, M, gr.sizeof_gr_complex)) # Output signature
+            gr.io_signature(M, M, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into encoder blocks.
         mimo_algorithm = {'alamouti' : digital.alamouti_encoder_cc_make(),
@@ -45,8 +44,8 @@ class mimo_encoder_cc(gr.hier_block2):
                           'vblast' : digital.vblast_encoder_cc_make(M)}
 
         # Check for valid M.
-        if M < 2:
-            raise ValueError('MIMO block must have M >= 2 (M=%d) selected).' % M)
+        if M < 1:
+            raise ValueError('MIMO block must have M >= 1 (M=%d) selected).' % M)
         # Check for valid MIMO algorithm.
         if mimo_technique not in mimo_algorithm:
             raise ValueError('MIMO algorithm %s unknown.' % (mimo_technique))
