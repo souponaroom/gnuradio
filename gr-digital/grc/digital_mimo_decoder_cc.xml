@@ -1,38 +1,47 @@
 <?xml version="1.0"?>
 <block>
-  <name>mimo_decoder_cc</name>
+  <name>MIMO Decoder</name>
   <key>digital_mimo_decoder_cc</key>
-  <category>[digital]</category>
-  <import>import digital</import>
-  <make>digital.mimo_decoder_cc($N, $mimo_technique, $training_sequence)</make>
-  <!-- Make one 'param' node for every Parameter you want settable from the GUI.
-       Sub-nodes:
-       * name
-       * key (makes the value accessible as $keyname, e.g. in the make node)
-       * type -->
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.mimo_decoder_cc($N, $mimo_technique, $vlen)</make>
   <param>
-    <name>...</name>
-    <key>...</key>
-    <type>...</type>
+    <name>N</name>
+    <key>N</key>
+    <value>2</value>
+    <type>int</type>
   </param>
-
-  <!-- Make one 'sink' node per input. Sub-nodes:
-       * name (an identifier for the GUI)
-       * type
-       * vlen
-       * optional (set to 1 for optional inputs) -->
+  <param>
+    <name>MIMO technique</name>
+    <key>mimo_technique</key>
+    <value>vblast</value>
+    <type>string</type>
+    <option>
+      <name>V-BLAST</name>
+      <key>vblast</key> 
+    </option>
+    <option>
+      <name>Alamouti</name>
+      <key>alamouti</key>
+    </option>
+    <option>
+      <name>Differential Alamouti</name>
+      <key>diff_stbc</key>
+    </option>
+  </param>
+  <param>
+    <name>Vector Length</name>
+    <key>vlen</key>
+    <value>1</value>
+    <type>int</type>
+  </param>
   <sink>
     <name>in</name>
-    <type><!-- e.g. int, float, complex, byte, short, xxx_vector, ...--></type>
+    <type>complex</type>
+    <nports>$N</nports>
   </sink>
-
-  <!-- Make one 'source' node per output. Sub-nodes:
-       * name (an identifier for the GUI)
-       * type
-       * vlen
-       * optional (set to 1 for optional inputs) -->
   <source>
     <name>out</name>
-    <type><!-- e.g. int, float, complex, byte, short, xxx_vector, ...--></type>
+    <type>complex</type>
   </source>
 </block>
