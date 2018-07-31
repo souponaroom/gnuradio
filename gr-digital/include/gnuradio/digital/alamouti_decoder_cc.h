@@ -25,7 +25,7 @@
 #define INCLUDED_DIGITAL_ALAMOUTI_DECODER_CC_H
 
 #include <gnuradio/digital/api.h>
-#include <gnuradio/sync_block.h>
+#include <gnuradio/sync_interpolator.h>
 
 namespace gr {
   namespace digital {
@@ -55,7 +55,7 @@ namespace gr {
  * [1] Andrea Goldsmith. 2005. Wireless Communications.
  *     Cambridge University Press, New York, NY, USA.
  */
-    class DIGITAL_API alamouti_decoder_cc : virtual public gr::sync_block
+    class DIGITAL_API alamouti_decoder_cc : virtual public gr::sync_interpolator
     {
      public:
       typedef boost::shared_ptr<alamouti_decoder_cc> sptr;
@@ -68,7 +68,7 @@ namespace gr {
        * class. digital::alamouti_decoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make();
+      static sptr make(uint32_t vlen=1);
     };
 
   } // namespace digital
