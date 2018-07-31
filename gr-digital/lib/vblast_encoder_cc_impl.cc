@@ -24,11 +24,14 @@
 #include "config.h"
 #endif
 
+#include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "vblast_encoder_cc_impl.h"
 
 namespace gr {
   namespace digital {
+
+    const pmt::pmt_t vblast_encoder_cc_impl::d_key = pmt::string_to_symbol("packet_length");
 
     vblast_encoder_cc::sptr
     vblast_encoder_cc::make(uint16_t num_outputs)
@@ -45,7 +48,10 @@ namespace gr {
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(num_outputs, num_outputs, sizeof(gr_complex)), num_outputs),
         d_num_outputs(num_outputs)
-    {}
+    {
+      // Don't propagate theses tags because the lengths are not proper anymore.
+      set_tag_propagation_policy(TPP_DONT);
+    }
 
     /*
      * Our virtual destructor.
@@ -70,6 +76,18 @@ namespace gr {
         }
       }
 
+      // Read old tags and write new tags (with new position and value).
+      std::vector <gr::tag_t> tags;
+      get_tags_in_window(tags, 0, 0, noutput_items*d_num_outputs, d_key);
+      for (int i = 0; i < tags.size(); ++i) {
+        for (int j = 0; j < d_num_outputs; ++j) {
+          //GR_LOG_DEBUG(d_logger, boost::format("Add input tag %d from offset %d to antenna %d") %i %tags[i].offset %j);
+          add_item_tag(j,
+                       tags[i].offset / d_num_outputs,
+                       tags[i].key,
+                       pmt::from_long(pmt::to_long(tags[i].value)/d_num_outputs));
+        }
+      }
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }
