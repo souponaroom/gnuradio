@@ -39,6 +39,11 @@ namespace gr {
  * output items as there are input items. The code rate is R=1.
  *
  * The CSI is transported via stream tags with key='csi'.
+ * The CSI must be a 3-dimensional vector with the dimensions vlen, N(=1 for Alamouti), M(=2 for Alamouti).
+ * For vlen>1 there is provided a separate channel matrix for each vector element.
+ * Set vlen>1 if you use a multicarrier system like OFDM
+ * (in this case it would be vlen=number of occupied sub-carriers).
+ * To generate a proper CSI tag, use the pmt structure pmt_vector(pmt_vector(pmt_c32vector))).
  * Initially the CSI is set to 1.0 + 0j for both branches and are updated
  * with each incoming CSI. Because the Alamouti algorithm works with sequences
  * of length 2, the tags should be set only on samples with even positions.
@@ -55,14 +60,11 @@ namespace gr {
     class alamouti_decoder_cc_impl : public alamouti_decoder_cc
     {
      private:
+      uint32_t d_vlen; /*!< Vector length of the incoming items. */
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const std::string s; /*!< String that matches the key of the CSI tags. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      std::vector <gr_complex> d_csi;
-      /*!< Array of length 2 which stores the current channel
-       * state information (CSI). The array is being updated which each
-       * received tag of the key='csi'.
-       */
+      std::vector<std::vector<std::vector<gr_complex> > > d_csi; /*!< Current channel matrix. */
 
       /*!
        * \brief Decodes the given buffer after the rules of Alamouti's code.
@@ -76,7 +78,7 @@ namespace gr {
       void decode_symbol(const gr_complex* in, gr_complex* out, uint32_t length);
 
      public:
-      alamouti_decoder_cc_impl();
+      alamouti_decoder_cc_impl(uint32_t vlen);
       ~alamouti_decoder_cc_impl();
 
       // Where all the action really happens
