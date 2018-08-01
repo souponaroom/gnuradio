@@ -65,6 +65,8 @@ namespace gr {
       d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0)));
       d_mimo_equalizer = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0)));
       d_snr = std::vector<float>(num_inputs, 1.0e6);
+      // Don't propagate theses tags because the lengths are not proper anymore.
+      set_tag_propagation_policy(TPP_DONT);
     }
 
     /*
@@ -246,6 +248,18 @@ namespace gr {
           equalize_symbol(input_items, &out[nprocessed], nprocessed, symbol_length);
           nprocessed += symbol_length*d_vlen*d_num_inputs;
         }
+      }
+
+      // Read old 'start' tags and write new tags (with new position and value).
+      std::vector <gr::tag_t> length_tags;
+      get_tags_in_window(length_tags, 0, 0, noutput_items/(d_num_inputs*d_vlen), pmt::string_to_symbol("start"));
+
+      for (unsigned int i = 0; i < length_tags.size(); ++i) {
+        GR_LOG_DEBUG(d_logger, boost::format("Tag offset %d") %length_tags[i].offset);
+        add_item_tag(0,
+                     (length_tags[i].offset)*(d_num_inputs*d_vlen),
+                     length_tags[i].key,
+                     pmt::from_long(0));
       }
 
       // Tell runtime system how many output items we produced.

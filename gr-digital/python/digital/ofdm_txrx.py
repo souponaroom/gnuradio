@@ -289,6 +289,7 @@ class ofdm_tx(gr.hier_block2):
                 mimo_technique=self.mimo_technique
             )
             self.connect(header_payload_mux, mimo_encoder)
+            #self.connect(mimo_encoder, blocks.tag_debug(gr.sizeof_gr_complex, 'MIMO encoder'))
             allocator = []
             ffter = []
             cyclic_prefixer = []

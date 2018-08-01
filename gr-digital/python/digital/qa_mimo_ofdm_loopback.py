@@ -25,6 +25,8 @@ from gnuradio import gr, gr_unittest
 from gnuradio import blocks
 from gnuradio import fft
 import digital_swig as digital
+from gnuradio.digital.ofdm_txrx import ofdm_tx
+from gnuradio.digital.mimo_ofdm_rx_cb import mimo_ofdm_rx_cb
 from gnuradio.digital.mimo_encoder_cc import mimo_encoder_cc
 from gnuradio.digital.mimo_decoder_cc import mimo_decoder_cc
 import numpy as np
@@ -110,6 +112,35 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
             print 'Modulation not supported.'
             exit(1)
 
+    def mimo_ofdm_tx(self, data, packet_len, num_items,
+                     fft_len, cp_len, len_tag_key,
+                     m, mimo_technique, channel_matrix):
+
+        src = blocks.vector_source_b(range(packet_len), True, 1, ())
+        s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
+                                                         packet_len,
+                                                         len_tag_key)
+        tx = ofdm_tx(
+            fft_len=fft_len, cp_len=cp_len,
+            packet_length_tag_key=len_tag_key,
+            bps_header=1,
+            bps_payload=1,
+            rolloff=0,
+            debug_log=False,
+            scramble_bits=False,
+            m=m, mimo_technique=mimo_technique)
+
+        static_channel = blocks.multiply_matrix_cc(channel_matrix)
+        head = blocks.head(gr.sizeof_gr_complex, num_items)
+
+        sinks = []
+        for i in range(0, m):
+            sinks.append(blocks.vector_sink_c())
+
+        self.tb.connect(src, s2tagged_stream, tx)
+        self.tb.connect((tx, 0), (static_channel, 0), head, sinks[0])
+        self.tb.connect((tx, 1), (static_channel, 1), sinks[1])
+        return sinks
 
     ''' Generate header and modulate payload data.'''
     def generate_mod_packets(self, data, packet_lengths,
@@ -177,17 +208,19 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
         self.tb.run()
         return sinks
 
-    def ofdm_mod(self, data, tags, m, fft_len, cp_len, sync_words, packet_length_tag_key,
+    def ofdm_mod(self, data, tags, m, channel_matrix, fft_len, cp_len, sync_words, packet_length_tag_key,
                       rolloff=0):
         mimo_sources = []
         for i in range(0, m):
             mimo_sources.append(blocks.vector_source_c(data=data[i], tags=tags[i]))
 
+        static_channel = blocks.multiply_matrix_cc(channel_matrix)
+
         allocator = []
         ffter = []
         cyclic_prefixer = []
         normalize = []
-        tx_sink = []
+        tx_sinks = []
         for i in range(0, m):
             mimo_pilot_symbols = np.repeat(_walsh_sequences[i][:m], 4).reshape((m, 4))
             allocator.append(
@@ -220,31 +253,29 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
             self.tb.connect(mimo_sources[i],
                             allocator[i],
                             ffter[i],
-                            cyclic_prefixer[i],
-                            normalize[i])
-            tx_sink.append(blocks.vector_sink_c())
-            self.tb.connect(normalize[i], tx_sink[i])
+                            cyclic_prefixer[i])
+            tx_sinks.append(blocks.vector_sink_c())
+            self.tb.connect(cyclic_prefixer[i], normalize[i], (static_channel, i), tx_sinks[i])
         self.tb.run()
-        return tx_sink
+        return tx_sinks
 
-    def ofdm_demod(self, data, tags, n, fft_len, cp_len):
+    def ofdm_demod(self, data, n, fft_len, cp_len):
         src = []
         dump_cp = []
         dump_sync = []
         mult = []
-        v2s = []
+        s2v = []
         ffter = []
         sinks = []
         for i in range(0, n):
-            src.append(blocks.vector_source_c(data=data[i], tags=tags))
+            src.append(blocks.vector_source_c(data=data[i]))
             dump_cp.append(blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len))
             dump_sync.append(blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 1, 3, 2))
             mult.append(blocks.multiply_const_cc(1.0 / np.sqrt(fft_len)))
-            v2s.append(blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len))
+            s2v.append(blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len))
             ffter.append(fft.fft_vcc(fft_len, True, (), True))
             sinks.append(blocks.vector_sink_c(vlen=fft_len))
-            self.tb.connect(src[i], dump_cp[i], mult[i], v2s[i], ffter[i], dump_sync[i], sinks[i])
-        self.tb.connect(src[0], blocks.tag_debug(gr.sizeof_gr_complex, 'After sync'))
+            self.tb.connect(src[i], dump_cp[i], mult[i], s2v[i], ffter[i], dump_sync[i], sinks[i])
         self.tb.run()
         return sinks
 
@@ -263,9 +294,12 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
             vlen=len(_def_occupied_carriers[0]))
         src = []
         for i in range(0, n):
-            src.append(blocks.vector_source_c(data=data[i], tags=tags[i], vlen=fft_len))
+            src.append(blocks.vector_source_c(data=data[i], tags=tags, vlen=fft_len))
             self.tb.connect(src[i], (channel_est, i), (mimo_decoder, i))
         sink = blocks.vector_sink_c()
+        self.tb.connect(src[0], blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'ofdm_demod', 'start'))
+        self.tb.connect((channel_est, 0), blocks.tag_debug(gr.sizeof_gr_complex*len(_def_occupied_carriers[0]), 'Chanest'))
+        self.tb.connect(mimo_decoder, blocks.tag_debug(gr.sizeof_gr_complex, 'MIMO decoder', 'start'))
         self.tb.connect(mimo_decoder, sink)
         self.tb.run()
         return sink
@@ -274,8 +308,7 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
     def parse(self, data, tags,
               occupied_carriers,
               bps_header, bps_payload,
-              header_constellation, payload_constellation
-              ):
+              header_constellation, payload_constellation):
 
         rx_src = blocks.vector_source_c(data=data,
                                         tags=tags)
@@ -296,9 +329,31 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
         self.tb.run()
         return sink_rx
 
+    def mimo_ofdm_rx(self, data, fft_len, cp_len, len_tag_key,
+                     n):
+        srcs = []
+        for i in range(n):
+            srcs.append(blocks.vector_source_c(data=data[i]))
+
+        rx = mimo_ofdm_rx_cb(
+            n=n,
+            mimo_technique='vblast',
+            fft_len=fft_len,
+            cp_len=cp_len,
+            packet_length_tag_key=len_tag_key,
+            bps_header=1,
+            bps_payload=1)
+
+        sink = blocks.vector_sink_b()
+        for i in range(0, n):
+            self.tb.connect(srcs[i], (rx, i))
+        self.tb.connect(rx, sink)
+        self.tb.run()
+        return sink
+
     def test_001_t (self):
         # Define test params.
-        packet_lengths = np.array([6, 18])
+        packet_lengths = np.array([18])
         data_length = np.sum(packet_lengths)
         header_len = len(_def_occupied_carriers[0])
         bps_header = 1
@@ -307,6 +362,8 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
         cp_len = fft_len/4
         m = 2
         n = 2
+        channel_matrix = (np.random.randn(n, m) + 1j * np.random.randn(n, m))
+        print 'channel matrix' + str(channel_matrix)
         mimo_technique = 'vblast'
         packet_len_tag_key = "packet_length"
         sync_word1 = _make_sync_word1(fft_len, _def_occupied_carriers, _def_pilot_carriers)
@@ -320,78 +377,90 @@ class qa_mimo_ofdm_loopback (gr_unittest.TestCase):
         # Payload data.
         data = np.random.randint(0, 100, data_length)
 
-        # Generate modulated packets.
-        mod_packets_sink = self.generate_mod_packets(data, packet_lengths,
-                                                     _def_occupied_carriers,
-                                                     bps_header, bps_payload,
-                                                     packet_len_tag_key,
-                                                     header_constellation,
-                                                     payload_constellation)
+        # # Generate modulated packets.
+        # mod_packets_sink = self.generate_mod_packets(data, packet_lengths,
+        #                                              _def_occupied_carriers,
+        #                                              bps_header, bps_payload,
+        #                                              packet_len_tag_key,
+        #                                              header_constellation,
+        #                                              payload_constellation)
+        #
+        # mimo_enc_sinks = self.mimo_enc(data=mod_packets_sink.data(),
+        #                          tags=mod_packets_sink.tags(),
+        #                          mimo_technique=mimo_technique,
+        #                          m=m)
+        #
+        # # pass data
+        # mimo_enc_data = []
+        # mimo_enc_tags = []
+        # for i in range(0, m):
+        #     mimo_enc_data.append(mimo_enc_sinks[i].data())
+        #     mimo_enc_tags.append(mimo_enc_sinks[i].tags())
+        #
+        # mimo_tx_sinks = self.ofdm_mod(data=mimo_enc_data,
+        #                         tags=mimo_enc_tags,
+        #                         m=m, channel_matrix=channel_matrix,
+        #                         fft_len=fft_len,
+        #                         cp_len=cp_len,
+        #                         sync_words=sync_words,
+        #                         packet_length_tag_key=packet_len_tag_key)
 
-        mimo_enc_sinks = self.mimo_enc(data=mod_packets_sink.data(),
-                                 tags=mod_packets_sink.tags(),
-                                 mimo_technique=mimo_technique,
-                                 m=m)
+        # Use ofdm_tx to generate tx data
+        mimo_tx_sinks = self.mimo_ofdm_tx(data=data, packet_len=packet_lengths[0], num_items=fft_len*2000,
+                                          fft_len=fft_len, cp_len=cp_len, len_tag_key=packet_len_tag_key,
+                                          m=m, mimo_technique=mimo_technique, channel_matrix=channel_matrix)
 
-        # pass data
-        mimo_enc_data = []
-        mimo_enc_tags = []
-        for i in range(0, m):
-            mimo_enc_data.append(mimo_enc_sinks[i].data())
-            mimo_enc_tags.append(mimo_enc_sinks[i].tags())
-
-        mimo_tx = self.ofdm_mod(data=mimo_enc_data,
-                                tags=mimo_enc_tags,
-                                m=m,
-                                fft_len=fft_len,
-                                cp_len=cp_len,
-                                sync_words=sync_words,
-                                packet_length_tag_key=packet_len_tag_key)
-
-        # Channel
+        # Pass data
         rx_data = []
         for i in range(0, m):
-            rx_data.append(mimo_tx[i].data())
+            rx_data.append(mimo_tx_sinks[i].data())
 
-        # Simulate tags from sync
-        rx_tags = []
-        offset = 0
-        for i in range(0, packet_lengths.size):
-            rx_tags.append(gr.tag_utils.python_to_tag((offset,
-                                                       pmt.string_to_symbol("start"),
-                                                       pmt.from_long(0))))
-            offset += (packet_lengths[i] * 8 / bps_payload + header_len)/n
 
-        # OFDM demod
-        ofdm_demod = self.ofdm_demod(data=rx_data,
-                                     tags=rx_tags,
-                                     n=n,
-                                     fft_len=fft_len,
-                                     cp_len=cp_len)
+        # Use ofdm_rx to receive data
+        result = self.mimo_ofdm_rx(data=rx_data, fft_len=fft_len, cp_len=cp_len,
+                                   len_tag_key=packet_len_tag_key, n=n)
 
-        # pass data
-        ofdm_demod_data = []
-        ofdm_demod_tags = []
-        for i in range(0, n):
-            ofdm_demod_data.append(ofdm_demod[i].data())
-            ofdm_demod_tags.append(ofdm_demod[i].tags())
+        print 'result'
+        print result.data()
 
-        # MIMO channel est and decoder
-        mimo_dec = self.mimo_decode(data=ofdm_demod_data,
-                                    tags=ofdm_demod_tags,
-                                    n=n,
-                                    mimo_technique=mimo_technique,
-                                    fft_len=fft_len)
-
-        # pass data
-        mimo_dec_data = mimo_dec.data()
-        mimo_dec_tags = mimo_dec.tags()
-
-        # Header and payload reader.
-        rx_data = self.parse(mimo_dec_data, mimo_dec_tags,
-                             _def_occupied_carriers,
-                             bps_header, bps_payload,
-                             header_constellation, payload_constellation)
+        # # OFDM demod
+        # ofdm_demod = self.ofdm_demod(data=rx_data,
+        #                              n=n,
+        #                              fft_len=fft_len,
+        #                              cp_len=cp_len)
+        #
+        # # Simulate tags from sync
+        # ofdm_demod_tags = []
+        # offset = 0
+        # for i in range(0, packet_lengths.size):
+        #     ofdm_demod_tags.append(gr.tag_utils.python_to_tag((offset,
+        #                                                pmt.string_to_symbol("start"),
+        #                                                pmt.from_long(0))))
+        #     offset += ((packet_lengths[i] * 8 / bps_payload + header_len) / n)/len(_def_occupied_carriers[0])
+        #
+        #
+        # # pass data
+        # ofdm_demod_data = []
+        # for i in range(0, n):
+        #     ofdm_demod_data.append(ofdm_demod[i].data())
+        #
+        # # MIMO channel est and decoder
+        # mimo_dec = self.mimo_decode(data=ofdm_demod_data,
+        #                             tags=ofdm_demod_tags,
+        #                             n=n,
+        #                             mimo_technique=mimo_technique,
+        #                             fft_len=fft_len)
+        #
+        # # pass data
+        # mimo_dec_data = mimo_dec.data()
+        # mimo_dec_tags = mimo_dec.tags()
+        #
+        #
+        # # Header and payload reader.
+        # rx_data = self.parse(mimo_dec_data, mimo_dec_tags,
+        #                      _def_occupied_carriers,
+        #                      bps_header, bps_payload,
+        #                      header_constellation, payload_constellation)
 
 
 if __name__ == '__main__':

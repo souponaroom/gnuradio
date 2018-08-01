@@ -70,6 +70,8 @@ namespace gr {
     {
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
               (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (n, 1.0)));
+      // Set tag propagation policy.
+      set_tag_propagation_policy(TPP_ONE_TO_ONE );
     }
 
     /*

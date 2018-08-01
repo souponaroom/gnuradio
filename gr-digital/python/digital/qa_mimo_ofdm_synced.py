@@ -1,25 +1,25 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# 
+#
 # Copyright 2018 Free Software Foundation, Inc.
-# 
+#
 # This file is part of GNU Radio
-# 
+#
 # GNU Radio is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3, or (at your option)
 # any later version.
-# 
+#
 # GNU Radio is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with GNU Radio; see the file COPYING.  If not, write to
 # the Free Software Foundation, Inc., 51 Franklin Street,
 # Boston, MA 02110-1301, USA.
-# 
+#
 
 from gnuradio import gr, gr_unittest
 from gnuradio import blocks
@@ -29,7 +29,7 @@ from gnuradio.digital.ofdm_txrx import ofdm_tx
 import numpy as np
 import pmt
 
-class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
+class qa_mimo_ofdm_synced (gr_unittest.TestCase):
 
     def setUp (self):
         self.tb = gr.top_block ()
@@ -39,8 +39,8 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
 
     def test_001_t (self):
         # Define test params.
-        packet_len = 14
-        len_tag_key = 'packet_length'
+        packet_len = 50
+        len_tag_key = 'packet_len'
         fft_len = 64
         cp_len = fft_len/4
         pilot_carriers = [-21, -7, 7, 21]
@@ -81,11 +81,26 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
                                                                pilot_symbols=self.walsh_sequences[:N, :N],
                                                                pilot_carriers=pilot_carriers,
                                                                occupied_carriers=occupied_carriers)
+
+        mimo_dec = digital.vblast_decoder_cc(num_inputs=M,
+                                          equalizer_type="ZF",
+                                          vlen=len(occupied_carriers))
+        # Header reader.
+        header_formatter_rx = digital.packet_header_ofdm(
+            [occupied_carriers], 1,
+            "packet_length",
+            "frame_length",
+            "packet_num",
+            1, 1)
+        header_constellation = digital.constellation_bpsk()
+        header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
+                                                           header_formatter_rx.formatter())
+
         dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
         dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
         dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 6, 8, 2)
         dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 6, 8, 2)
-        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 10)
+        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 4)
         sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
         sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
 
@@ -99,8 +114,7 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
                         fft1,
                         dump_sync1,
                         (channel_est, 0),
-                        sink1)
-        #self.tb.connect((channel_est, 0), blocks.tag_debug(gr.sizeof_gr_complex*len(occupied_carriers), 'channel est pls'),)
+                        (mimo_dec, 0))
         self.tb.connect((tx, 1),
                         (static_channel, 1),
                         dump_cp2,
@@ -109,42 +123,9 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
                         fft2,
                         dump_sync2,
                         (channel_est, 1),
-                        head,
-                        sink2)
-        self.tb.run ()
-        # check data
-        csi = np.empty(shape=[fft_len, N, N], dtype=complex)
-        for k in range(0, len(occupied_carriers)):
-            for n in range(0, N):
-                for m in range(0, M):
-                    csi[k][n][m] = pmt.c32vector_ref(pmt.vector_ref(pmt.vector_ref(sink1.tags()[0].value, k), n), m)
-        for c in range(0, len(occupied_carriers)):
-            for n in range(0, N):
-                self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 1)
-
-    def test_002_t(self):
-        N=2
-        fft_len = 4
-        length = 10
-        occupied_carriers = [-1]
-        data = np.random.randn(N, fft_len*10)
-        src1 = blocks.vector_source_c(data[0], vlen=fft_len)
-        src2 = blocks.vector_source_c(data[1], vlen=fft_len)
-        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
-                                                               fft_len=fft_len,
-                                                               pilot_symbols=[[1,1],[1,-1]],
-                                                               pilot_carriers=[0],
-                                                               occupied_carriers=occupied_carriers)
-        sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-        sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-        head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 5)
-        self.tb.connect(src1, (channel_est, 0), head, sink1)
-        self.tb.connect(src2, (channel_est, 1), sink2)
+                        (mimo_dec, 1))
+        self.tb.connect(mimo_dec, header_reader, blocks.null_sink(gr.sizeof_gr_complex))
         self.tb.run()
-        self.assertComplexTuplesAlmostEqual(data[0][-1 + fft_len / 2:5 * fft_len:fft_len],
-            sink1.data()[0:len(occupied_carriers) * length / 2], 2)
-        self.assertComplexTuplesAlmostEqual(data[1][-1 + fft_len / 2:5 * fft_len:fft_len],
-            sink2.data()[0:len(occupied_carriers) * length / 2], 2)
 
 if __name__ == '__main__':
-    gr_unittest.run(qa_mimo_ofdm_channel_estimator_vcvc, "qa_mimo_ofdm_channel_estimator_vcvc.xml")
+    gr_unittest.run(qa_mimo_ofdm_synced, "qa_mimo_ofdm_synced.xml")

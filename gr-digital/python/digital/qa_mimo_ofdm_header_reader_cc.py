@@ -92,6 +92,7 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
 
         self.tb.connect(payload_src, payload_unpack, payload_mod, (header_payload_mux, 1))
         self.tb.connect(payload_src, header_gen)
+        self.tb.connect(header_payload_mux, blocks.tag_debug(gr.sizeof_gr_complex, 'nach hpMUX'))
         sink = blocks.vector_sink_c()
         self.tb.connect(header_payload_mux, sink)
         self.tb.run()
@@ -126,7 +127,7 @@ class qa_mimo_ofdm_header_reader_cc (gr_unittest.TestCase):
     '''Test with 2 packets which follow each other directly.'''
     def test_001_t (self):
         # Define test params.
-        packet_lengths = np.array([4, 4])
+        packet_lengths = np.array([2, 4])
         data_length = np.sum(packet_lengths)
         occupied_carriers = range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22, 27)
         header_len = len(occupied_carriers)

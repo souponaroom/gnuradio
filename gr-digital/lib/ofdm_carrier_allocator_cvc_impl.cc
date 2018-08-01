@@ -23,7 +23,7 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
+#include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "ofdm_carrier_allocator_cvc_impl.h"
 
@@ -198,7 +198,6 @@ namespace gr {
 	  out[i * d_fft_len + d_pilot_carriers[i % d_pilot_carriers.size()][k]] = d_pilot_symbols[i % d_pilot_symbols.size()][k];
 	}
       }
-
       return n_ofdm_symbols + d_sync_words.size();
     }
 
