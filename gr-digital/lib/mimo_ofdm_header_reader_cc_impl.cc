@@ -55,12 +55,11 @@ namespace gr {
         d_constellation(constellation),
         d_dim(constellation->dimensionality()),
         d_header_formatter(header_formatter),
-        d_symbol_counter(0),
         d_header_length(header_formatter->header_len()),
         d_packet_length(0),
         d_frame_length(0),
         d_packet_num(0),
-        d_on_frame(false),
+        d_on_packet(false),
         d_len_tag_key(pmt::string_to_symbol("packet_length")),
         d_frame_len_tag_key(pmt::string_to_symbol("frame_length")),
         d_num_tag_key(pmt::string_to_symbol("packet_num"))
@@ -71,6 +70,7 @@ namespace gr {
         throw std::invalid_argument("Header length must be a multiple of the constellation dimension.");
       }
       set_tag_propagation_policy(TPP_DONT);
+      set_min_noutput_items(d_header_length);
     }
 
     /*
@@ -142,173 +142,110 @@ namespace gr {
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
 
-      // Collect all tags of the input buffer in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
-      //GR_LOG_INFO(d_logger, format("Found %d tags.") %tags.size());
-
-      uint16_t segment_length; // Number of items in the current segment.
-
-      if(tags.size() == 0) { // Input buffer includes no tags at all.
-        if(d_on_frame){
-          if (d_symbol_counter == 0){
-            /* If we not yet wrote the first item of the packet, we still have
-             * to add the tags from the header to the stream. */
-            add_tags(0);
-          }
-          if(noutput_items < d_packet_length-d_symbol_counter){
-            // The whole input buffer is part of the current frame. We copy it to the output.
-            memcpy(out, in, sizeof(gr_complex)*noutput_items);
-            d_symbol_counter += noutput_items;
-            nwritten = noutput_items;
-            nconsumed = noutput_items;
-          } else {
-            // The frame ends within this input buffer and there is no tag afterwards.
-            // Copy the rest of the frame and reset frame state.
-            memcpy(out, in, sizeof(gr_complex)*(d_packet_length-d_symbol_counter));
-            nwritten = d_packet_length-d_symbol_counter;
-            d_on_frame = false;
-            // Dump the rest of the input buffer.
-            nconsumed = noutput_items;
-          }
-        } else{
-          // Dump complete input buffer, because we are not on a frame.
-          nconsumed = noutput_items;
+      // Check if we are currently on a packet.
+      if (d_on_packet){
+        // We are at the beginning of the payload of the current packet, which is completely in this buffer.
+        // Check if this packet is interrupted by a new packet.
+        std::vector <gr::tag_t> interrupt_tags;
+        get_tags_in_window(interrupt_tags, 0, 0, d_packet_length, d_key);
+        if(interrupt_tags.size() > 0){
+          // We get interrupted. Dump current packet to the beginning of the next packet.
+          nconsumed = interrupt_tags[0].offset - nitems_read(0);
+        } else {
+          // We don't get interrupted.
+          // Copy payload to output and add tags.
+          memcpy(out, in, sizeof(gr_complex) * d_packet_length);
+          add_tags(0);
+          nconsumed = d_packet_length;
+          nwritten = d_packet_length;
         }
-      } else { // Input buffer includes tags.
-        if (tags[0].offset - nitems_read(0) > 0){
-          // There are items in the input buffer, before the first tag arrives.
-          segment_length = tags[0].offset - nitems_read(0);
-          if(d_on_frame){
-            if (segment_length < d_packet_length-d_symbol_counter){
-              // The next tag comes before the end of this packet.
-              // Copy rest of the data change the value of the packet length tag to a smaller value.
-              memcpy(out, in, sizeof(gr_complex) * segment_length);
-              nwritten = segment_length;
-              nconsumed = segment_length;
-              
-              d_on_frame = false;
+        // We finished this packet.
+        d_on_packet = false;
+      }
+      // We are not on a packet and search for the next packet.
+      std::vector <gr::tag_t> tags;
+      get_tags_in_window(tags, 0, nconsumed, noutput_items, d_key);
+      // Dump everything until the next packet arrives.
+      if(tags.size() == 0){
+        // There are no tags in this buffer. Dump samples.
+        nconsumed = noutput_items;
+      } else {
+        // There are tags in this buffer. Dump samples before the first tag.
+        nconsumed = tags[0].offset - nitems_read(0);
+      }
+      // Iterate over tags.
+      uint32_t segment_length;
+      for (unsigned int i = 0; i < tags.size(); ++i){
+        if (i < tags.size() - 1) {
+          // This is not the last tag.
+          segment_length = tags[i + 1].offset - tags[i].offset;
+          // Check if the next tag arrives within this header.
+          if (d_header_length > segment_length){
+            // Dump this samples.
+            nconsumed += segment_length;
+            continue;
+          }
+          // Demodulate header.
+          demod_header(&in[nconsumed], d_header_data);
+          // Consume header.
+          nconsumed += d_header_length;
+          // Parse header.
+          if(parse_header()){
+            // This header is valid.
+            // Check if this packet is interrupted by a new packet.
+            if (d_packet_length > segment_length-d_header_length){
+              // We get interrupted. Dump current packet to the beginning of the next packet.
+              nconsumed += segment_length-d_header_length;
             } else{
-              // The frame ends within this input buffer, but there is no tag directly afterwards.
-              if (d_symbol_counter == 0){
-                /* If we not yet wrote the first item of the packet, we still have
-                 * to add the tags from the header to the stream. */
-                add_tags(0);
-              }
-              // Copy the rest of the frame and reset frame state.
-              memcpy(out, in, sizeof(gr_complex)*(d_packet_length-d_symbol_counter));
-              nwritten = d_packet_length-d_symbol_counter;
-              d_on_frame = false;
-              // Dump the rest of the input buffer til the next tag position.
-              nconsumed = segment_length;
+              // We don't get interrupted.
+              // Copy payload to output and add tags.
+              memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex) * d_packet_length);
+              add_tags(nwritten);
+              nconsumed += segment_length-d_header_length;
+              nwritten += d_packet_length;
+            }
+          } else {
+            // This header is invalid.
+            // Dump the segment.
+            nconsumed += segment_length-d_header_length;
+          }
+        } else {
+          // This is the last tag.
+          segment_length = noutput_items - nconsumed;
+          // Check if there are header_length samples left in the input buffer.
+          if (d_header_length > segment_length) {
+            // Process header in the next work() call where the whole packet is available.
+            set_min_noutput_items(d_header_length);
+            break;
+          }
+          // Demodulate header.
+          demod_header(&in[nconsumed], d_header_data);
+          // Consume header.
+          nconsumed += d_header_length;
+          // Parse header.
+          if(parse_header()){
+            // This header is valid.
+            // Check if there are packet_length samples left in the input buffer.
+            if (d_packet_length > segment_length-d_header_length){
+              // Process packet in the next work() call where the whole packet is available.
+              d_on_packet = true;
+              set_min_noutput_items(d_packet_length);
+            } else{
+              // Copy payload to output and add tags.
+              memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex) * d_packet_length);
+              add_tags(nwritten);
+              nconsumed += segment_length-d_header_length;
+              nwritten += d_packet_length;
+              // Reset min_noutput_items to default for this block.
+              set_min_noutput_items(d_header_length);
             }
           } else{
-            // Dump input til the next tag position, because we are not on a frame.
-            nconsumed = segment_length;
-          }
-        }
-        // Iterate over tags in buffer.
-        for (unsigned int i = 0; i < tags.size(); ++i){
-          // We are on a new frame.
-          // Distinguish last tag from other tags.
-          if (i < tags.size() - 1) {
-            // This is not the last tag.
-            // Calculate the segment length.
-            segment_length = tags[i + 1].offset - tags[i].offset;
-            // Check if whole header is in this buffer.
-            if (segment_length < d_header_length){
-              // The segment is shorter than the header. Dump segment.
-              nconsumed += segment_length;
-              GR_LOG_INFO(d_logger, format("The distance between two start tags is shorter than the header length."));
-              continue;
-            }
-            // Demodulate header.
-            demod_header(&in[nconsumed], d_header_data);
-            // Consume header.
-            nconsumed += d_header_length;
-            // Parse header.
-            if(parse_header()){
-              // The header is valid.
-              GR_LOG_INFO(d_logger, format("Detected a valid packet at item %1% #######  ") % (nitems_read(0)+nconsumed-d_header_length));
-              if (segment_length-d_header_length < d_packet_length){
-                // The next tag comes before the end of this packet.
-                // Dump this packet.
-                nconsumed += segment_length-d_header_length;
-                continue;
-              }
-              // Copy packet.
-              memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex)*d_packet_length);
-              // Consume packet and possible overhead before the next tag.
-              nconsumed += segment_length-d_header_length;
-              if (segment_length-d_header_length > 0){
-                /* If we wrote at least one item to the output, we can add the tags
-                 * from the header to the stream. */
-                add_tags(nwritten);
-              }
-              nwritten += d_packet_length;
-            } else{
-              // The header is corrupted.
-              GR_LOG_INFO(d_logger, format("Detected an invalid packet at item %1%") % (nitems_read(0)+nconsumed-d_header_length));
-              // Dump the segment.
-              nconsumed += segment_length-d_header_length;
-            }
-          } else {
-            // This is the last tag.
-            // Calculate the segment length.
-            segment_length = noutput_items - (tags[i].offset - nitems_read(0));
-            // Check if whole header is in this buffer.
-            if (segment_length < d_header_length){
-              /* The segment is shorter than the header length. But
-               * it can continue with the next input buffer. Don't consume it
-               * and process it with the next frame. */
-              break;
-            }
-            // Demodulate header.
-            demod_header(&in[nconsumed], d_header_data);
-            nconsumed += d_header_length;
-            // Parse header.
-            if(parse_header()){
-              // The header is valid.
-              GR_LOG_INFO(d_logger, format("Detected a valid packet at item %1% ###") % (nitems_read(0)+nconsumed));
-              // Check if the packet is finished within this buffer.
-              if (d_packet_length <= segment_length-d_header_length){
-                // The packet is finished within this buffer.
-                // Copy packet and consume segment.
-                memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex)*d_packet_length);
-                // Consume rest of the segment.
-                nconsumed += segment_length-d_header_length;
-                if (d_packet_length > 0){
-                  /* If we wrote at least one item to the output, we can add the tags
-                   * from the header to the stream. */
-                  add_tags(nwritten);
-                }
-                nwritten += d_packet_length;
-                d_on_frame = false;
-              } else{
-                // The packet continues after this buffer.
-                // Copy segment (only part of the whole packet).
-                memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex)*(segment_length-d_header_length));
-                // Consume rest of the segment.
-                nconsumed += segment_length-d_header_length;
-                // Set packet counter to continue with this packet in the next general_work() call.
-                d_on_frame = true;
-                d_symbol_counter = segment_length-d_header_length;
-                if (d_symbol_counter > 0){
-                  /* If we wrote at least one item to the output, we can add the tags
-                   * from the header to the stream. */
-                  add_tags(nwritten);
-                }
-                nwritten += d_symbol_counter; // =(segment_length-d_header_length)
-              }
-            } else{
-              // The header is corrupted.
-              GR_LOG_INFO(d_logger, format("Detected an invalid packet at item %1%") % (nitems_read(0)+nconsumed));
-              // Dump the segment.
-              nconsumed += segment_length-d_header_length;
-              d_on_frame = false;
-            }
+            // This header is invalid.
+            nconsumed += segment_length-d_header_length;
           }
         }
       }
+
       // Tell runtime system how many input items we consumed on
       // each input stream.
       consume_each (nconsumed);

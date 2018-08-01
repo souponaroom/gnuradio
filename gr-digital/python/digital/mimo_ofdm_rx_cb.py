@@ -229,8 +229,10 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         #for i in range(0, self.n): TODO enable
         #    self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i)) #TODO add coarse freq sync after FFT
         # TODO disable
-        self.connect(dump_sync1, (channel_est, 0))
-        self.connect(dump_sync2, (channel_est, 1))
+        stream2tagged_stream_sync1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
+        stream2tagged_stream_sync2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
+        self.connect(dump_sync1, stream2tagged_stream_sync1, (channel_est, 0))
+        self.connect(dump_sync2, stream2tagged_stream_sync2, (channel_est, 1))
         #self.connect((channel_est, 0), blocks.tag_debug(gr.sizeof_gr_complex*len(_def_occupied_carriers[0]), 'Chanest_rx', 'start'))
 
         """
@@ -256,22 +258,24 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter())
         # TODO enable
-        # self.connect(mimo_decoder, header_reader)
+        self.connect(mimo_decoder, header_reader)
          # TODO disable
-        stream2tagged_stream1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 144, "packet_length")
-        header_ersatz = blocks.keep_m_in_n(gr.sizeof_gr_complex, 144, 144+48, 48)
+        #stream2tagged_stream1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 144+48, "start")
+        #stream2tagged_stream2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 144, "packet_length")
+        #header_ersatz = blocks.keep_m_in_n(gr.sizeof_gr_complex, 144, 144+48, 48)
         #self.connect(mimo_decoder, stream2tagged_stream1, header_reader)
-        self.connect(mimo_decoder, header_ersatz, stream2tagged_stream1)
-        self.connect(header_ersatz, blocks.tag_debug(gr.sizeof_gr_complex, 'header_reader'))
+        #self.connect(mimo_decoder, header_ersatz, stream2tagged_stream2)
+        #self.connect((channel_est, 0), blocks.tag_debug(gr.sizeof_gr_complex*48, 'Channel est1', 'start'))
+        #self.connect((channel_est, 1), blocks.tag_debug(gr.sizeof_gr_complex*48, 'Channel est2', 'start'))
 
         """
         Payload demod
         """
         payload_constellation = _get_constellation(bps_payload)
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
-        self.connect(payload_demod, blocks.tag_debug(gr.sizeof_char, 'demod'))
+        #self.connect(payload_demod, blocks.tag_debug(gr.sizeof_char, 'demod'))
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
-        self.connect(payload_pack, blocks.tag_debug(gr.sizeof_char, 'pack'))
+        #self.connect(payload_pack, blocks.tag_debug(gr.sizeof_char, 'pack'))
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
         #self.connect(crc, blocks.tag_debug(gr.sizeof_char, 'crc'))
-        self.connect(stream2tagged_stream1, payload_demod, payload_pack, self)
+        self.connect(header_reader, payload_demod, payload_pack, crc, self)

@@ -75,7 +75,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
         sink = blocks.vector_sink_b()
 
-        self.tb.connect(src, s2tagged_stream, blocks.head(gr.sizeof_char, 56),  tx)
+        self.tb.connect(src, s2tagged_stream, blocks.head(gr.sizeof_char, 14*10),  tx)
         self.tb.connect((tx, 0), (static_channel, 0), (rx, 0))
         self.tb.connect((tx, 1), (static_channel, 1), (rx, 1))
         self.tb.connect(rx, sink)

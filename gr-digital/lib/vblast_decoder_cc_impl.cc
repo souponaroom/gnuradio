@@ -255,7 +255,6 @@ namespace gr {
       get_tags_in_window(length_tags, 0, 0, noutput_items/(d_num_inputs*d_vlen), pmt::string_to_symbol("start"));
 
       for (unsigned int i = 0; i < length_tags.size(); ++i) {
-        GR_LOG_DEBUG(d_logger, boost::format("Tag offset %d") %length_tags[i].offset);
         add_item_tag(0,
                      (length_tags[i].offset)*(d_num_inputs*d_vlen),
                      length_tags[i].key,

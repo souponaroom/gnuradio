@@ -34,14 +34,13 @@ namespace gr {
       constellation_sptr d_constellation;
       unsigned int d_dim;
       packet_header_default::sptr d_header_formatter;
-      std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      uint32_t d_symbol_counter;
+      //uint32_t d_symbol_counter;
       uint32_t d_header_length;
       uint32_t d_packet_length;
       uint32_t d_frame_length;
       uint32_t d_packet_num;
-      bool d_on_frame;
+      bool d_on_packet;
       unsigned char* d_header_data;
 
       pmt::pmt_t d_len_tag_key;
