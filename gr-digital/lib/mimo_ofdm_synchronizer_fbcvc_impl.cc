@@ -38,8 +38,8 @@ namespace gr {
 
     mimo_ofdm_synchronizer_fbcvc::sptr
     mimo_ofdm_synchronizer_fbcvc::make(uint16_t n,
-                                       uint16_t fft_len,
-                                       uint16_t cp_len,
+                                       uint32_t fft_len,
+                                       uint32_t cp_len,
                                        const std::vector<gr_complex> &sync_symbol1,
                                        const std::vector<gr_complex> &sync_symbol2)
     {
@@ -56,17 +56,18 @@ namespace gr {
      */
     mimo_ofdm_synchronizer_fbcvc_impl::mimo_ofdm_synchronizer_fbcvc_impl(
             uint16_t n,
-            uint16_t fft_len,
-            uint16_t cp_len,
+            uint32_t fft_len,
+            uint32_t cp_len,
             const std::vector<gr_complex> &sync_symbol1,
             const std::vector<gr_complex> &sync_symbol2)
       : gr::block("mimo_ofdm_synchronizer_fbcvc",
               gr::io_signature::make3(3+n, 3+n, sizeof(float), sizeof(unsigned char), sizeof(gr_complex)),
-              gr::io_signature::make(n, n, sizeof(gr_complex) * sync_symbol1.size())),
+              gr::io_signature::make(n, n, sizeof(gr_complex) * fft_len)),
         d_n(n),
         d_fft_len(fft_len),
         d_cp_len(cp_len),
-        d_sync_sym_count(0),
+        d_on_frame(false),
+        d_first_data_symbol(false),
         d_phase(0.),
         d_corr_v(sync_symbol2),
         d_first_active_carrier(0),
@@ -86,6 +87,9 @@ namespace gr {
       d_max_pos_carr_offset = d_fft_len - d_last_active_carrier - 1;
       d_rec_sync_symbol1 = std::vector<gr_complex> (fft_len, 0.0);
       d_rec_sync_symbol2 = std::vector<gr_complex> (fft_len, 0.0);
+
+      set_tag_propagation_policy(TPP_DONT);
+      set_min_noutput_items(2);
     }
 
     /*
@@ -99,7 +103,7 @@ namespace gr {
     mimo_ofdm_synchronizer_fbcvc_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
       for (int i = 0; i < 3+d_n; ++i) {
-        ninput_items_required[i] = (noutput_items+1)*(d_fft_len+d_cp_len);
+        ninput_items_required[i] = (noutput_items)*d_symbol_len;
       }
     }
 
@@ -117,13 +121,14 @@ namespace gr {
     mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const std::vector<gr_complex> &sync_sym1,
                                                        const std::vector<gr_complex> &sync_sym2)
     {
+      // TODO FFT before estimation!!!
       int carr_offset = 0;
       // Use Schmidl & Cox method
       float Bg_max = 0;
       // g here is 2g in the paper
       for (int g = d_max_neg_carr_offset; g <= d_max_pos_carr_offset; g += 2) {
         gr_complex tmp = gr_complex(0, 0);
-        for (int k = 0; k < d_fft_len; k++) {
+        for (unsigned int k = 0; k < d_fft_len; k++) {
           if (d_corr_v[k] != gr_complex(0, 0)) {
             tmp += std::conj(sync_sym1[k+g]) * std::conj(d_corr_v[k]) * sync_sym2[k+g];
           }
@@ -149,137 +154,118 @@ namespace gr {
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
 
-      while (nconsumed < noutput_items*(d_symbol_len) && nwritten < noutput_items*(d_symbol_len)) {
-        /* Search for an unexpected (meaning 'out of sync') trigger in the following items of the symbols
-         * (except the first one, which wouldn't be unexpected). */
-        uint16_t next_trigger = 0;
-        for (unsigned int k = 1; k < d_fft_len; ++k) {
-          if (trigger[nconsumed + k] == 1) {
-            next_trigger = k;
-            // We found a trigger in the symbol. Apparently, we are out of sync.
-            // Check if there is also a trigger at the start of the symbol.
-            if (trigger[nconsumed] == 1){
-              /* There is also a trigger at the beginning of the symbol. We would
-               * dumpy the first 2 symbols (sync symbols), but due the trigger
-               * later in the frame, we only dumpy the samples between the triggers
-               * and sync to the latest trigger. */
-              // Dump samples and rotate phase.
-              rotate_phase(&fine_freq_off[nconsumed], next_trigger);
-              nconsumed += next_trigger;
-            } else {
-              /* There is no trigger at the beginning of this symbol, so we are
-               * not at the beginning of the frame (where we would have to dump
-               * the first 2 sync symbols).
-               * Copy rest of the data up to the trigger and fill the rest of the vector with
-               * zeros to sync to the latest trigger. */
-              if (next_trigger > d_cp_len) {
-                // Dump cyclic prefix and rotate phase.
-                rotate_phase(&fine_freq_off[nconsumed], d_cp_len);
-                nconsumed += d_cp_len;
-                for (int j = 0; j < next_trigger-d_cp_len; ++j) {
-                  // Calculate the modulated signal for fine frequency correction.
-                  gr_complex fine_freq_corr = std::polar((float) 1.0, -d_phase);
-                  for (int n = 0; n < d_n; ++n) {
-                    ((gr_complex *) output_items[n])[nwritten + j] =
-                            ((const gr_complex *) input_items[3 + n])[nconsumed + j] * fine_freq_corr;
-                  }
-                  // Rotate phase for fine frequency correction.
-                  rotate_phase(&fine_freq_off[nconsumed+j], 1);
-                }
-                // Add info tag 'out_of_sync'.
-                add_item_tag(0,
-                             (nitems_written(0) + nwritten) / d_fft_len,
-                             pmt::mp("lost_sync"),
-                             pmt::from_long(0));
-                // Fill the rest of the symbol with zeros.
-                for (int j = next_trigger-d_cp_len; j < d_fft_len; ++j) {
-                  for (int n = 0; n < d_n; ++n) {
-                    ((gr_complex *) output_items[n])[nwritten + j] = 0.0;
-                  }
-                }
-                nconsumed += next_trigger-d_cp_len;
-                nwritten += d_fft_len;
-              } else {
-                // The next trigger is located in the range of the cyclic prefix.
-                // Dump samples and rotate phase.
-                rotate_phase(&fine_freq_off[nconsumed], next_trigger);
-                nconsumed += next_trigger;
-              }
-            }
-            break;
+      uint32_t symbol_count = 0;
+
+      while (symbol_count < noutput_items) {
+        // Search for the last trigger in the current symbol.
+        uint32_t trigger_pos = 0;
+        bool found_trigger = false;
+        for (unsigned int k = 0; k < d_symbol_len; ++k){
+          if(trigger[nconsumed+k] == 1){
+            trigger_pos = std::max(trigger_pos, k);
+            found_trigger = true;
           }
-          // We found no 'out of sync' trigger in this symbol.
         }
-        if (next_trigger == 0){
-          // No triggers were found in the next symbol, check if there is a trigger at the beginning.
-          if (trigger[nconsumed] == 1){
-            // There is a trigger at the beginning of the symbol.
-            // We write the first of 2 sync symbols of the reference signal in a separate buffer and rotate the phase.
-            rotate_phase(&fine_freq_off[nconsumed], d_cp_len);
-            nconsumed += d_cp_len;
-            for (int j = 0; j < d_fft_len; ++j) {
-              // Calculate the modulated signal for fine frequency correction.
-              gr_complex fine_freq_corr = std::polar((float)1.0, -d_phase);
-              d_rec_sync_symbol1[j] = ref_sig[nconsumed+j] * fine_freq_corr;
-              rotate_phase(&fine_freq_off[nconsumed+j], 1);
-            }
-            nconsumed += d_fft_len;
-            d_sync_sym_count = 1;
-          } else if(d_sync_sym_count == 1){
-            // There is no trigger at the beginning of the symbol but there was one at the beginning of the previous symbol.
-            // We write the second of 2 sync symbols of the reference signal in a separate buffer and rotate the phase.
-            rotate_phase(&fine_freq_off[nconsumed], d_cp_len);
-            nconsumed += d_cp_len;
-            for (int j = 0; j < d_fft_len; ++j) {
-              // Calculate the modulated signal for fine frequency correction.
-              gr_complex fine_freq_corr = std::polar((float)1.0, -d_phase);
-              d_rec_sync_symbol2[j] = ref_sig[nconsumed+j] * fine_freq_corr;
-              rotate_phase(&fine_freq_off[nconsumed+j], 1);
-            }
-            nconsumed += d_fft_len;
-            d_sync_sym_count = 2;
-          } else {
-            // Check if this is the first symbol after the 2 sync symbols.
-            if (d_sync_sym_count == 2){
-              // Set start tag on this symbol.
-              add_item_tag(0,
-                           nitems_written(0) + nwritten/d_fft_len,
-                           pmt::mp("start_of_frame"),
-                           pmt::from_long(0));
-              // Calculate frequency integer carrier offset and tag it.
-              int carr_offset = get_carr_offset(d_rec_sync_symbol1, d_rec_sync_symbol2);
-              add_item_tag(0,
-                           nitems_written(0) + nwritten/d_fft_len,
-                           pmt::mp("ofdm_sync_carr_offset"),
-                           pmt::from_long(carr_offset));
-              // Reset sync symbol counter.
-              d_sync_sym_count = 0;
-            }
-            // There is no trigger at the beginning of the current and the previous symbol.
-            // We dump the cyclic prefix (and rotate the phase) and copy the rest.
-            rotate_phase(&fine_freq_off[nconsumed], d_cp_len);
-            nconsumed += d_cp_len;
-            for (int j = 0; j < d_fft_len; ++j) {
-              // Calculate the modulated signal for fine frequency correction.
-              gr_complex fine_freq_corr = std::polar((float)1.0, -d_phase);
+        // State machine.
+        if(found_trigger){
+          GR_LOG_INFO(d_logger, format("-Rel %d, Abs %d. Found trigger at %d")%nconsumed %(nconsumed+nitems_read(0)) %trigger_pos);
+          // Check if we can copy one fft_len vector before the trigger arrives.
+          if(d_on_frame && (trigger_pos >= d_fft_len)){
+            GR_LOG_INFO(d_logger, format("--Found trigger. Copy symbol before trigger."));
+            // Copy this symbol before we dump the samples until the next trigger.
+            // TODO copy symbol with rotator and fine freq correction multiplication.
+            for (unsigned int i = 0; i < d_fft_len; ++i) {
               for (int n = 0; n < d_n; ++n) {
-                ((gr_complex *) output_items[n])[nwritten + j] =
-                        ((const gr_complex *) input_items[3 + n])[nconsumed + j] * fine_freq_corr;
+                ((gr_complex *) output_items[n])[nwritten + i] =
+                        ((const gr_complex *) input_items[3 + n])[nconsumed + i];
               }
-              // Rotate phase for fine frequency correction.
-              rotate_phase(&fine_freq_off[nconsumed+j], 1);
             }
-            nconsumed += d_fft_len;
+            if(d_first_data_symbol) {
+              // Set start tag on this fft vector.
+              for (int n = 0; n < d_n; ++n) {
+                add_item_tag(n,
+                             nitems_written(0) + nwritten / d_fft_len,
+                             pmt::string_to_symbol("start"),
+                             pmt::from_long(0));
+              }
+              d_first_data_symbol = false;
+            }
             nwritten += d_fft_len;
           }
-        }
-      }
-      // Tell runtime system how many input items we consumed on
-      // each input stream.
-      consume_each (nconsumed);
+          // Dump all samples of the new symbol until the trigger pos.
+          nconsumed += trigger_pos;
+          d_on_frame = false;
+          if(nconsumed == 0){
+            GR_LOG_INFO(d_logger, format("--Found trigger. Nconsumed == 0."));
+            // The input buffer contains both sync symbols. We can process them if they are not interrupted by new triggers.
+            // Search for triggers in the range of the sync symbols.
+            trigger_pos = 0;
+            for (unsigned int k = 1; k < 2*d_symbol_len; ++k){
+              if(trigger[nconsumed+k] == 1) {
+                trigger_pos = std::max(trigger_pos, k);
+              }
+            }
+            if(trigger_pos == 0){
+              GR_LOG_INFO(d_logger, format("---The sync syms are free of triggers."));
+              // The sync syms dont get interrupted. Process them.
+              // TODO Coarse freq estimation.
+              nconsumed += 2*d_symbol_len;
+              d_on_frame = true;
+              d_first_data_symbol = true;
+              // Consumed 2 symbols and adjust loop counter manually.
+              symbol_count += 2;
+              continue;
+            } else {
+              GR_LOG_INFO(d_logger, format("---The sync syms get interrupted."));
+              // The sync syms get interrupted.
+              // Start new synced buffer, which has min length of 2 sync symbols.
+              break;
+            }
+          } else{
+            GR_LOG_INFO(d_logger, format("--Found trigger. Nconsumed =%d.")%nconsumed);
+            // Start new synced buffer, which has min length of 2 sync symbols.
+            break;
+          }
+        } else {
+          GR_LOG_INFO(d_logger, format("-Rel %d, abs %d. No trigger found.")%nconsumed %(nconsumed+nitems_read(0)));
+          // We did not find a trigger.
+          if(d_on_frame){
+            GR_LOG_INFO(d_logger, format("-- On frame."));
+            // We were on a frame and didn't find a trigger in this symbol.
+            // Copy symbol and dump cyclic_prefix.
 
-      // Tell runtime system how many output items we produced.
-      return nwritten/d_fft_len; // noutput_items = nwritten/d_symbol_len
+            // TODO copy symbol with rotator and fine freq correction multiplication.
+            for (unsigned int i = 0; i < d_fft_len; ++i) {
+              for (int n = 0; n < d_n; ++n) {
+                ((gr_complex *) output_items[n])[nwritten + i] =
+                        ((const gr_complex *) input_items[3 + n])[nconsumed + i];
+              }
+            }
+
+            if(d_first_data_symbol) {
+              // Set start tag on this fft vector.
+              for (int n = 0; n < d_n; ++n) {
+                add_item_tag(n,
+                             nitems_written(0) + nwritten / d_fft_len,
+                             pmt::string_to_symbol("start"),
+                             pmt::from_long(0));
+              }
+              d_first_data_symbol = false;
+            }
+            nconsumed += d_symbol_len;
+            nwritten += d_fft_len;
+          } else {
+            GR_LOG_INFO(d_logger, format("-- Not on frame."));
+            // We were not on a frame and didn't find a trigger.
+            // Dump whole symbol.
+            nconsumed += d_symbol_len;
+          }
+        }
+        symbol_count++;
+      }
+
+      consume_each (nconsumed);
+      return nwritten/d_fft_len;
     }
 
   } /* namespace digital */

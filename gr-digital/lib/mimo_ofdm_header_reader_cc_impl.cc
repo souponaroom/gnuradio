@@ -115,7 +115,6 @@ namespace gr {
             GR_LOG_INFO(d_logger, format("Unknown header tag %s")%pmt::symbol_to_string(header_tags[c].key));
           }
         }
-        GR_LOG_INFO(d_logger, format("Packet len = %d, Frame len = %d") %d_packet_length %d_frame_length);
         d_header_tags = header_tags;
         return true;
       }
@@ -206,6 +205,7 @@ namespace gr {
             }
           } else {
             // This header is invalid.
+            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
             // Dump the segment.
             nconsumed += segment_length-d_header_length;
           }
@@ -241,6 +241,8 @@ namespace gr {
             }
           } else{
             // This header is invalid.
+            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
+            // Dump the segment.
             nconsumed += segment_length-d_header_length;
           }
         }

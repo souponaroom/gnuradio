@@ -32,10 +32,11 @@ namespace gr {
     {
      private:
       uint16_t d_n; /*!< Number of receiving antennas N. */
-      uint16_t d_fft_len; /*!< FFT length. */
-      uint16_t d_cp_len; /*!< Cyclic prefix length. */
+      uint32_t d_fft_len; /*!< FFT length. */
+      uint32_t d_cp_len; /*!< Cyclic prefix length. */
       uint16_t d_symbol_len; /*!< FFT length + cyclic prefic length */
-      uint8_t d_sync_sym_count; /*!< Counter for the sync symbols after the start of an OFDM frame. */
+      bool d_on_frame;
+      bool d_first_data_symbol;
       float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
 
       std::vector<gr_complex> d_corr_v;
@@ -64,8 +65,8 @@ namespace gr {
 
      public:
       mimo_ofdm_synchronizer_fbcvc_impl(uint16_t n,
-                                        uint16_t fft_len,
-                                        uint16_t cp_len,
+                                        uint32_t fft_len,
+                                        uint32_t cp_len,
                                         const std::vector<gr_complex> &sync_symbol1,
                                         const std::vector<gr_complex> &sync_symbol2);
       ~mimo_ofdm_synchronizer_fbcvc_impl();

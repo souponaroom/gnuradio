@@ -48,7 +48,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         M=2
         channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-        src = blocks.vector_source_b(range(packet_len), True, 1, ())
+        src = blocks.vector_source_b(range(packet_len*10), True, 1, ())
         s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
                                                          packet_len,
                                                          len_tag_key)
@@ -75,10 +75,10 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
         sink = blocks.vector_sink_b()
 
-        self.tb.connect(src, s2tagged_stream, blocks.head(gr.sizeof_char, 14*10),  tx)
+        self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*1000), s2tagged_stream, tx)
         self.tb.connect((tx, 0), (static_channel, 0), (rx, 0))
         self.tb.connect((tx, 1), (static_channel, 1), (rx, 1))
-        self.tb.connect(rx, sink)
+        self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len*4), sink)
 
         self.tb.run ()
         # check data

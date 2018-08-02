@@ -201,18 +201,20 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         """
         add = blocks.add_cc()
         sum_sync_detect = digital.ofdm_sync_sc_cfb(fft_len, cp_len)
+
         mimo_sync = digital.mimo_ofdm_synchronizer_fbcvc(self.n,
                                                          self.fft_len,
                                                          self.cp_len,
                                                          self.sync_word1,
                                                          self.sync_word2)
-        # for i in range(0, self.n): TODO enable
-        #     self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (add, i))
-        #     self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (mimo_sync, 3+i))
+        #for i in range(0, self.n):
+        #    self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (add, i))
+        #    self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 3+i))
         # self.connect(add, sum_sync_detect)
-        # self.connect((sum_sync_detect, 0), (mimo_sync, 0))
-        # self.connect((sum_sync_detect, 1), (mimo_sync, 1))
-        # self.connect(add, (mimo_sync, 2))
+        # self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
+        # self.connect((sum_sync_detect, 1), (mimo_sync, 1))  # Trigger signal.
+        # self.connect(add, (mimo_sync, 2)) # Sum signal.
+        # self.connect((mimo_sync, 0), blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'MIMO sync'))
 
         ## Disable sync TODO disable
         dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
@@ -239,8 +241,9 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             pilot_symbols=self.pilot_symbols[:self.n, :self.n],
             pilot_carriers=pilot_carriers[0],
             occupied_carriers=self.occupied_carriers[0])
-        #for i in range(0, self.n): TODO enable
-        #    self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i)) #TODO add coarse freq sync after FFT
+        #for i in range(0, self.n):
+        #    self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i))  # TODO add coarse freq sync after FFT
+
         # TODO disable
         stream2tagged_stream_sync1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
         stream2tagged_stream_sync2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
@@ -269,7 +272,13 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             bps_header, bps_payload)
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter())
-        self.connect(mimo_decoder, header_reader)
+        # TODO enable
+        # self.connect(mimo_decoder, header_reader)
+        # TODO disable
+        stream2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 144, "packet_length")
+
+        header_ersatz = blocks.keep_m_in_n(gr.sizeof_gr_complex, 144, 144 + 48, 48)
+        self.connect(mimo_decoder, header_ersatz, stream2tagged_stream)
 
         """
         Payload demod
@@ -278,4 +287,4 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(header_reader, payload_demod, payload_pack, crc, self)
+        self.connect(stream2tagged_stream, payload_demod, payload_pack, crc, self)
