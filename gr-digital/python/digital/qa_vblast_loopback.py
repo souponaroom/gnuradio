@@ -40,7 +40,6 @@ class qa_vblast_loopback (gr_unittest.TestCase):
             num_inputs = np.random.randint(low=num_inputs_min, high=num_inputs_max+1)
             # Generate random input data.
             data = np.random.randn(data_length*num_inputs*vlen[a]) + 1j * np.random.randn(data_length*num_inputs*vlen[a])
-
             # Randomly generate CSI for one symbol.
             csi = (np.random.randn(vlen[a], num_inputs, num_inputs) + 1j * np.random.randn(vlen[a], num_inputs, num_inputs))
 
@@ -71,9 +70,9 @@ class qa_vblast_loopback (gr_unittest.TestCase):
 
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data,
-                                         repeat=False,
-                                         tags=tags)
+                                         repeat=False)
             vblast_encoder = digital.vblast_encoder_cc(num_inputs)
+
             demux = []
             channels = []
             for i in range(0, vlen[a]):
@@ -83,18 +82,33 @@ class qa_vblast_loopback (gr_unittest.TestCase):
                 channels.append(blocks.multiply_matrix_cc_make(csi[i]))
             mux = []
             s2v = []
+            encoder_sinks = []
             for i in range(0, num_inputs):
                 mux.append(blocks.stream_mux(gr.sizeof_gr_complex, [1]*vlen[a]))
                 s2v.append(blocks.stream_to_vector(gr.sizeof_gr_complex, vlen[a]))
+                encoder_sinks.append(blocks.vector_sink_c(vlen=vlen[a]))
 
             vblast_decoder = digital.vblast_decoder_cc(num_inputs, equalizer_type, vlen[a])
             sink = blocks.vector_sink_c()
+
             self.tb.connect(src, vblast_encoder)
             for n in range(0, num_inputs):
                 for i in range(0, vlen[a]):
                     self.tb.connect((vblast_encoder, n), demux[i*num_inputs+n], (channels[i], n))
                     self.tb.connect((channels[i], n), (mux[n], i))
-                self.tb.connect(mux[n], s2v[n], (vblast_decoder, n))
+                self.tb.connect(mux[n], s2v[n], encoder_sinks[n])
+            self.tb.run()
+
+            encoder_srcs = [blocks.vector_source_c(data=encoder_sinks[0].data(),
+                                                   tags=tags,
+                                                   vlen=vlen[a],
+                                                   repeat=False)]
+            for i in range(1, num_inputs):
+                encoder_srcs.append(blocks.vector_source_c(data=encoder_sinks[i].data(),
+                                                           vlen=vlen[a]))
+
+            for i in range(0, num_inputs):
+                self.tb.connect(encoder_srcs[i], (vblast_decoder, i))
 
             self.tb.connect(vblast_decoder, sink)
             # Run flowgraph.
@@ -115,7 +129,7 @@ class qa_vblast_loopback (gr_unittest.TestCase):
                                      num_inputs_min=1,
                                      num_inputs_max=1,
                                      equalizer_type='ZF',
-                                     vlen=[1, np.random.randint(2,17)])
+                                     vlen=[2, np.random.randint(2,17)])
 
     '''
     2 tests validating the correct output of the loopback with random input data, MMSE equalizer,
