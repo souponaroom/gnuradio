@@ -97,6 +97,8 @@ namespace gr {
         correlation += in[i*distance] * std::conj(pilot[(i+pilot_offset)%d_n]);
       }
       // Return correlation after normalization.
+      //GR_LOG_DEBUG(d_logger, format("    pilot seq %d %d, rx seq = %d %d")%pilot[(0+pilot_offset)%d_n] %pilot[(1+pilot_offset)%d_n] %in[0] %in[1*distance]);
+      //GR_LOG_DEBUG(d_logger, format("    corr %d") %(correlation/(gr_complex)d_n));
       return correlation/(gr_complex)d_n;
     }
 
@@ -106,7 +108,7 @@ namespace gr {
       for (unsigned int c = 0; c < d_pilot_carriers[0]+d_fft_len/2; ++c) {
         d_channel_state[c] = d_channel_state[d_pilot_carriers[0]+d_fft_len/2];
       }
-      for (unsigned int c = d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_len/2; c < d_fft_len; ++c) {
+      for (unsigned int c = d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_len/2+1; c < d_fft_len; ++c) {
         d_channel_state[c] = d_channel_state[d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_len/2];
       }
       // Linear interpolation over the channel estimations of the OFDM carriers.
@@ -149,14 +151,17 @@ namespace gr {
             //GR_LOG_DEBUG(d_logger, format("sym %d, carrier %d, stream %i: %d")%s %d_pilot_carriers[c] %i %in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * s]);
             for (int j = 0; j < d_n; ++j) { // Iterate over N MIMO pilot sequences.
               // Correlate received pilot symbols with reference. The result is the path coefficient h_ij.
+              //GR_LOG_DEBUG(d_logger, format("nread %d item %d carr %d pilot %d input %d")%(nitems_read(0)) %s %c %j %i);
               d_channel_state[d_pilot_carriers[c] + d_fft_len / 2][i][j] = correlate_pilots(
                       &in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * s],
                       d_pilot_symbols[j],
                       d_fft_len,
-                      s%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
+                      (nitems_read(0)+s)%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
             }
           }
         }
+        //GR_LOG_DEBUG(d_logger, format("item %d: corr %d %d %d %d")%(nitems_read(0)+s) %d_channel_state[11][0][0] %d_channel_state[25][0][0] %d_channel_state[39][0][0] %d_channel_state[53][0][0]);
+
         // We have estimated the CSI for the pilot carriers. Now, lets interpolate over all OFDM carriers.
         interpolate_channel_state();
 

@@ -217,10 +217,12 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         # self.connect((mimo_sync, 0), blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'MIMO sync'))
 
         ## Disable sync TODO disable
-        dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
-        dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
-        dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 2, 4, 2)
-        dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 2, 4, 2)
+        #dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
+        #dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
+        dump_cp1 = digital.cp_dumper(fft_len, fft_len + cp_len, cp_len)
+        dump_cp2 = digital.cp_dumper(fft_len, fft_len + cp_len, cp_len)
+        dump_sync1 = digital.cp_dumper(2, 4, 2, fft_len)
+        dump_sync2 = digital.cp_dumper(2, 4, 2, fft_len)
         mult1 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
         mult2 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
         v2s1 = blocks.stream_to_vector(gr.sizeof_gr_complex, self.fft_len)
@@ -247,8 +249,11 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         # TODO disable
         stream2tagged_stream_sync1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
         stream2tagged_stream_sync2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
-        self.connect(dump_sync1, ofdm_demod[0], stream2tagged_stream_sync1, (channel_est, 0))
-        self.connect(dump_sync2, ofdm_demod[1], stream2tagged_stream_sync2, (channel_est, 1))
+        #self.connect(dump_sync1, ofdm_demod[0], stream2tagged_stream_sync1, (channel_est, 0))
+        #self.connect(dump_sync2, ofdm_demod[1], stream2tagged_stream_sync2, (channel_est, 1))
+        self.connect(dump_sync1, ofdm_demod[0], (channel_est, 0))
+        self.connect(dump_sync2, ofdm_demod[1], (channel_est, 1))
+
 
         """
         MIMO decoder
@@ -257,8 +262,11 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             N=self.n,
             mimo_technique=self.mimo_technique,
             vlen=len(self.occupied_carriers[0]))
+        # TODO enable again
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
+
+
 
         """
         Header reader
@@ -273,7 +281,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter())
         # TODO enable
-        # self.connect(mimo_decoder, header_reader)
+        #self.connect(mimo_decoder, header_reader)
         # TODO disable
         stream2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 144, "packet_length")
 
@@ -287,4 +295,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(stream2tagged_stream, payload_demod, payload_pack, crc, self)
+        self.connect(stream2tagged_stream, payload_demod, payload_pack, self)
+
+        s2ts_pack = blocks.stream_to_tagged_stream(gr.sizeof_char, 1, 8, "packet_length")
+        #self.connect((channel_est, 1), blocks.vector_to_stream(gr.sizeof_gr_complex, len(occupied_carriers[0])), payload_demod, s2ts_pack, payload_pack, self)
+        #self.connect((channel_est, 0), blocks.null_sink(gr.sizeof_gr_complex*len(occupied_carriers[0])))

@@ -130,6 +130,7 @@ install(FILES
     mimo_ofdm_channel_estimator_vcvc.h
     mimo_ofdm_synchronizer_fbcvc.h
     mimo_ofdm_header_reader_cc.h
-    ofdm_correct_carrier_freq_offset_vcvc.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
+    ofdm_correct_carrier_freq_offset_vcvc.h
+    cp_dumper.h DESTINATION ${GR_INCLUDE_DIR}/gnuradio/digital
     COMPONENT "digital_devel"
 )
