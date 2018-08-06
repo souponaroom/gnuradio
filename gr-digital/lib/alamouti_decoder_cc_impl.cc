@@ -37,26 +37,31 @@ namespace gr {
     const pmt::pmt_t alamouti_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
 
     alamouti_decoder_cc::sptr
-    alamouti_decoder_cc::make()
+    alamouti_decoder_cc::make(uint32_t vlen)
     {
       return gnuradio::get_initial_sptr
-        (new alamouti_decoder_cc_impl());
+        (new alamouti_decoder_cc_impl(vlen));
     }
 
     /*
      * The private constructor
      */
-    alamouti_decoder_cc_impl::alamouti_decoder_cc_impl()
-      : gr::sync_block("alamouti_decoder_cc",
-              gr::io_signature::make(1, 1, sizeof(gr_complex)),
-              gr::io_signature::make(1, 1, sizeof(gr_complex)))
+    alamouti_decoder_cc_impl::alamouti_decoder_cc_impl(uint32_t vlen)
+      : gr::sync_interpolator("alamouti_decoder_cc",
+              gr::io_signature::make(1, 1, sizeof(gr_complex)*vlen),
+              gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
+        d_vlen(vlen)
     {
       /* Set the number of input and output items to a multiple of 2,
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
        */
-      set_output_multiple(2);
+      set_output_multiple(2*vlen);
+      // Check if vlen is an even number.
+      if (vlen != 1 && vlen%2 != 0){
+        throw std::invalid_argument("Vector length must be an even number.");
+      }
       // Init CSI array.
-      d_csi = std::vector<gr_complex>(2, 1.0);
+      d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(1, std::vector<gr_complex> (2, 1.0)));
       // Set tag propagation policy to 'All to All'.
       set_tag_propagation_policy(TPP_ALL_TO_ALL);
     }
@@ -73,12 +78,12 @@ namespace gr {
                                             gr_complex* out,
                                             uint32_t length){
       // Iterate over received sequences (= 2 complex symbols).
-      for (unsigned int i = 0; i < length; i+=2) {
+      for (unsigned int i = 0; i < length*d_vlen; i+=2) {
         // Calculate the sum of the energy of both branches.
-        float total_branch_energy = std::norm(d_csi[0]) + std::norm(d_csi[1]);
+        float total_branch_energy = std::norm(d_csi[i%d_vlen][0][0]) + std::norm(d_csi[i%d_vlen][0][1]);
         // Calculate an estimation for the transmission sequence.
-        out[i] = (std::conj(d_csi[0])*in[i] + d_csi[1]*std::conj(in[i+1]))/total_branch_energy;
-        out[i+1] = (std::conj(d_csi[1])*in[i] - d_csi[0]*std::conj(in[i+1]))/total_branch_energy;
+        out[i] = (std::conj(d_csi[i%d_vlen][0][0])*in[i] + d_csi[i%d_vlen][0][1]*std::conj(in[i+1]))/total_branch_energy;
+        out[i+1] = (std::conj(d_csi[i%d_vlen][0][1])*in[i] - d_csi[i%d_vlen][0][0]*std::conj(in[i+1]))/total_branch_energy;
       }
     }
 
@@ -99,9 +104,9 @@ namespace gr {
 
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
-        symbol_length = noutput_items;
+        symbol_length = noutput_items/d_vlen;
         decode_symbol(in, out, symbol_length);
-        nprocessed += symbol_length;
+        nprocessed += symbol_length*d_vlen;
       } else { // Input buffer includes tags.
         if (tags[0].offset - nitems_read(0) > 0){
           /* There are items in the input buffer, before the first tag arrives,
@@ -119,14 +124,14 @@ namespace gr {
             ++symbol_length;
           }
           decode_symbol(in, out, symbol_length);
-          nprocessed += symbol_length;
+          nprocessed += symbol_length*d_vlen;
         }
         // Iterate over tags in buffer.
         for (unsigned int i = 0; i < tags.size(); ++i) {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
             // This is not the last tag in the buffer.
-            symbol_length = tags[i + 1].offset - nitems_read(0) - nprocessed;
+            symbol_length = tags[i + 1].offset - nitems_read(0) - nprocessed/d_vlen;
             // Check if the next tag is on an uneven position (which it should usually not).
             if(symbol_length%2 != 0){
               // This should be prevented by the system developer in most cases.
@@ -140,13 +145,19 @@ namespace gr {
             }
           } else {
             // This is the last tag in the buffer.
-            symbol_length = noutput_items - nprocessed;
+            symbol_length = (noutput_items - nprocessed)/d_vlen;
           }
-          // Get CSI from tag.
-          d_csi = pmt::c32vector_elements(tags[i].value);
+          // Get CSI from 'csi' tag.
+          for (unsigned int k = 0; k < pmt::length(tags[i].value); ++k) {
+            pmt::pmt_t carrier_csi = pmt::vector_ref(tags[i].value, k);
+            for (unsigned int j = 0; j < pmt::length(carrier_csi); ++j) {
+              d_csi[k][j] = pmt::c32vector_elements(pmt::vector_ref(carrier_csi, j));
+            }
+          }
+          //GR_LOG_DEBUG(d_logger, format("csi: %d %d")%(d_csi[0][0][0]) %(d_csi[0][0][1]));
           // Process the symbol with the calculated weighting vector.
           decode_symbol(&in[nprocessed], &out[nprocessed], symbol_length);
-          nprocessed += symbol_length;
+          nprocessed += symbol_length*d_vlen;
         }
       }
 
