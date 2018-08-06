@@ -36,27 +36,31 @@ namespace gr {
     const pmt::pmt_t diff_stbc_decoder_cc_impl::d_key = pmt::string_to_symbol("start");
 
     diff_stbc_decoder_cc::sptr
-    diff_stbc_decoder_cc::make(float phase_offset)
+    diff_stbc_decoder_cc::make(float phase_offset, uint32_t vlen)
     {
       return gnuradio::get_initial_sptr
-        (new diff_stbc_decoder_cc_impl(phase_offset));
+        (new diff_stbc_decoder_cc_impl(phase_offset, vlen));
     }
 
     /*
      * The private constructor
      */
-    diff_stbc_decoder_cc_impl::diff_stbc_decoder_cc_impl(float phase_offset)
+    diff_stbc_decoder_cc_impl::diff_stbc_decoder_cc_impl(float phase_offset, uint32_t vlen)
       : gr::block("diff_stbc_decoder_cc",
-              gr::io_signature::make(1, 1, sizeof(gr_complex)),
+              gr::io_signature::make(1, 1, sizeof(gr_complex)*vlen),
               gr::io_signature::make(1, 1, sizeof(gr_complex))),
+        d_vlen(vlen),
         d_basis_vecs(std::vector<gr_complex>(2, std::polar((float)M_SQRT1_2, phase_offset)))
     {
       // Init predecessor with dummy sequence.
-      d_predecessor[0] = d_predecessor[1] = d_basis_vecs[0];
+      d_predecessor = new gr_complex[2*vlen];
+      for (unsigned int i = 0; i < vlen*2; ++i) {
+        d_predecessor[i] = d_basis_vecs[0];
+      }
       /* Set the number of input and output items to a multiple of 2,
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
        */
-      set_output_multiple(2);
+      set_output_multiple(2*vlen);
     }
 
     /*
@@ -69,7 +73,7 @@ namespace gr {
     void
     diff_stbc_decoder_cc_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
-      ninput_items_required[0] = noutput_items;
+      ninput_items_required[0] = noutput_items/d_vlen;
     }
 
     void
@@ -78,14 +82,16 @@ namespace gr {
                                                 gr_complex *out,
                                                 uint32_t length) {
       if (length > 0) {
-        // Calculate the dot product of the received input sequences with the new basis.
-        gr_complex r_1 = seq[0] * std::conj(prev_seq[0]) + std::conj(seq[1]) * prev_seq[1];
-        gr_complex r_2 = seq[0] * std::conj(prev_seq[1]) - std::conj(seq[1]) * prev_seq[0];
-        // Calculate the decoded (but not normalized!) samples and write them to the output buffer.
-        out[0] = d_basis_vecs[0] * r_1 - std::conj(d_basis_vecs[1]) * r_2;
-        out[1] = d_basis_vecs[1] * r_1 + std::conj(d_basis_vecs[0]) * r_2;
+        for (unsigned int i = 0; i < d_vlen; ++i) {
+          // Calculate the dot product of the received input sequences with the new basis.
+          gr_complex r_1 = seq[0*d_vlen + i] * std::conj(prev_seq[0*d_vlen + i]) + std::conj(seq[1*d_vlen + i]) * prev_seq[1*d_vlen + i];
+          gr_complex r_2 = seq[0*d_vlen + i] * std::conj(prev_seq[1*d_vlen + i]) - std::conj(seq[1*d_vlen + i]) * prev_seq[0*d_vlen + i];
+          // Calculate the decoded (but not normalized!) samples and write them to the output buffer.
+          out[0*d_vlen + i] = d_basis_vecs[0] * r_1 - std::conj(d_basis_vecs[1]) * r_2;
+          out[1*d_vlen + i] = d_basis_vecs[1] * r_1 + std::conj(d_basis_vecs[0]) * r_2;
+        }
         // Recursively decode the remaining sequences of this block.
-        decode_sequences(seq, &seq[2], &out[2], length-2);
+        decode_sequences(seq, &seq[2*d_vlen], &out[2*d_vlen], length - 2);
       }
     }
 
@@ -101,9 +107,8 @@ namespace gr {
       uint32_t nconsumed = 0;
       uint32_t nproduced = 0;
       uint32_t input_block_length;
-
       // Collect all tags of the input buffer with key "start" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+      get_tags_in_window(tags, 0, 0, noutput_items/d_vlen, d_key);
       // Check if the next tag is on an uneven position.
       for (unsigned int j = 0; j < tags.size(); ++j) {
         if (tags[j].offset%2 != 0){
@@ -118,11 +123,11 @@ namespace gr {
       }
       if (tags.size() > 0) {
         // Process samples before the first tag.
-        input_block_length = (tags[0].offset-(tags[0].offset%2)) - nitems_read(0);
+        input_block_length = (tags[0].offset-((tags[0].offset)%2)) - nitems_read(0);
         // Decode remaining sequences of the current block before the first tag.
         decode_sequences(d_predecessor, in, out, input_block_length);
         nconsumed = input_block_length;
-        nproduced = input_block_length;
+        nproduced = input_block_length*d_vlen;
 
         // Iterate over data blocks between taqs.
         for (unsigned int i = 0; i+1 < tags.size(); ++i) {
@@ -133,30 +138,30 @@ namespace gr {
           input_block_length = (tags[i+1].offset-(tags[i+1].offset%2)) - (tags[i].offset-(tags[i].offset%2));
           // Decode sequences of this block.
           if (input_block_length > 2) {
-            decode_sequences(&in[nconsumed], &in[nconsumed + 2], &out[nproduced], input_block_length - 2);
-            nproduced += input_block_length - 2;
+            decode_sequences(&in[nconsumed*d_vlen], &in[(nconsumed + 2)*d_vlen], &out[nproduced], input_block_length - 2);
+            nproduced += (input_block_length - 2)*d_vlen;
           }
           nconsumed += input_block_length;
 
         }
         // Process samples after last tag in the buffer.
-        input_block_length = noutput_items - nconsumed;
+        input_block_length = noutput_items/d_vlen - nconsumed;
         // Decode remaining sequences of this buffer.
-        if (input_block_length - 2 > 0) {
+        if (input_block_length > 2) {
           // There is more than one sequence left.
-          decode_sequences(&in[nconsumed], &in[nconsumed + 2], &out[nproduced], input_block_length - 2);
-          nproduced += input_block_length - 2;
+          decode_sequences(&in[nconsumed*d_vlen], &in[(nconsumed + 2)*d_vlen], &out[nproduced], input_block_length - 2);
+          nproduced += (input_block_length - 2)*d_vlen;
         }
         nconsumed += input_block_length;
+
       } else{
         // Process all samples, because there is no tag in this buffer.
         decode_sequences(d_predecessor, in, out, noutput_items);
-        nconsumed = noutput_items;
+        nconsumed = noutput_items/d_vlen;
         nproduced = noutput_items;
       }
       // Remember last sequence as predecessor of the next buffer.
-      d_predecessor[0] = in[noutput_items-2];
-      d_predecessor[1] = in[noutput_items-1];
+      memcpy(d_predecessor, &in[noutput_items-2*d_vlen], sizeof(gr_complex)*2*d_vlen);
 
       // Tell runtime system how many input items we consumed.
       consume_each (nconsumed);
