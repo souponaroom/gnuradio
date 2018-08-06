@@ -1,0 +1,36 @@
+<block>
+  <name>V-BLAST Decoder</name>
+  <key>digital_vblast_decoder_cc</key>
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.vblast_decoder_cc($num_inputs, $equalizer_type)</make>
+  <param>
+    <name>Number of Inputs</name>
+    <key>num_inputs</key>
+    <value>2</value>
+    <type>int</type>
+  </param>
+  <param>
+    <name>Equalizer Type</name>
+    <key>equalizer_type</key>
+    <value>"ZF"</value>
+    <type>string</type>
+    <option>
+      <name>Zero Forcing</name>
+      <key>"ZF"</key>
+    </option>
+    <option>
+      <name>Minimum Mean Squared Error</name>
+      <key>"MMSE"</key>
+    </option>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+    <nports>$num_inputs</nports>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+  </source>
+</block>
