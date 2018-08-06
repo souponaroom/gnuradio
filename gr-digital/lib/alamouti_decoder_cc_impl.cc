@@ -56,6 +56,10 @@ namespace gr {
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
        */
       set_output_multiple(2*vlen);
+      // Check if vlen is an even number.
+      if (vlen != 1 && vlen%2 != 0){
+        throw std::invalid_argument("Vector length must be an even number.");
+      }
       // Init CSI array.
       d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(1, std::vector<gr_complex> (2, 1.0)));
       // Set tag propagation policy to 'All to All'.
@@ -73,15 +77,13 @@ namespace gr {
     alamouti_decoder_cc_impl::decode_symbol(const gr_complex* in,
                                             gr_complex* out,
                                             uint32_t length){
-      for (unsigned int k = 0; k < d_vlen; ++k) {
-        // Iterate over received sequences (= 2 complex symbols).
-        for (unsigned int i = 0; i < length; i+=2) {
-          // Calculate the sum of the energy of both branches.
-          float total_branch_energy = std::norm(d_csi[k][0][0]) + std::norm(d_csi[k][0][1]);
-          // Calculate an estimation for the transmission sequence.
-          out[i*d_vlen + k] = (std::conj(d_csi[k][0][0])*in[i*d_vlen + k] + d_csi[k][0][1]*std::conj(in[(i+1)*d_vlen + k]))/total_branch_energy;
-          out[(i+1)*d_vlen + k] = (std::conj(d_csi[k][0][1])*in[i*d_vlen + k] - d_csi[k][0][0]*std::conj(in[(i+1)*d_vlen + k]))/total_branch_energy;
-        }
+      // Iterate over received sequences (= 2 complex symbols).
+      for (unsigned int i = 0; i < length*d_vlen; i+=2) {
+        // Calculate the sum of the energy of both branches.
+        float total_branch_energy = std::norm(d_csi[i%d_vlen][0][0]) + std::norm(d_csi[i%d_vlen][0][1]);
+        // Calculate an estimation for the transmission sequence.
+        out[i] = (std::conj(d_csi[i%d_vlen][0][0])*in[i] + d_csi[i%d_vlen][0][1]*std::conj(in[i+1]))/total_branch_energy;
+        out[i+1] = (std::conj(d_csi[i%d_vlen][0][1])*in[i] - d_csi[i%d_vlen][0][0]*std::conj(in[i+1]))/total_branch_energy;
       }
     }
 
@@ -152,6 +154,7 @@ namespace gr {
               d_csi[k][j] = pmt::c32vector_elements(pmt::vector_ref(carrier_csi, j));
             }
           }
+          //GR_LOG_DEBUG(d_logger, format("csi: %d %d")%(d_csi[0][0][0]) %(d_csi[0][0][1]));
           // Process the symbol with the calculated weighting vector.
           decode_symbol(&in[nprocessed], &out[nprocessed], symbol_length);
           nprocessed += symbol_length*d_vlen;

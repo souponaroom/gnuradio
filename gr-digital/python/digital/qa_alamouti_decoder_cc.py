@@ -39,10 +39,9 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
     def dice_csi_tags(self, input, num_tags, tag_pos, vlen=1):
         tags = []
         # Calculate initial behaviour before first tag.
-        output = np.empty(shape=[len(input), len(input[0])], dtype=complex)
-        for k in range(0, vlen):
-            output[k][::2] = (input[k][::2] + np.conj(input[k][1::2]))/2.0
-            output[k][1::2] = (input[k][::2] - np.conj(input[k][1::2]))/2.0
+        output = np.empty(shape=[len(input)], dtype=complex)
+        output[::2] = (input[::2] + np.conj(input[1::2]))/2.0
+        output[1::2] = (input[::2] - np.conj(input[1::2]))/2.0
 
         # Iterate over tags and update the calculated output according to the diced CSI.
         for i in range(0, num_tags):
@@ -64,20 +63,34 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
                                                     csi_pmt,
                                                     pmt.from_long(0))))
             # Calculate the expected result.
-            for k in range(0, vlen):
-                total_branch_energy = np.sum(np.square(np.abs(csi[k][0])))
+            if vlen == 1:
+                total_branch_energy = np.sum(np.square(np.abs(csi[0][0])))
                 if tag_pos[i]%2 == 0:
-                    output[k][tag_pos[i]  ::2] = (np.conj(csi[k][0][0])*input[k][tag_pos[i]::2] +
-                                               csi[k][0][1]*np.conj(input[k][tag_pos[i]+1::2]))/total_branch_energy
-                    output[k][tag_pos[i]+1::2] = (np.conj(csi[k][0][1])*input[k][tag_pos[i]::2] -
-                                               csi[k][0][0]*np.conj(input[k][tag_pos[i]+1::2]))/total_branch_energy
+                    output[tag_pos[i]  ::2] = (np.conj(csi[0][0][0])*input[tag_pos[i]::2] +
+                                               csi[0][0][1]*np.conj(input[tag_pos[i]+1::2]))/total_branch_energy
+                    output[tag_pos[i]+1::2] = (np.conj(csi[0][0][1])*input[tag_pos[i]::2] -
+                                               csi[0][0][0]*np.conj(input[tag_pos[i]+1::2]))/total_branch_energy
                 else:
-                    output[k][tag_pos[i]+1::2] = (np.conj(csi[k][0][0])*input[k][tag_pos[i]+1::2] +
-                                               csi[k][0][1]*np.conj(input[k][tag_pos[i]+2::2]))/total_branch_energy
-                    output[k][tag_pos[i]+2::2] = (np.conj(csi[k][0][1])*input[k][tag_pos[i]+1::2] -
-                                               csi[k][0][0]*np.conj(input[k][tag_pos[i]+2::2]))/total_branch_energy
-
-        return tags, np.reshape(output.T, vlen*len(input[0]))
+                    output[tag_pos[i]+1::2] = (np.conj(csi[0][0][0])*input[tag_pos[i]+1::2] +
+                                               csi[0][0][1]*np.conj(input[tag_pos[i]+2::2]))/total_branch_energy
+                    output[tag_pos[i]+2::2] = (np.conj(csi[0][0][1])*input[tag_pos[i]+1::2] -
+                                               csi[0][0][0]*np.conj(input[tag_pos[i]+2::2]))/total_branch_energy
+            else:
+                if tag_pos[i]%2 == 0:
+                    for j in range(tag_pos[i]*vlen, len(input), 2):
+                        total_branch_energy = np.sum(np.square(np.abs(csi[j % vlen][0])))
+                        output[j] = (np.conj(csi[j%vlen][0][0])*input[j] +
+                                                   csi[j%vlen][0][1]*np.conj(input[j+1]))/total_branch_energy
+                        output[j+1] = (np.conj(csi[j%vlen][0][1])*input[j] -
+                                                   csi[j%vlen][0][0]*np.conj(input[j+1]))/total_branch_energy
+                else:
+                    for j in range((tag_pos[i]+1)*vlen, len(input), 2):
+                        total_branch_energy = np.sum(np.square(np.abs(csi[j % vlen][0])))
+                        output[j] = (np.conj(csi[j%vlen][0][0])*input[j] +
+                                                   csi[j%vlen][0][1]*np.conj(input[j+1]))/total_branch_energy
+                        output[j+1] = (np.conj(csi[j%vlen][0][1])*input[j] -
+                                                   csi[j%vlen][0][0]*np.conj(input[j+1]))/total_branch_energy
+        return tags, output
 
     ''' 
     5 tests validating the correct output of the decoder with random input data and vector length 1.
@@ -91,7 +104,7 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
 
         for i in range(repetitions):
             # Generate random input data.
-            data = np.random.randn(vlen, data_length) + 1j * np.random.randn(vlen, data_length)
+            data = np.random.randn(vlen * data_length) + 1j * np.random.randn(vlen *data_length)
             # Generate random tag positions.
             tag_pos = np.random.randint(low=0, high=data_length/2, size=num_tags)*2
             tag_pos = np.sort(tag_pos)
@@ -101,7 +114,7 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
                                                        tag_pos)
 
             # Build up the test flowgraph.
-            src = blocks.vector_source_c(data=np.reshape(data.T, vlen*data_length),
+            src = blocks.vector_source_c(data=data,
                                          repeat=False,
                                          tags=tags)
             alamouti = digital.alamouti_decoder_cc()
@@ -120,17 +133,17 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
         # Define test params.
         data_length = 20
         repetitions = 5
-        num_tags = 4
+        num_tags = 2
 
         for i in range(repetitions):
             # Generate random input data with a random vector length.
-            vlen = np.random.randint(2, 17)
+            vlen = np.random.randint(2, 8)*2
             data = np.random.randn(vlen, data_length) + 1j * np.random.randn(vlen, data_length)
             # Generate random tag positions.
             tag_pos = np.random.randint(low=0, high=data_length/2, size=num_tags)*2
             tag_pos = np.sort(tag_pos)
             # Calculate expected result.
-            tags, expected_result = self.dice_csi_tags(data,
+            tags, expected_result = self.dice_csi_tags(np.reshape(data.T, vlen*data_length),
                                                        num_tags,
                                                        tag_pos,
                                                        vlen)
