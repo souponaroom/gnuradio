@@ -205,7 +205,7 @@ namespace gr {
             }
           } else {
             // This header is invalid.
-            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
+            //GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
             // Dump the segment.
             nconsumed += segment_length-d_header_length;
           }
@@ -241,7 +241,7 @@ namespace gr {
             }
           } else{
             // This header is invalid.
-            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
+            //GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
             // Dump the segment.
             nconsumed += segment_length-d_header_length;
           }

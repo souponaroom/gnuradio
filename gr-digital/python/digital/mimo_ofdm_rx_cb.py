@@ -217,12 +217,12 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         # self.connect((mimo_sync, 0), blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'MIMO sync'))
 
         ## Disable sync TODO disable
-        #dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
-        #dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
-        dump_cp1 = digital.cp_dumper(fft_len, fft_len + cp_len, cp_len)
-        dump_cp2 = digital.cp_dumper(fft_len, fft_len + cp_len, cp_len)
-        dump_sync1 = digital.cp_dumper(2, 4, 2, fft_len)
-        dump_sync2 = digital.cp_dumper(2, 4, 2, fft_len)
+        dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
+        dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
+        #dump_cp1 = digital.cp_dumper(fft_len, fft_len + cp_len, cp_len-5)
+        #dump_cp2 = digital.cp_dumper(fft_len, fft_len + cp_len, cp_len-5)
+        dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
+        dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
         mult1 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
         mult2 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
         v2s1 = blocks.stream_to_vector(gr.sizeof_gr_complex, self.fft_len)
