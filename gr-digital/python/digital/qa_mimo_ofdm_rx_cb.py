@@ -48,50 +48,50 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         M=2
         channel_matrix = [[1,0],[0,1]]#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-        src = blocks.vector_source_b(range(packet_len*10), True, 1, ())
-        s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
-                                                         packet_len,
-                                                         len_tag_key)
-        tx = ofdm_tx(
-            fft_len=fft_len, cp_len=cp_len,
-            packet_length_tag_key=len_tag_key,
-            bps_header=1,
-            bps_payload=1,
-            rolloff=0,
-            debug_log=False,
-            scramble_bits=False,
-            m=M, mimo_technique="vblast"
-        )
-        static_channel = blocks.multiply_matrix_cc(channel_matrix)
-        #chan_sink1 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant1.dat")
-        #chan_sink2 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant2.dat")
-        chan_src1 = blocks.file_source(gr.sizeof_gr_complex, "channel_data_ant1.dat")
-        chan_src2 = blocks.file_source(gr.sizeof_gr_complex, "channel_data_ant2.dat")
-        rx = mimo_ofdm_rx_cb(
-            n=N,
-            mimo_technique='vblast',
-            fft_len=fft_len,
-            cp_len=cp_len,
-            packet_length_tag_key=len_tag_key,
-            bps_header=1,
-            bps_payload=1
-        )
+        for i in range(0, 13):
 
-        sink = blocks.vector_sink_b()
+            src = blocks.vector_source_b(range(packet_len*15), True, 1, ())
+            s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
+                                                             packet_len,
+                                                             len_tag_key)
+            tx = ofdm_tx(
+                fft_len=fft_len, cp_len=cp_len,
+                packet_length_tag_key=len_tag_key,
+                bps_header=1,
+                bps_payload=1,
+                rolloff=0,
+                debug_log=False,
+                scramble_bits=False,
+                m=M, mimo_technique="vblast"
+            )
+            static_channel = blocks.multiply_matrix_cc(channel_matrix)
+            #chan_sink1 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant1.dat")
+            #chan_sink2 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant2.dat")
+            chan_src1 = blocks.file_source(gr.sizeof_gr_complex, "channel_data_ant1.dat")
+            chan_src2 = blocks.file_source(gr.sizeof_gr_complex, "channel_data_ant2.dat")
+            rx = mimo_ofdm_rx_cb(
+                n=N,
+                mimo_technique='vblast',
+                fft_len=fft_len,
+                cp_len=cp_len,
+                packet_length_tag_key=len_tag_key,
+                bps_header=1,
+                bps_payload=1
+            )
 
-        #self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*1000), s2tagged_stream, tx)
+            sink = blocks.vector_sink_b()
 
-        self.tb.connect(chan_src1, (static_channel, 0), (rx, 0))
-        self.tb.connect(chan_src2, (static_channel, 1), (rx, 1))
-        self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len*5), sink)
-        #self.tb.connect((tx, 0), chan_sink1)
-        #self.tb.connect((tx, 1), chan_sink2)
+            #self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*1000), s2tagged_stream, tx)
 
-        self.tb.run ()
-        # check data
-        print 'result'
-        for i in range(0, len(sink.data())/18):
-            print sink.data()[i*18:(i+1)*18]
+            self.tb.connect(chan_src1, (static_channel, 0), (rx, 0))
+            self.tb.connect(chan_src2, (static_channel, 1), (rx, 1))
+            self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len*10), sink)
+            #self.tb.connect((tx, 0), chan_sink1)
+            #self.tb.connect((tx, 1), chan_sink2)
+
+            self.tb.run ()
+            # check data
+            self.assertComplexTuplesAlmostEqual(range(packet_len*10), sink.data(), 2)
 
 
 if __name__ == '__main__':
