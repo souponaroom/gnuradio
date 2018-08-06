@@ -67,6 +67,7 @@ namespace gr {
     class diff_stbc_decoder_cc_impl : public diff_stbc_decoder_cc
     {
      private:
+      uint32_t d_vlen;
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       const std::vector <gr_complex> d_basis_vecs;
@@ -78,7 +79,7 @@ namespace gr {
        * transformed back to the standard basis {(1,0),(0,1)}.
        * [1] refers to this vector as '(a_1, a_2)'.
        */
-      gr_complex d_predecessor[2];
+      gr_complex *d_predecessor;
       /*!< Complex array of size 2 which stores the last sequence of the
        * previous input buffer.
        */
@@ -95,7 +96,7 @@ namespace gr {
                             uint32_t length);
 
      public:
-      diff_stbc_decoder_cc_impl(float phase_offset);
+      diff_stbc_decoder_cc_impl(float phase_offset, uint32_t vlen);
       ~diff_stbc_decoder_cc_impl();
 
       // Where all the action really happens

@@ -38,14 +38,15 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
         self.tb = None
 
     # Produce stream tags and calculate expected result.
-    def decode(self, basis, input, tag_pos):
+    def decode(self, basis, input, tag_pos, vlen):
         # Calculate the expected behaviour without the presence of tags.
-        output = np.empty(shape=[len(input)], dtype=complex)
-        data = np.append(basis, input)
-        output[::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*basis[0] - \
-                      (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(basis[1])
-        output[1::2] = (data[2::2]*np.conj(data[0:len(input):2]) + np.conj(data[3::2])*data[1:len(input):2])*basis[1] + \
-                       (data[2::2]*np.conj(data[1:len(input):2]) - np.conj(data[3::2])*data[0:len(input):2])*np.conj(basis[0])
+        output = np.empty(shape=[len(input*vlen)], dtype=complex)
+        data = np.append(np.repeat(basis, vlen), input)
+        for k in range(0, vlen):
+            output[k::2*vlen] = (data[2*vlen+k::2*vlen]*np.conj(data[k:len(input):2*vlen]) + np.conj(data[3*vlen+k::2*vlen])*data[1*vlen+k:len(input):2*vlen])*basis[0] - \
+                          (data[2*vlen+k::2*vlen]*np.conj(data[1*vlen+k:len(input):2*vlen]) - np.conj(data[3*vlen+k::2*vlen])*data[0*vlen+k:len(input):2*vlen])*np.conj(basis[1])
+            output[1*vlen+k::2*vlen] = (data[2*vlen+k::2*vlen]*np.conj(data[0*vlen+k:len(input):2*vlen]) + np.conj(data[3*vlen+k::2*vlen])*data[1*vlen+k:len(input):2*vlen])*basis[1] + \
+                           (data[2*vlen+k::2*vlen]*np.conj(data[1*vlen+k:len(input):2*vlen]) - np.conj(data[3*vlen+k::2*vlen])*data[0*vlen+k:len(input):2*vlen])*np.conj(basis[0])
 
         # Iterate over tags and update the calculated output according to the random CSI.
         tags = []
@@ -57,9 +58,13 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
                                                     pmt.string_to_symbol("start"),
                                                     csi_pmt,
                                                     pmt.from_long(0))))
-        return tags, np.delete(output, np.append(tag_pos, tag_pos+1))
+        delete_indices = np.empty(shape=0, dtype=int)
+        for tag in tag_pos:
+            delete_indices = np.append(delete_indices, np.arange(tag*vlen, (tag+2)*vlen))
 
-    ''' 5 test with random input data, random tag positions, random basis.'''
+        return tags, np.delete(output, delete_indices)
+
+    ''' 5 test with random input data, random tag positions, random basis and random vector length.'''
     def test_001_t (self):
         # Define test params.
         data_length = 20
@@ -67,7 +72,8 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
         num_tags = 4
 
         for i in range(repetitions):
-            data = np.random.randint(-1, 2, size=data_length) + 1j*np.random.randint(-1, 2, size=data_length)
+            vlen = np.random.randint(1, 9)
+            data = np.random.randint(-1, 2, size=data_length*vlen) + 1j*np.random.randint(-1, 2, size=data_length*vlen)
             # Generate random tag positions.
             tag_pos = np.random.randint(low=0, high=data_length / 2, size=num_tags) * 2
             tag_pos = np.sort(tag_pos)
@@ -75,13 +81,14 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
             phase_shift = 2.0 * np.pi * np.random.randn()
             basis = np.array([M_SQRT_2 * np.exp(1j * phase_shift), M_SQRT_2 * np.exp(1j * phase_shift)])
 
-            tags, expected_result = self.decode(basis, data, tag_pos)
+            tags, expected_result = self.decode(basis, data, tag_pos, vlen)
 
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data,
+                                         vlen=vlen,
                                          repeat=False,
                                          tags=tags)
-            stbc = digital.diff_stbc_decoder_cc(phase_shift)
+            stbc = digital.diff_stbc_decoder_cc(phase_shift, vlen)
             sink = blocks.vector_sink_c()
             self.tb.connect(src, stbc, sink)
             # Run flowgraph.

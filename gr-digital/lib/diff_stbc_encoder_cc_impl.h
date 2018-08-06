@@ -53,23 +53,27 @@ namespace gr {
     class diff_stbc_encoder_cc_impl : public diff_stbc_encoder_cc
     {
      private:
-      const std::vector <gr_complex> d_basis_vecs;
+      /*!< Number of items which are processed parallel. This equals a
+       * vector size, but with stream input/output item sizes.
+       */
+      uint32_t d_block_len;
       /*!< Complex vector of size 2. The 2 complex elements of this vectors
        * can each be interpreted as a basis vector in the complex plane.
        * These 2 2-dimensional vectors (= 2 complex numbers) are a new basis
        * for the complex plane in which the input samples are transformed into.
        * [1] refers to this vector as '(a_1, a_2)'.
        */
-      std::vector <gr_complex> d_mapping_coeffs;
+      const std::vector <gr_complex> d_basis_vecs;
       /*!< Complex vector of size 2. The elements are the coefficients which
        * describe the input sample with the new basis vectors d_basis_vecs.
        * [1] refers to this vector as 'M(S) = (A(S), B(S)). Note that [1] includes
        * bit mapping into this mapping whereas this block accepts complex symbols.
        */
-      gr_complex d_predecessor[2];
-      /*!< Complex array of size 2 which stores the first element of the last
+      std::vector <std::vector<gr_complex> > d_mapping_coeffs;
+      /*!< 2-dimensional, complex array of size 2 x block_len which stores the first element of the last
        * transmitted sequence of the previous buffer.
        */
+      gr_complex *d_predecessor;
 
       /*!< \brief Calculates the coefficients to a new vector basis of a incoming vector.
        * The calculation of this function equals a basis transformation. The incoming
@@ -90,8 +94,8 @@ namespace gr {
        * @param out2 Complex pointer to first unwritten sample of output port 2.
        */
       void encode_data(const gr_complex* in,
-                       const gr_complex predecessor1,
-                       const gr_complex predecessor2,
+                       const gr_complex* predecessor1,
+                       const gr_complex* predecessor2,
                        gr_complex* out1,
                        gr_complex* out2);
 
@@ -101,7 +105,7 @@ namespace gr {
                        uint32_t length);
 
      public:
-      diff_stbc_encoder_cc_impl(float phase_offset);
+      diff_stbc_encoder_cc_impl(float phase_offset, uint32_t block_len);
       ~diff_stbc_encoder_cc_impl();
 
       // Where all the action really happens
