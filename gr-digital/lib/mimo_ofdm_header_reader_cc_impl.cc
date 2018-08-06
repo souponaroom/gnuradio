@@ -137,7 +137,7 @@ namespace gr {
                        gr_vector_void_star &output_items)
     {
       gr_complex const *in = (const gr_complex*)input_items[0];
-      unsigned char *out = (unsigned char*)output_items[0];
+      gr_complex *out = (gr_complex*)output_items[0];
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
 
@@ -182,6 +182,7 @@ namespace gr {
           if (d_header_length > segment_length){
             // Dump this samples.
             nconsumed += segment_length;
+            GR_LOG_INFO(d_logger, format("Provided segment between 'start' tags is smaller than the expected header length."));
             continue;
           }
           // Demodulate header.
@@ -190,10 +191,12 @@ namespace gr {
           nconsumed += d_header_length;
           // Parse header.
           if(parse_header()){
+            //GR_LOG_DEBUG(d_logger, format("Valid segment at %d.")%tags[i].offset);
             // This header is valid.
             // Check if this packet is interrupted by a new packet.
             if (d_packet_length > segment_length-d_header_length){
               // We get interrupted. Dump current packet to the beginning of the next packet.
+              GR_LOG_INFO(d_logger, format("A packet of length %d gets interrupted by a new 'start' tag.")%d_packet_length);
               nconsumed += segment_length-d_header_length;
             } else{
               // We don't get interrupted.
@@ -205,7 +208,7 @@ namespace gr {
             }
           } else {
             // This header is invalid.
-            //GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
+            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
             // Dump the segment.
             nconsumed += segment_length-d_header_length;
           }
@@ -241,7 +244,7 @@ namespace gr {
             }
           } else{
             // This header is invalid.
-            //GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
+            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
             // Dump the segment.
             nconsumed += segment_length-d_header_length;
           }
