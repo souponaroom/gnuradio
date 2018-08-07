@@ -48,9 +48,9 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         M=2
         channel_matrix = [[1,0],[0,1]]#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-        for i in range(0, 1):
+        for i in range(0, 10):
 
-            src = blocks.vector_source_b(range(packet_len*15), True, 1, ())
+            src = blocks.vector_source_b(range(packet_len*10), True, 1, ())
             s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
                                                              packet_len,
                                                              len_tag_key)
@@ -85,16 +85,16 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
             self.tb.connect(chan_src1, (static_channel, 0), (rx, 0))
             self.tb.connect(chan_src2, (static_channel, 1), (rx, 1))
-            self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len*2), sink)
+            self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len*10), sink)
             #self.tb.connect((tx, 0), chan_sink1)
             #self.tb.connect((tx, 1), chan_sink2)
 
             self.tb.run ()
             # check data
-            print 'result'
-            for i in range(0, len(sink.data()) / 14):
-                print sink.data()[i * 14:(i + 1) * 14]
-            self.assertComplexTuplesAlmostEqual(range(packet_len*2), sink.data(), 2)
+            #print 'result'
+            #for i in range(0, len(sink.data()) / 14):
+            #    print sink.data()[i * 14:(i + 1) * 14]
+            self.assertComplexTuplesAlmostEqual(range(packet_len*10), sink.data(), 2)
 
 
 

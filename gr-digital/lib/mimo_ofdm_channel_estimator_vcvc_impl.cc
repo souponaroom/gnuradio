@@ -84,7 +84,9 @@ namespace gr {
     void
     mimo_ofdm_channel_estimator_vcvc_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
-      ninput_items_required[0] = noutput_items+d_n-1;
+      for (int i = 0; i < d_n; ++i) {
+        ninput_items_required[i] = noutput_items+d_n-1;
+      }
     }
 
     gr_complex
