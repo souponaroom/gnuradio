@@ -66,7 +66,7 @@ namespace gr {
        * class. digital::diff_stbc_encoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(float phase_offset = 0.0);
+      static sptr make(float phase_offset = 0.0, uint32_t block_len=1);
     };
 
   } // namespace digital

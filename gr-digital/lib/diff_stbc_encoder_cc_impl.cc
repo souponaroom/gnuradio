@@ -27,35 +27,41 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <complex>
-
+#include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "diff_stbc_encoder_cc_impl.h"
+
+using namespace boost;
 
 namespace gr {
   namespace digital {
 
     diff_stbc_encoder_cc::sptr
-    diff_stbc_encoder_cc::make(float phase_offset)
+    diff_stbc_encoder_cc::make(float phase_offset, uint32_t block_len)
     {
       return gnuradio::get_initial_sptr
-        (new diff_stbc_encoder_cc_impl(phase_offset));
+        (new diff_stbc_encoder_cc_impl(phase_offset, block_len));
     }
 
     /*
      * The private constructor
      */
-    diff_stbc_encoder_cc_impl::diff_stbc_encoder_cc_impl(float phase_offset)
+    diff_stbc_encoder_cc_impl::diff_stbc_encoder_cc_impl(float phase_offset, uint32_t block_len)
       : gr::sync_block("diff_stbc_encoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(2, 2, sizeof(gr_complex))),
+        d_block_len(block_len),
         d_basis_vecs(std::vector<gr_complex>(2, std::polar((float)M_SQRT1_2, phase_offset)))
     {
-      d_mapping_coeffs = std::vector<gr_complex>(2, 0.0);
-      d_predecessor[0] = d_predecessor[1] = d_basis_vecs[0];
-      /* Set the number of input and output items to a multiple of 2,
+      d_mapping_coeffs = std::vector<std::vector<gr_complex> > (2, std::vector<gr_complex>(block_len, 0.0));
+      d_predecessor = new gr_complex[2*block_len];
+      for (unsigned int i = 0; i < 2*block_len; ++i) {
+        d_predecessor[i] = d_basis_vecs[0];
+      }
+      /* Set the number of input and output items to a multiple of 2 blocks,
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
        */
-      set_output_multiple(2);
+      set_output_multiple(2*block_len);
     }
 
     /*
@@ -67,25 +73,29 @@ namespace gr {
 
     void
     diff_stbc_encoder_cc_impl::map_symbols(const gr_complex *in) {
-      d_mapping_coeffs[0] =  in[0]*std::conj(d_basis_vecs[0]) + in[1]*std::conj(d_basis_vecs[1]);
-      d_mapping_coeffs[1] = -in[0]*          d_basis_vecs[1]  + in[1]*          d_basis_vecs[0];
+      for (unsigned int k = 0; k < d_block_len; ++k) {
+        d_mapping_coeffs[0][k] = in[0+k] * std::conj(d_basis_vecs[0]) + in[1*d_block_len+k] * std::conj(d_basis_vecs[1]);
+        d_mapping_coeffs[1][k] = -in[0+k] * d_basis_vecs[1] + in[1*d_block_len+k] * d_basis_vecs[0];
+      }
     }
 
     void
     diff_stbc_encoder_cc_impl::encode_data(const gr_complex *in,
-                                           const gr_complex predecessor1,
-                                           const gr_complex predecessor2,
+                                           const gr_complex *predecessor1,
+                                           const gr_complex *predecessor2,
                                            gr_complex *out1,
                                            gr_complex *out2) {
       // Transform input vector to new basis and calculate new coefficients.
       map_symbols(in);
-      // Calculate the output of antenna 1.
-      *out1 = d_mapping_coeffs[0] * predecessor1 - d_mapping_coeffs[1] * std::conj(predecessor2);
-      // Calculate the output of antenna 2.
-      *out2 = d_mapping_coeffs[0] * predecessor2 + d_mapping_coeffs[1] * std::conj(predecessor1);
-      // Calculate the second element of the output sequence after the rules of Alamouti.
-      out1[1] = -std::conj(*out2);
-      out2[1] = std::conj(*out1);
+      for (unsigned int k = 0; k < d_block_len; ++k) { // Iterate over elements of one block.
+        // Calculate the output of antenna 1.
+        out1[k] = d_mapping_coeffs[0][k] * predecessor1[k] - d_mapping_coeffs[1][k] * std::conj(predecessor2[k]);
+        // Calculate the output of antenna 2.
+        out2[k] = d_mapping_coeffs[0][k] * predecessor2[k] + d_mapping_coeffs[1][k] * std::conj(predecessor1[k]);
+        // Calculate the second element of the output sequence after the rules of Alamouti.
+        out1[1*d_block_len+k] = -std::conj(out2[k]);
+        out2[1*d_block_len+k] = std::conj(out1[k]);
+      }
     }
 
     void
@@ -95,18 +105,20 @@ namespace gr {
                                            uint32_t length) {
       uint32_t count = 0;
 
-      while (count < length) {
+      while (count < length*d_block_len) {
         // Transform input vector to new basis and calculate new coefficients.
         map_symbols(&in[count]);
-        // Calculate the output of antenna 1.
-        out1[count+2] = d_mapping_coeffs[0] * out1[count] - d_mapping_coeffs[1] * std::conj(out2[count]);
-        // Calculate the output of antenna 2.
-        out2[count+2] = d_mapping_coeffs[0] * out2[count] + d_mapping_coeffs[1] * std::conj(out1[count]);
-        // Calculate the second element of the output sequence after the rules of Alamouti.
-        out1[count+3] = -std::conj(out2[count+2]);
-        out2[count+3] = std::conj(out1[count+2]);
+        for (unsigned int k = 0; k < d_block_len; ++k) {
+          // Calculate the output of antenna 1.
+          out1[count+2*d_block_len+k] = d_mapping_coeffs[0][k] * out1[count+k] - d_mapping_coeffs[1][k] * std::conj(out2[count+k]);
+          // Calculate the output of antenna 2.
+          out2[count+2*d_block_len+k] = d_mapping_coeffs[0][k] * out2[count+k] + d_mapping_coeffs[1][k] * std::conj(out1[count+k]);
+          // Calculate the second element of the output sequence after the rules of Alamouti.
+          out1[count+3*d_block_len+k] = -std::conj(out2[count+2*d_block_len+k]);
+          out2[count+3*d_block_len+k] = std::conj(out1[count+2*d_block_len+k]);
+        }
 
-        count += 2;
+        count += 2*d_block_len;
       }
     }
 
@@ -120,15 +132,17 @@ namespace gr {
       gr_complex *out2 = (gr_complex *) output_items[1];
 
       // Handle first sequence manually, because of a special predecessor assignment.
-      encode_data(in, d_predecessor[0], d_predecessor[1], out1, out2);
+      encode_data(in, &d_predecessor[0], &d_predecessor[d_block_len], out1, out2);
 
       // Calculate the output of both antennas.
-      encode_data(&in[2], out1, out2, noutput_items-2);
+      encode_data(&in[2*d_block_len], out1, out2, noutput_items-2*d_block_len);
 
       // Update predecessor for next call of work.
-      if(noutput_items > 1) {
-        d_predecessor[0] = out1[noutput_items - 2];
-        d_predecessor[1] = out2[noutput_items - 2];
+      if(noutput_items >= 2*d_block_len) {
+        for (unsigned int k = 0; k < d_block_len; ++k) {
+          d_predecessor[k] = out1[noutput_items - 2*d_block_len + k];
+          d_predecessor[d_block_len+k] = out2[noutput_items - 2*d_block_len + k];
+        }
       }
       // Tell runtime system how many output items we produced.
       return noutput_items;
