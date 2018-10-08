@@ -1,0 +1,51 @@
+<block>
+  <name>MIMO-OFDM Sync</name>
+  <key>digital_mimo_ofdm_synchronizer_fbcvc</key>
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.mimo_ofdm_synchronizer_fbcvc($n, $fft_len, $cp_len, $sync_symbol1, $sync_symbol2)</make>
+  <param>
+    <name>N</name>
+    <key>n</key>
+    <type>int</type>
+  </param>
+  <param>
+    <name>FFT length</name>
+    <key>fft_len</key>
+    <type>int</type>
+  </param>
+  <param>
+    <name>CP length</name>
+    <key>cp_len</key>
+    <type>int</type>
+  </param>
+  <param>
+    <name>Sync symbol 1</name>
+    <key>sync_symbol1</key>
+    <type>complex_vector</type>
+  </param>
+  <param>
+    <name>Sync symbol 2</name>
+    <key>sync_symbol2</key>
+    <type>complex_vector</type>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>float</type>
+  </sink>
+  <sink>
+    <name>in</name>
+    <type>byte</type>
+  </sink>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+    <nports>$n</nports>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+    <vlen>$fft_len</vlen>
+    <nports>$n</nports>
+  </source>
+</block>

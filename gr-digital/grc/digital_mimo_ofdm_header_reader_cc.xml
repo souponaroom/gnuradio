@@ -1,0 +1,25 @@
+<block>
+  <name>MIMO-OFDM Header Reader</name>
+  <key>digital_mimo_ofdm_header_reader_cc</key>
+  <category>[MIMO]</category>
+  <import>from gnuradio import digital</import>
+  <make>digital.mimo_ofdm_header_reader_cc($constellation, $header_formatter)</make>
+  <param>
+    <name>Constellation Object</name>
+    <key>constellation</key>
+    <type>raw</type>
+  </param>
+  <param>
+    <name>Header Format Object</name>
+    <key>header_formatter</key>
+    <type>raw</type>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+  </sink>
+  <source>
+    <name>out</name>
+    <type>complex</type>
+  </source>
+</block>
