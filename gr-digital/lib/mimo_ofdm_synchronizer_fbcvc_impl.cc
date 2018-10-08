@@ -168,7 +168,7 @@ namespace gr {
         }
         // State machine.
         if(found_trigger){
-          GR_LOG_INFO(d_logger, format("-Rel %d, Abs %d. Found trigger at %d")%nconsumed %(nconsumed+nitems_read(0)) %trigger_pos);
+          //GR_LOG_INFO(d_logger, format("-Rel %d, Abs %d. Found trigger at %d")%nconsumed %(nconsumed+nitems_read(0)) %trigger_pos);
           // Check if we can copy one fft_len vector before the trigger arrives.
           if(d_on_frame && (trigger_pos >= d_fft_len)){
             GR_LOG_INFO(d_logger, format("--Found trigger. Copy symbol before trigger."));
@@ -227,7 +227,7 @@ namespace gr {
             break;
           }
         } else {
-          GR_LOG_INFO(d_logger, format("-Rel %d, abs %d. No trigger found.")%nconsumed %(nconsumed+nitems_read(0)));
+          //GR_LOG_INFO(d_logger, format("-Rel %d, abs %d. No trigger found.")%nconsumed %(nconsumed+nitems_read(0)));
           // We did not find a trigger.
           if(d_on_frame){
             GR_LOG_INFO(d_logger, format("-- On frame."));

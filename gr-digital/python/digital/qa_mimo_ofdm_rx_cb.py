@@ -40,15 +40,15 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
     def test_001_t (self):
         # Define test params.
-        packet_len = 14
+        packet_len = 8
         len_tag_key = 'packet_length'
         fft_len = 64
         cp_len = fft_len/4
         N=2
         M=2
-        channel_matrix = [[1,0],[0,1]]#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
+        channel_matrix = [[2,1],[-1,3]]#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
-        for i in range(0, 10):
+        for i in range(0, 1):
 
             src = blocks.vector_source_b(range(packet_len*10), True, 1, ())
             s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
@@ -65,10 +65,10 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
                 m=M, mimo_technique="vblast"
             )
             static_channel = blocks.multiply_matrix_cc(channel_matrix)
-            #chan_sink1 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant1.dat")
-            #chan_sink2 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant2.dat")
-            chan_src1 = blocks.file_source(gr.sizeof_gr_complex, "channel_data_ant1.dat")
-            chan_src2 = blocks.file_source(gr.sizeof_gr_complex, "channel_data_ant2.dat")
+            chan_sink1 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant1.dat")
+            chan_sink2 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant2.dat")
+            chan_src1 = blocks.file_source(gr.sizeof_gr_complex, "181001_channel_data_ant1.dat")
+            chan_src2 = blocks.file_source(gr.sizeof_gr_complex, "181001_channel_data_ant2.dat")
             rx = mimo_ofdm_rx_cb(
                 n=N,
                 mimo_technique='vblast',
@@ -81,20 +81,21 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
             sink = blocks.vector_sink_b()
 
-            #self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*1000), s2tagged_stream, tx)
-
-            self.tb.connect(chan_src1, (static_channel, 0), (rx, 0))
-            self.tb.connect(chan_src2, (static_channel, 1), (rx, 1))
-            self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len*10), sink)
-            #self.tb.connect((tx, 0), chan_sink1)
-            #self.tb.connect((tx, 1), chan_sink2)
+            self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*100), s2tagged_stream, tx)
+            self.tb.connect((tx, 0), (static_channel, 0), (rx, 0))
+            self.tb.connect((tx, 1), (static_channel, 1), (rx, 1))
+            # self.tb.connect((tx, 0), chan_sink1)
+            # self.tb.connect((tx, 1), chan_sink2)
+            # self.tb.connect(chan_src1, (rx, 0))
+            # self.tb.connect(chan_src2, (rx, 1))
+            self.tb.connect(rx, sink)
 
             self.tb.run ()
             # check data
-            #print 'result'
-            #for i in range(0, len(sink.data()) / 14):
-            #    print sink.data()[i * 14:(i + 1) * 14]
-            self.assertComplexTuplesAlmostEqual(range(packet_len*10), sink.data(), 2)
+            print 'result'
+            for i in range(0, len(sink.data()) / (packet_len+4)):
+                print sink.data()[i * (packet_len+4):(i + 1) * (packet_len+4)]
+            #self.assertComplexTuplesAlmostEqual(range(packet_len*10), sink.data(), 2)
 
 
 

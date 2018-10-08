@@ -55,6 +55,8 @@ _def_packet_num_tag_key = "packet_num"
 # Data and pilot carriers are same as in 802.11a
 _def_occupied_carriers = (range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22, 27),)
 _def_pilot_carriers=((-21, -7, 7, 21,),)
+_def_pilot_carriers_mimo=((-26, -23, -20, -17, -14, -11, -8, -5, -2, 2, 5, 8, 11, 14, 17, 20, 23, 26,),)
+_def_occupied_carriers_mimo = ((-24, -22, -21, -19, -18, -16, -15, -13, -12, -10, -9, -7, -6, -4, -3, -1, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 21, 22, 24),)
 _pilot_sym_scramble_seq = (
         1,1,1,1, -1,-1,-1,1, -1,-1,-1,-1, 1,1,-1,1, -1,-1,1,1, -1,1,1,-1, 1,1,1,1, 1,1,-1,1,
         1,1,-1,1, 1,-1,-1,1, 1,1,-1,1, -1,-1,-1,1, -1,1,-1,-1, 1,-1,-1,1, 1,1,1,1, -1,-1,1,1,
@@ -158,8 +160,8 @@ class ofdm_tx(gr.hier_block2):
     """
     def __init__(self, fft_len=_def_fft_len, cp_len=_def_cp_len,
                  packet_length_tag_key=_def_packet_length_tag_key,
-                 occupied_carriers=_def_occupied_carriers,
-                 pilot_carriers=_def_pilot_carriers,
+                 occupied_carriers=_def_occupied_carriers_mimo,
+                 pilot_carriers=_def_pilot_carriers_mimo,
                  pilot_symbols=_def_pilot_symbols,
                  bps_header=1,
                  bps_payload=1,
@@ -289,13 +291,16 @@ class ofdm_tx(gr.hier_block2):
                 mimo_technique=self.mimo_technique
             )
             self.connect(header_payload_mux, mimo_encoder)
+            self.connect(header_payload_mux, blocks.file_sink(gr.sizeof_gr_complex, "tx_symbols.dat"))
             #self.connect(mimo_encoder, blocks.tag_debug(gr.sizeof_gr_complex, 'MIMO encoder'))
             allocator = []
             ffter = []
             cyclic_prefixer = []
             normalize = []
             for i in range(0, self.m):
-                mimo_pilot_symbols = numpy.repeat(_walsh_sequences[i][:self.m], 4).reshape((self.m, 4))
+                mimo_pilot_symbols = numpy.repeat(_walsh_sequences[i][:self.m], len(pilot_carriers[0])).reshape((self.m, len(pilot_carriers[0])))
+                print "pilots"
+                print len(pilot_carriers[0])
                 allocator.append(
                     digital.ofdm_carrier_allocator_cvc(
                         self.fft_len,
@@ -329,6 +334,10 @@ class ofdm_tx(gr.hier_block2):
                              cyclic_prefixer[i],
                              normalize[i],
                              (self, i))
+                self.connect(cyclic_prefixer[i],
+                             blocks.file_sink(gr.sizeof_gr_complex, "tx_nach_cp.dat"))
+            self.connect(allocator[0], blocks.file_sink(gr.sizeof_gr_complex * fft_len, "tx_freq.dat"))
+            self.connect(ffter[0], blocks.file_sink(gr.sizeof_gr_complex * 64, "tx_time.dat"))
 
 
 class ofdm_rx(gr.hier_block2):

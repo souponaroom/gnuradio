@@ -163,6 +163,8 @@ namespace gr {
           }
         }
         //GR_LOG_DEBUG(d_logger, format("item %d: corr %d %d %d %d")%(nitems_read(0)+s) %d_channel_state[11][0][0] %d_channel_state[25][0][0] %d_channel_state[39][0][0] %d_channel_state[53][0][0]);
+        //GR_LOG_DEBUG(d_logger, format("item %d: corr %d %d %d %d")%(nitems_read(0)+s) %d_channel_state[11][0][0] %d_channel_state[11][0][1] %d_channel_state[11][1][0] %d_channel_state[11][1][1]);
+
 
         // We have estimated the CSI for the pilot carriers. Now, lets interpolate over all OFDM carriers.
         interpolate_channel_state();

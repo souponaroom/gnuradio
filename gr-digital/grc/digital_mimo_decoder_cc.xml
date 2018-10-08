@@ -38,6 +38,7 @@
   <sink>
     <name>in</name>
     <type>complex</type>
+    <vlen>$vlen</vlen>
     <nports>$N</nports>
   </sink>
   <source>
