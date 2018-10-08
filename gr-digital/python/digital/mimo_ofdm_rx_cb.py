@@ -214,28 +214,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
         self.connect((sum_sync_detect, 1), (mimo_sync, 1))  # Trigger signal.
         self.connect(add, (mimo_sync, 2)) # Sum signal.
-        #self.connect((mimo_sync, 0), blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'MIMO sync'))
-
-        ## Disable sync TODO disable
-        dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, 1)
-        dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, 1)
-        dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
-        dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
-        mult1 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
-        mult2 = blocks.multiply_const_cc(1.0 / np.sqrt(fft_len))
-        s2v1 = blocks.stream_to_vector(gr.sizeof_gr_complex, self.fft_len)
-        s2v2 = blocks.stream_to_vector(gr.sizeof_gr_complex, self.fft_len)
-
-        serializer1 = digital.ofdm_serializer_vcc(fft_len, occupied_carriers, "serializer_key")
-        serializer2 = digital.ofdm_serializer_vcc(fft_len, occupied_carriers, "serializer_key")
-
-        #self.connect((self, 0), dump_cp1, mult1, s2v1, dump_sync1)
-        #self.connect((self, 1), dump_cp2, mult2, s2v2, dump_sync2)
-        #self.connect(dump_cp1, blocks.file_sink(gr.sizeof_gr_complex, "rx_time.dat"))
-
-        # Debug files
-        #self.connect((self, 0), blocks.file_sink(gr.sizeof_gr_complex, "rx_data.dat"))
-
 
         """
         OFDM demod and MIMO channel estimation
@@ -251,22 +229,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             occupied_carriers=self.occupied_carriers[0])
         for i in range(0, self.n):
             self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i))  # TODO add coarse freq sync after FFT
-
-        # TODO disable
-        stream2tagged_stream_sync1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
-        stream2tagged_stream_sync2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, ((48+144)/2)/48, "start")
-        #self.connect(dump_sync1, ofdm_demod[0], stream2tagged_stream_sync1, (channel_est, 0))
-        #self.connect(dump_sync2, ofdm_demod[1], stream2tagged_stream_sync2, (channel_est, 1))
-        muxer = blocks.stream_mux(gr.sizeof_gr_complex, [1, 1])
-        #self.connect(dump_sync1, stream2tagged_stream_sync1, ofdm_demod[0], (channel_est, 0))
-        #self.connect(dump_sync2, stream2tagged_stream_sync2, ofdm_demod[1], (channel_est, 1))
-        #self.connect(dump_sync1, ofdm_demod[0], blocks.null_sink(gr.sizeof_gr_complex*fft_len))
-        #self.connect(dump_sync2, ofdm_demod[1], blocks.null_sink(gr.sizeof_gr_complex*fft_len))
-        #self.connect(dump_sync1, ofdm_demod[0], (channel_est, 0))
-        #self.connect(dump_sync2, ofdm_demod[1], (channel_est, 1))
-        #self.connect(blocks.file_source(gr.sizeof_gr_complex*fft_len, "mimo_after_fft1.dat"), (channel_est, 0))
-        #self.connect(blocks.file_source(gr.sizeof_gr_complex*fft_len, "mimo_after_fft2.dat"), (channel_est, 1))
-        self.connect(ofdm_demod[0], blocks.file_sink(gr.sizeof_gr_complex*fft_len, "rx_freq.dat"))
 
         """
         MIMO decoder
@@ -292,20 +254,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             bps_header, bps_payload)
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter())
-        # TODO enable
-        #self.connect(mimo_decoder, header_reader)
-        # TODO disable
-        s2ts = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, 144+48, "start")
-        #header_ersatz = blocks.keep_m_in_n(gr.sizeof_gr_complex, 144, 144 + 48, 48)
-        # self.connect(blocks.file_source(gr.sizeof_gr_complex, "mimo_after_dec.dat"),
-        #              blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 1, (48+144), "start"),
-        #              header_reader)
-
-
-        #self.connect(header_ersatz, stream2tagged_stream)
-        #self.connect(mimo_decoder, header_ersatz, blocks.null_sink(gr.sizeof_gr_complex))
-        #self.connect(blocks.file_source(gr.sizeof_gr_complex, "mimo_after_header_ersatz.dat"), stream2tagged_stream)
-
+        self.connect(mimo_decoder, header_reader)
 
         """
         Payload demod
@@ -314,5 +263,4 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(mimo_decoder, blocks.file_sink(gr.sizeof_gr_complex, "rx_symbols.dat"))
-        self.connect(mimo_decoder, header_reader, payload_demod, payload_pack, self)
+        self.connect(header_reader, payload_demod, payload_pack, self)

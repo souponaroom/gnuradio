@@ -46,7 +46,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         cp_len = fft_len/4
         N=2
         M=2
-        channel_matrix = [[2,1],[-1,3]]#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
+        channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
 
         for i in range(0, 1):
 
