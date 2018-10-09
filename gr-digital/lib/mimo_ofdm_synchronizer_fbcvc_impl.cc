@@ -160,11 +160,11 @@ namespace gr {
         // Search for the last trigger in the current symbol.
         uint32_t trigger_pos = 0;
         bool found_trigger = false;
-        // TODO search backwards and break if you found sth to save searching time
-        for (unsigned int k = 0; k < d_symbol_len; ++k){
-          if(trigger[nconsumed+k] == 1){
-            trigger_pos = std::max(trigger_pos, k);
+        for (unsigned int k = d_symbol_len; k >= 1; --k){
+          if(trigger[nconsumed+k-1] == 1){
+            trigger_pos = k-1;
             found_trigger = true;
+            break;
           }
         }
         // State machine.
@@ -178,9 +178,7 @@ namespace gr {
                 ((gr_complex *) output_items[n])[nwritten + i] = ((const gr_complex *) input_items[3 + n])[nconsumed + i]*std::polar((float)1.0, -d_phase);
               }
               // Rotate phase.
-              d_phase += fine_freq_off[nconsumed+i] * 2.0 / d_fft_len;
-              // Place the phase in [0, pi).
-              d_phase = std::fmod(d_phase, 2.*M_PI);
+              rotate_phase(&fine_freq_off[nconsumed+i], 1);
             }
             if(d_first_data_symbol) {
               // Set start tag on this fft vector.
@@ -200,20 +198,21 @@ namespace gr {
             rotate_phase(&fine_freq_off[nconsumed], trigger_pos);
           }
           nconsumed += trigger_pos;
-
           d_on_frame = false;
+          // We are finished with the symbol before the trigger.
+
+          // The first two symbols after the trigger should be sync symbols.
           if(nconsumed == 0){
             // The input buffer contains both sync symbols. We can process them if they are not interrupted by new triggers.
             // Search for triggers in the range of the sync symbols.
             trigger_pos = 0;
-            // TODO search backwards and break if you found sth to save searching time
-            for (unsigned int k = 1; k < 2*d_symbol_len; ++k){
-              if(trigger[k] == 1) {
-                trigger_pos = std::max(trigger_pos, k);
+            for (unsigned int k = 2*d_symbol_len; k >= 2; --k){
+              if(trigger[k-1] == 1) {
+                trigger_pos = k-1;
+                break;
               }
             }
             if(trigger_pos == 0){
-              GR_LOG_INFO(d_logger, format("---The sync syms are free of triggers."));
               // The sync syms dont get interrupted. Process them.
               // TODO Coarse freq estimation.
               // Dump sync symbols and rotate phase.
@@ -231,26 +230,20 @@ namespace gr {
               break;
             }
           } else{
-            GR_LOG_INFO(d_logger, format("--Found trigger. Nconsumed =%d.")%nconsumed);
             // Start new synced buffer, which has min length of 2 sync symbols.
             break;
           }
         } else {
           // We did not find a trigger.
           if(d_on_frame){
-            GR_LOG_INFO(d_logger, format("-- On frame."));
             // We were on a frame and didn't find a trigger in this symbol.
             // Copy symbol and dump cyclic_prefix.
-
-            // TODO copy symbol with rotator and fine freq correction multiplication.
             for (unsigned int i = 0; i < d_fft_len; ++i) {
               for (int n = 0; n < d_n; ++n) {
                 ((gr_complex *) output_items[n])[nwritten + i] = ((const gr_complex *) input_items[3 + n])[nconsumed + i]*std::polar((float)1.0, -d_phase);
               }
               // Rotate phase.
-              d_phase += fine_freq_off[nconsumed+i] * 2.0 / d_fft_len;
-              // Place the phase in [0, pi).
-              d_phase = std::fmod(d_phase, 2.*M_PI);
+              rotate_phase(&fine_freq_off[nconsumed+i], 1);
             }
 
             if(d_first_data_symbol) {
