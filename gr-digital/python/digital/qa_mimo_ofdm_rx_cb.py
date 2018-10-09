@@ -23,6 +23,7 @@
 
 from gnuradio import gr, gr_unittest
 from gnuradio import blocks
+from gnuradio import analog
 from gnuradio import fft
 import digital_swig as digital
 from gnuradio.digital.ofdm_txrx import ofdm_tx
@@ -50,7 +51,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
         for i in range(0, 1):
 
-            src = blocks.vector_source_b(range(packet_len*10), True, 1, ())
+            src = blocks.vector_source_b(range(packet_len*4), True, 1, ())
             s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
                                                              packet_len,
                                                              len_tag_key)
@@ -65,10 +66,10 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
                 m=M, mimo_technique="vblast"
             )
             static_channel = blocks.multiply_matrix_cc(channel_matrix)
-            chan_sink1 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant1.dat")
-            chan_sink2 = blocks.file_sink(gr.sizeof_gr_complex, "channel_data_ant2.dat")
-            chan_src1 = blocks.file_source(gr.sizeof_gr_complex, "181001_channel_data_ant1.dat")
-            chan_src2 = blocks.file_source(gr.sizeof_gr_complex, "181001_channel_data_ant2.dat")
+            const = analog.sig_source_c(64, analog.GR_COS_WAVE, 0.5, 1.0)
+            mult1 = blocks.multiply_cc()
+            mult2 = blocks.multiply_cc()
+
             rx = mimo_ofdm_rx_cb(
                 n=N,
                 mimo_technique='vblast',
@@ -82,13 +83,15 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
             sink = blocks.vector_sink_b()
 
             self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*100), s2tagged_stream, tx)
-            self.tb.connect((tx, 0), (static_channel, 0), (rx, 0))
-            self.tb.connect((tx, 1), (static_channel, 1), (rx, 1))
+            self.tb.connect((tx, 0), (static_channel, 0), mult1, (rx, 0))
+            self.tb.connect((tx, 1), (static_channel, 1), mult2, (rx, 1))
+            self.tb.connect(const, (mult1, 1))
+            self.tb.connect(const, (mult2, 1))
             # self.tb.connect((tx, 0), chan_sink1)
             # self.tb.connect((tx, 1), chan_sink2)
             # self.tb.connect(chan_src1, (rx, 0))
             # self.tb.connect(chan_src2, (rx, 1))
-            self.tb.connect(rx, sink)
+            self.tb.connect(rx, blocks.head(gr.sizeof_char, (packet_len+4)*4), sink)
 
             self.tb.run ()
             # check data

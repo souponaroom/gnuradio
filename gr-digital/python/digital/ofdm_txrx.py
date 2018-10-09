@@ -299,8 +299,6 @@ class ofdm_tx(gr.hier_block2):
             normalize = []
             for i in range(0, self.m):
                 mimo_pilot_symbols = numpy.repeat(_walsh_sequences[i][:self.m], len(pilot_carriers[0])).reshape((self.m, len(pilot_carriers[0])))
-                print "pilots"
-                print len(pilot_carriers[0])
                 allocator.append(
                     digital.ofdm_carrier_allocator_cvc(
                         self.fft_len,
