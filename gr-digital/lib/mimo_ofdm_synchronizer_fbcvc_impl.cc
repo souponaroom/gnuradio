@@ -88,6 +88,9 @@ namespace gr {
       d_rec_sync_symbol1 = std::vector<gr_complex> (fft_len, 0.0);
       d_rec_sync_symbol2 = std::vector<gr_complex> (fft_len, 0.0);
 
+      // Set allocation for repeating FFT in integer carrier freq offset measurement.
+      d_fft = new fft::fft_complex(d_fft_len, true, 1);
+
       set_tag_propagation_policy(TPP_DONT);
       set_min_noutput_items(2);
     }
@@ -97,6 +100,8 @@ namespace gr {
      */
     mimo_ofdm_synchronizer_fbcvc_impl::~mimo_ofdm_synchronizer_fbcvc_impl()
     {
+      // Delete allocation for FFT.
+      delete d_fft;
     }
 
     void
@@ -118,10 +123,20 @@ namespace gr {
     }
 
     int
-    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const std::vector<gr_complex> &sync_sym1,
-                                                       const std::vector<gr_complex> &sync_sym2)
+    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const gr_complex *sync_sym1,
+                                                       const gr_complex *sync_sym2)
     {
-      // TODO FFT before estimation!!!
+      // Calculate FFT of sync sym 1.
+      gr_complex sync_sym1_fft[d_fft_len];
+      memcpy(d_fft->get_inbuf(), sync_sym1, d_fft_len*sizeof(gr_complex));
+      d_fft->execute();
+      memcpy(sync_sym1_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+      // Calculate FFT of sync sym 2.
+      gr_complex sync_sym2_fft[d_fft_len];
+      memcpy(d_fft->get_inbuf(), sync_sym2, d_fft_len*sizeof(gr_complex));
+      d_fft->execute();
+      memcpy(sync_sym2_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+
       int carr_offset = 0;
       // Use Schmidl & Cox method
       float Bg_max = 0;
@@ -130,7 +145,7 @@ namespace gr {
         gr_complex tmp = gr_complex(0, 0);
         for (unsigned int k = 0; k < d_fft_len; k++) {
           if (d_corr_v[k] != gr_complex(0, 0)) {
-            tmp += std::conj(sync_sym1[k+g]) * std::conj(d_corr_v[k]) * sync_sym2[k+g];
+            tmp += std::conj(sync_sym1_fft[k+g]) * std::conj(d_corr_v[k]) * sync_sym2_fft[k+g];
           }
         }
         if (std::abs(tmp) > Bg_max) {
@@ -138,6 +153,7 @@ namespace gr {
           carr_offset = g;
         }
       }
+      GR_LOG_INFO(d_logger, format("Int carrier offset: %d.")%carr_offset);
       return carr_offset;
     }
 
@@ -214,7 +230,10 @@ namespace gr {
             }
             if(trigger_pos == 0){
               // The sync syms dont get interrupted. Process them.
-              // TODO Coarse freq estimation.
+              // Coarse freq estimation.
+              // TODO correct fine freq offset on ref signal before measuring the fine freq offset
+              get_carr_offset(&ref_sig[nconsumed], &ref_sig[nconsumed+d_symbol_len]);
+              // TODO write tag with integer carrier offset
               // Dump sync symbols and rotate phase.
               rotate_phase(fine_freq_off, 2*d_symbol_len);
               nconsumed = 2*d_symbol_len;

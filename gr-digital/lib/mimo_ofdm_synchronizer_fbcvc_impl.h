@@ -24,6 +24,7 @@
 #define INCLUDED_DIGITAL_MIMO_OFDM_SYNCHRONIZER_FBCVC_IMPL_H
 
 #include <gnuradio/digital/mimo_ofdm_synchronizer_fbcvc.h>
+#include <gnuradio/fft/fft.h>
 
 namespace gr {
   namespace digital {
@@ -42,6 +43,7 @@ namespace gr {
       std::vector<gr_complex> d_corr_v;
       std::vector<gr_complex> d_rec_sync_symbol1;
       std::vector<gr_complex> d_rec_sync_symbol2;
+      fft::fft_complex *d_fft;
       //! The index of the first carrier with data (index 0 is not DC here, but the lowest frequency)
       int d_first_active_carrier;
       //! The index of the last carrier with data
@@ -60,8 +62,8 @@ namespace gr {
       void rotate_phase(const float *fine_freq_off, uint16_t rotation_length);
 
       /*! Calculate the coarse frequency offset in number of carriers. */
-      int get_carr_offset(const std::vector<gr_complex> &sync_sym1,
-                          const std::vector<gr_complex> &sync_sym2);
+      int get_carr_offset(const gr_complex *sync_sym1,
+                          const gr_complex *sync_sym2);
 
      public:
       mimo_ofdm_synchronizer_fbcvc_impl(uint16_t n,
