@@ -213,7 +213,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.connect(add, sum_sync_detect)
         self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
         self.connect((sum_sync_detect, 1), (mimo_sync, 1))  # Trigger signal.
-        self.connect(add, (mimo_sync, 2)) # Sum signal.
+        self.connect(add, blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 2)) # Sum signal.
 
         """
         OFDM demod and MIMO channel estimation
