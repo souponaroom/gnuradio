@@ -30,12 +30,16 @@
     <type>complex_vector</type>
   </param>
   <sink>
-    <name>in</name>
+    <name>fine_freq_off</name>
     <type>float</type>
   </sink>
   <sink>
-    <name>in</name>
+    <name>timing</name>
     <type>byte</type>
+  </sink>
+  <sink>
+    <name>ref_sig</name>
+    <type>complex</type>
   </sink>
   <sink>
     <name>in</name>

@@ -3,7 +3,7 @@
   <key>digital_mimo_ofdm_channel_estimator_vcvc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.mimo_ofdm_channel_estimator_vcvc($n, $fft_len, $pilot_symbols, $pilot_carriers)</make>
+  <make>digital.mimo_ofdm_channel_estimator_vcvc($n, $fft_len, $pilot_symbols, $pilot_carriers, $occupied_carriers)</make>
   <param>
     <name>N</name>
     <key>n</key>
@@ -20,11 +20,17 @@
     <name>Pilot Symbols</name>
     <key>pilot_symbols</key>
     <value>()</value>
-    <type>complex_vector</type>
+    <type>raw</type>
   </param>
   <param>
     <name>Pilot Carriers</name>
     <key>pilot_carriers</key>
+    <value>()</value>
+    <type>int_vector</type>
+  </param>
+  <param>
+    <name>Occupied Carriers</name>
+    <key>occupied_carriers</key>
     <value>()</value>
     <type>int_vector</type>
   </param>
@@ -37,7 +43,7 @@
   <source>
     <name>out</name>
     <type>complex</type>
-    <vlen>$fft_len</vlen>
+    <vlen>len($occupied_carriers)</vlen>
     <nports>$n</nports>
   </source>
 </block>
