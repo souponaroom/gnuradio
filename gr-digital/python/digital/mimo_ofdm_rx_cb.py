@@ -175,7 +175,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
         self.pilot_carriers =pilot_carriers,
-        self.pilot_symbols = pilot_symbols
+        self.pilot_symbols = np.array(pilot_symbols)
         self.bps_header = bps_header
         self.bps_payload = bps_payload
 
@@ -263,4 +263,4 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(header_reader, payload_demod, payload_pack, self)
+        self.connect(header_reader, payload_demod, payload_pack, crc, self)

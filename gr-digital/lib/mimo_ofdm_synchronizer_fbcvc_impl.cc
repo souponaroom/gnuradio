@@ -123,20 +123,9 @@ namespace gr {
     }
 
     int
-    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const gr_complex *sync_sym1,
-                                                       const gr_complex *sync_sym2)
+    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const gr_complex *sync_sym1_fft,
+                                                       const gr_complex *sync_sym2_fft)
     {
-      // Calculate FFT of sync sym 1.
-      gr_complex sync_sym1_fft[d_fft_len];
-      memcpy(d_fft->get_inbuf(), sync_sym1, d_fft_len*sizeof(gr_complex));
-      d_fft->execute();
-      memcpy(sync_sym1_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
-      // Calculate FFT of sync sym 2.
-      gr_complex sync_sym2_fft[d_fft_len];
-      memcpy(d_fft->get_inbuf(), sync_sym2, d_fft_len*sizeof(gr_complex));
-      d_fft->execute();
-      memcpy(sync_sym2_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
-
       int carr_offset = 0;
       // Use Schmidl & Cox method
       float Bg_max = 0;
@@ -166,6 +155,8 @@ namespace gr {
       const float *fine_freq_off = (const float *) input_items[0];
       const unsigned char *trigger = (const unsigned char *) input_items[1];
       const gr_complex *ref_sig = (const gr_complex *) input_items[2];
+
+      GR_LOG_INFO(d_logger, format("Fine freq offset: %d.")%fine_freq_off[0]);
 
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
@@ -231,11 +222,37 @@ namespace gr {
             if(trigger_pos == 0){
               // The sync syms dont get interrupted. Process them.
               // Coarse freq estimation.
-              // TODO correct fine freq offset on ref signal before measuring the fine freq offset
-              get_carr_offset(&ref_sig[nconsumed], &ref_sig[nconsumed+d_symbol_len]);
+
+              // Calculate FFT of the (fine frequency corrected) sync symbol 1.
+              for (int i = 0; i < d_fft_len; ++i) {
+                d_fft->get_inbuf()[i] = ref_sig[i]*std::polar((float)1.0, -d_phase);
+                // Rotate phase.
+                rotate_phase(&fine_freq_off[i], 1);
+              }
+              d_fft->execute();
+              // Save FFT vector to array.
+              gr_complex sync_sym1_fft[d_fft_len];
+              memcpy(sync_sym1_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+
+              // Rotate CP between the sync symbols.
+              rotate_phase(&fine_freq_off[d_fft_len], d_cp_len);
+
+              // Calculate FFT of the (fine frequency corrected) sync symbol 2.
+              for (int i = d_symbol_len; i < d_symbol_len+d_fft_len; ++i) {
+                d_fft->get_inbuf()[i] = ref_sig[i]*std::polar((float)1.0, -d_phase);
+                // Rotate phase.
+                rotate_phase(&fine_freq_off[i], 1);
+              }
+              d_fft->execute();
+              // Save FFT vector to array.
+              gr_complex sync_sym2_fft[d_fft_len];
+              memcpy(sync_sym2_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+
+              // Estimate carrier frequency offset.
+              get_carr_offset(sync_sym1_fft, sync_sym2_fft);
               // TODO write tag with integer carrier offset
-              // Dump sync symbols and rotate phase.
-              rotate_phase(fine_freq_off, 2*d_symbol_len);
+              // Rotate CP after the second sync symbol.
+              rotate_phase(&fine_freq_off[d_symbol_len+d_fft_len], d_cp_len);
               nconsumed = 2*d_symbol_len;
               d_on_frame = true;
               d_first_data_symbol = true;
