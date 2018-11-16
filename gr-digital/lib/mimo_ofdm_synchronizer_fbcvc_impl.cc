@@ -70,7 +70,7 @@ namespace gr {
         d_first_data_symbol(false),
         d_phase(0.),
         d_corr_v(sync_symbol2),
-        d_first_active_carrier(0),
+        d_first_active_carrier(0), // TODO calculate properly
         d_last_active_carrier(sync_symbol2.size()-1)
     {
       // Check if both sync symbols have the length fft_len
@@ -81,12 +81,57 @@ namespace gr {
         throw std::invalid_argument("sync symbols must have length fft_len.");
       }
       d_symbol_len = d_fft_len + d_cp_len;
+
+      // Set index of first and last active carrier
+      for (int i = 0; i < d_fft_len; i++) {
+        if (sync_symbol1[i] != gr_complex(0, 0)) {
+          d_first_active_carrier = i;
+          break;
+        }
+      }
+      for (int i = d_fft_len-1; i >= 0; i--) {
+        if (sync_symbol1[i] != gr_complex(0, 0)) {
+          d_last_active_carrier = i;
+          break;
+        }
+      }
+
+      // Set up coarse freq estimation info
+      // Allow all possible values:
+      d_rec_sync_symbol1 = std::vector<gr_complex> (fft_len, 0.0);
+      d_rec_sync_symbol2 = std::vector<gr_complex> (fft_len, 0.0);
+
+
+      // Sanity checks
+      if (sync_symbol2.size()) {
+        if (sync_symbol1.size() != sync_symbol2.size()) {
+          throw std::invalid_argument("sync symbols must have equal length.");
+        }
+      } else {
+        if (sync_symbol1[d_first_active_carrier+1] == gr_complex(0, 0)) {
+          d_last_active_carrier++;
+
+        }
+      }
+
       // Set up coarse freq estimation info
       // Allow all possible values:
       d_max_neg_carr_offset = -d_first_active_carrier;
       d_max_pos_carr_offset = d_fft_len - d_last_active_carrier - 1;
-      d_rec_sync_symbol1 = std::vector<gr_complex> (fft_len, 0.0);
-      d_rec_sync_symbol2 = std::vector<gr_complex> (fft_len, 0.0);
+      // Carrier offsets must be even
+      if (d_max_neg_carr_offset % 2)
+        d_max_neg_carr_offset++;
+      if (d_max_pos_carr_offset % 2)
+        d_max_pos_carr_offset--;
+
+      // Calculate differential modulated PN sequence
+      for (int i = 0; i < d_fft_len; i++) {
+        if (sync_symbol1[i] == gr_complex(0, 0)) {
+          d_corr_v[i] = gr_complex(0, 0);
+        } else {
+          d_corr_v[i] /= sync_symbol1[i];
+        }
+      }
 
       // Set allocation for repeating FFT in integer carrier freq offset measurement.
       d_fft = new fft::fft_complex(d_fft_len, true, 1);
@@ -130,13 +175,15 @@ namespace gr {
       // Use Schmidl & Cox method
       float Bg_max = 0;
       // g here is 2g in the paper
+
       for (int g = d_max_neg_carr_offset; g <= d_max_pos_carr_offset; g += 2) {
         gr_complex tmp = gr_complex(0, 0);
         for (unsigned int k = 0; k < d_fft_len; k++) {
           if (d_corr_v[k] != gr_complex(0, 0)) {
-            tmp += std::conj(sync_sym1_fft[k+g]) * std::conj(d_corr_v[k]) * sync_sym2_fft[k+g];
+            tmp += std::conj(sync_sym1_fft[(k+g+d_fft_len/2)%d_fft_len]) * std::conj(d_corr_v[k]) * sync_sym2_fft[(k+g+d_fft_len/2)%d_fft_len];
           }
         }
+        GR_LOG_INFO(d_logger, format("tmp(%d): %d.")%g %std::abs(tmp));
         if (std::abs(tmp) > Bg_max) {
           Bg_max = std::abs(tmp);
           carr_offset = g;
@@ -156,7 +203,7 @@ namespace gr {
       const unsigned char *trigger = (const unsigned char *) input_items[1];
       const gr_complex *ref_sig = (const gr_complex *) input_items[2];
 
-      GR_LOG_INFO(d_logger, format("Fine freq offset: %d.")%fine_freq_off[0]);
+      //GR_LOG_INFO(d_logger, format("Fine freq offset: %d.")%fine_freq_off[0]);
 
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
@@ -235,7 +282,7 @@ namespace gr {
               memcpy(sync_sym1_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
 
               // Rotate CP between the sync symbols.
-              rotate_phase(&fine_freq_off[d_fft_len], d_cp_len);
+              rotate_phase(&fine_freq_off[d_fft_len], d_cp_len); // TODO not necessary?
 
               // Calculate FFT of the (fine frequency corrected) sync symbol 2.
               for (int i = d_symbol_len; i < d_symbol_len+d_fft_len; ++i) {
@@ -247,6 +294,10 @@ namespace gr {
               // Save FFT vector to array.
               gr_complex sync_sym2_fft[d_fft_len];
               memcpy(sync_sym2_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+
+              /*for (int j = 0; j < 64; ++j) {
+                GR_LOG_INFO(d_logger, format("%d %d")%j %sync_sym2_fft[(j+32)%64]);
+              }*/
 
               // Estimate carrier frequency offset.
               get_carr_offset(sync_sym1_fft, sync_sym2_fft);

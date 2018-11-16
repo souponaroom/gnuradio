@@ -66,7 +66,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
                 m=M, mimo_technique="vblast"
             )
             static_channel = blocks.multiply_matrix_cc(channel_matrix)
-            const = analog.sig_source_c(64, analog.GR_COS_WAVE, 0.5, 1.0)
+            const = analog.sig_source_c(fft_len, analog.GR_COS_WAVE, 0.0, 1.0)
             mult1 = blocks.multiply_cc()
             mult2 = blocks.multiply_cc()
 
