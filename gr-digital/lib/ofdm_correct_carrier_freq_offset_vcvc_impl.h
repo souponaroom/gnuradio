@@ -31,6 +31,7 @@ namespace gr {
     class ofdm_correct_carrier_freq_offset_vcvc_impl : public ofdm_correct_carrier_freq_offset_vcvc
     {
      private:
+      uint16_t d_n; /*!< Number of receiving and transmitting antennas. */
       uint32_t d_fft_len; /*!< Length of the FFT vectors and vlen of the items of this block. */
       uint32_t d_cp_len; /*!< Cyclic prefix length. (Required to correct the frequency offset over time. */
       std::string d_carrier_freq_offset_key; /*!< Key of the required tags which include the carrier frequency offset. */
@@ -43,10 +44,12 @@ namespace gr {
        * @param out Poiner to the output buffer.
        * @param length Number of FFT vectors to process.
        */
-      void correct_offset(const gr_complex *in, gr_complex *out, uint32_t length);
+      void correct_offset(gr_vector_const_void_star &input_items,
+                          gr_vector_void_star &output_items,
+                          uint32_t offset, uint32_t length);
 
      public:
-      ofdm_correct_carrier_freq_offset_vcvc_impl(uint32_t fft_len, uint32_t cp_len, std::string carrier_freq_offset_key);
+      ofdm_correct_carrier_freq_offset_vcvc_impl(uint16_t n, uint32_t fft_len, uint32_t cp_len, std::string carrier_freq_offset_key);
       ~ofdm_correct_carrier_freq_offset_vcvc_impl();
 
       // Where all the action really happens

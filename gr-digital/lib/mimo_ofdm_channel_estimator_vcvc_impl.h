@@ -39,11 +39,21 @@ namespace gr {
       std::vector<int> d_pilot_carriers; /*!< OFDM sub-carriers, where the pilot symbols are located. */
       std::vector<int> d_occupied_carriers;
       uint32_t d_output_vlen;
+
       /*!< 3-dimensional vector, storing the MIMO CSI from the current OFDM symbol for
        * each sub-carrier.
        * The dimensions are fft_len, N, N.
        */
       std::vector<std::vector<std::vector<gr_complex> > > d_channel_state;
+
+      void extract_payload_carriers(gr_vector_const_void_star &input_items,
+                                    gr_vector_void_star &output_items,
+                                    uint32_t length);
+
+      void estimate_channel_state(gr_vector_const_void_star &input_items,
+                                  uint32_t reading_offset);
+
+      pmt::pmt_t generate_csi_pmt();
 
       /*!< Correlates the received pilot symbols with the actual ones.
        *

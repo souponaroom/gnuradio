@@ -208,19 +208,31 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                                                          self.sync_word1,
                                                          self.sync_word2)
         for i in range(0, self.n):
-            self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (add, i))
-            self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 3+i))
+           self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (add, i))
+           self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 3+i))
         self.connect(add, sum_sync_detect)
         self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
         self.connect((sum_sync_detect, 1), (mimo_sync, 1))  # Trigger signal.
         self.connect(add, blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 2)) # Sum signal.
-
         """
-        OFDM demod and MIMO channel estimation
+        OFDM demod
         """
         ofdm_demod = []
         for i in range(0, self.n):
             ofdm_demod.append(fft.fft_vcc(self.fft_len, True, (), True))
+            self.connect((mimo_sync, i), ofdm_demod[i])
+
+        """
+        Carrier frequency correction
+        """
+        carrier_freq_corrector = digital.ofdm_correct_carrier_freq_offset_vcvc(
+            self.n, self.fft_len, self.cp_len, "carrier_freq_offset")
+        for i in range(0, self.n):
+            self.connect(ofdm_demod[i], (carrier_freq_corrector, i))
+
+        """
+        MIMO channel estimation
+        """
         channel_est = digital.mimo_ofdm_channel_estimator_vcvc(
             n=self.n,
             fft_len=fft_len,
@@ -228,7 +240,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             pilot_carriers=pilot_carriers[0],
             occupied_carriers=self.occupied_carriers[0])
         for i in range(0, self.n):
-            self.connect((mimo_sync, i), ofdm_demod[i], (channel_est, i))  # TODO add coarse freq sync after FFT
+            self.connect((carrier_freq_corrector, i), (channel_est, i))
 
         """
         MIMO decoder
@@ -237,7 +249,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             N=self.n,
             mimo_technique=self.mimo_technique,
             vlen=len(self.occupied_carriers[0]))
-        # TODO enable again
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
 

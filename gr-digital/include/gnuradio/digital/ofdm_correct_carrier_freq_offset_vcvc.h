@@ -48,7 +48,7 @@ namespace gr {
        * class. digital::ofdm_correct_carrier_freq_offset_vcvc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint32_t fft_len, uint32_t cp_len, std::string carrier_freq_offset_key);
+      static sptr make(uint16_t n, uint32_t fft_len, uint32_t cp_len, std::string carrier_freq_offset_key);
     };
 
   } // namespace digital

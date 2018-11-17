@@ -71,7 +71,8 @@ namespace gr {
         d_phase(0.),
         d_corr_v(sync_symbol2),
         d_first_active_carrier(0), // TODO calculate properly
-        d_last_active_carrier(sync_symbol2.size()-1)
+        d_last_active_carrier(sync_symbol2.size()-1),
+        d_carrier_freq_offset(0)
     {
       // Check if both sync symbols have the length fft_len
       if (sync_symbol1.size() != sync_symbol2.size()) {
@@ -183,13 +184,12 @@ namespace gr {
             tmp += std::conj(sync_sym1_fft[(k+g+d_fft_len/2)%d_fft_len]) * std::conj(d_corr_v[k]) * sync_sym2_fft[(k+g+d_fft_len/2)%d_fft_len];
           }
         }
-        GR_LOG_INFO(d_logger, format("tmp(%d): %d.")%g %std::abs(tmp));
         if (std::abs(tmp) > Bg_max) {
           Bg_max = std::abs(tmp);
           carr_offset = g;
         }
       }
-      GR_LOG_INFO(d_logger, format("Int carrier offset: %d.")%carr_offset);
+      //GR_LOG_INFO(d_logger, format("Int carrier offset: %d.")%carr_offset);
       return carr_offset;
     }
 
@@ -285,23 +285,18 @@ namespace gr {
               rotate_phase(&fine_freq_off[d_fft_len], d_cp_len); // TODO not necessary?
 
               // Calculate FFT of the (fine frequency corrected) sync symbol 2.
-              for (int i = d_symbol_len; i < d_symbol_len+d_fft_len; ++i) {
-                d_fft->get_inbuf()[i] = ref_sig[i]*std::polar((float)1.0, -d_phase);
+              for (int i = 0; i < d_fft_len; ++i) {
+                d_fft->get_inbuf()[i] = ref_sig[i+d_symbol_len]*std::polar((float)1.0, -d_phase);
                 // Rotate phase.
-                rotate_phase(&fine_freq_off[i], 1);
+                rotate_phase(&fine_freq_off[i+d_symbol_len], 1);
               }
               d_fft->execute();
               // Save FFT vector to array.
               gr_complex sync_sym2_fft[d_fft_len];
               memcpy(sync_sym2_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
 
-              /*for (int j = 0; j < 64; ++j) {
-                GR_LOG_INFO(d_logger, format("%d %d")%j %sync_sym2_fft[(j+32)%64]);
-              }*/
-
               // Estimate carrier frequency offset.
-              get_carr_offset(sync_sym1_fft, sync_sym2_fft);
-              // TODO write tag with integer carrier offset
+              d_carrier_freq_offset = get_carr_offset(sync_sym1_fft, sync_sym2_fft);
               // Rotate CP after the second sync symbol.
               rotate_phase(&fine_freq_off[d_symbol_len+d_fft_len], d_cp_len);
               nconsumed = 2*d_symbol_len;
@@ -340,6 +335,10 @@ namespace gr {
                              nitems_written(0) + nwritten / d_fft_len,
                              pmt::string_to_symbol("start"),
                              pmt::from_long(0));
+                add_item_tag(n,
+                             nitems_written(0) + nwritten / d_fft_len,
+                             pmt::string_to_symbol("carrier_freq_offset"),
+                             pmt::from_long(d_carrier_freq_offset));
               }
               d_first_data_symbol = false;
             }

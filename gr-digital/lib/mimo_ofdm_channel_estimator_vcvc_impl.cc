@@ -89,6 +89,42 @@ namespace gr {
       }
     }
 
+    void
+    mimo_ofdm_channel_estimator_vcvc_impl::extract_payload_carriers(
+            gr_vector_const_void_star &input_items,
+            gr_vector_void_star &output_items,
+            uint32_t length) {
+
+      for (int i = 0; i < d_n; ++i) {
+        const gr_complex *in = (const gr_complex *) input_items[i];
+        gr_complex *out = (gr_complex *) output_items[i];
+        for (int j = 0; j < length; ++j) {
+          for (unsigned int k = 0; k < d_output_vlen; ++k) {
+            out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k]+d_fft_len/2];
+          }
+        }
+      }
+    }
+
+    void
+    mimo_ofdm_channel_estimator_vcvc_impl::estimate_channel_state(
+            gr_vector_const_void_star &input_items,
+            uint32_t reading_offset) {
+      for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) { // Iterate over pilot carriers
+        for (int i = 0; i < d_n; ++i) { // Iterate over N MIMO input streams.
+          const gr_complex *in = (const gr_complex *) input_items[i];
+          for (int j = 0; j < d_n; ++j) { // Iterate over N MIMO pilot sequences.
+            // Correlate received pilot symbols with reference. The result is the path coefficient h_ij.
+            d_channel_state[d_pilot_carriers[c] + d_fft_len / 2][i][j] = correlate_pilots(
+                    &in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * reading_offset],
+                    d_pilot_symbols[j],
+                    d_fft_len,
+                    (nitems_read(0)+reading_offset)%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
+          }
+        }
+      }
+    }
+
     gr_complex
     mimo_ofdm_channel_estimator_vcvc_impl::correlate_pilots(const gr_complex *in,
                                                             std::vector<gr_complex> pilot,
@@ -99,8 +135,6 @@ namespace gr {
         correlation += in[i*distance] * std::conj(pilot[(i+pilot_offset)%d_n]);
       }
       // Return correlation after normalization.
-      //GR_LOG_DEBUG(d_logger, format("    pilot seq %d %d, rx seq = %d %d")%pilot[(0+pilot_offset)%d_n] %pilot[(1+pilot_offset)%d_n] %in[0] %in[1*distance]);
-      //GR_LOG_DEBUG(d_logger, format("    corr %d") %(correlation/(gr_complex)d_n));
       return correlation/(gr_complex)d_n;
     }
 
@@ -129,61 +163,40 @@ namespace gr {
       }
     }
 
+    pmt::pmt_t
+    mimo_ofdm_channel_estimator_vcvc_impl::generate_csi_pmt() {
+      // Assign the channel state vector to a PMT vector. Only take the occupied carriers.
+      pmt::pmt_t csi_pmt = pmt::make_vector(d_output_vlen, pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0])));
+      for (unsigned int k = 0; k < d_output_vlen; ++k) {
+        pmt::pmt_t csi_per_carrier = pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0]));
+        for (int i = 0; i < d_n; ++i){
+          pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_n, d_channel_state[0][0][0]);
+          for (int j = 0; j < d_n; ++j) {
+            pmt::c32vector_set(csi_line_vector, j, d_channel_state[d_occupied_carriers[k]+d_fft_len/2][i][j]);
+          }
+          pmt::vector_set(csi_per_carrier, i, csi_line_vector);
+        }
+        pmt::vector_set(csi_pmt, k, csi_per_carrier);
+      }
+      return csi_pmt;
+    }
+
     int
     mimo_ofdm_channel_estimator_vcvc_impl::general_work (int noutput_items,
                        gr_vector_int &ninput_items,
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-      // Copy data of occupied carriers to output.
-      for (int i = 0; i < d_n; ++i) {
-        const gr_complex *in = (const gr_complex *) input_items[i];
-        gr_complex *out = (gr_complex *) output_items[i];
-        for (int j = 0; j < noutput_items; ++j) {
-          for (unsigned int k = 0; k < d_output_vlen; ++k) {
-            out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k]+d_fft_len/2];
-          }
-        }
-      }
+
+      extract_payload_carriers(input_items, output_items, noutput_items);
 
       for (int s = 0; s < noutput_items; ++s) { // Iterate over OFDM symbols.
-        for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) { // Iterate over pilot carriers
-          for (int i = 0; i < d_n; ++i) { // Iterate over N MIMO input streams.
-            const gr_complex *in = (const gr_complex *) input_items[i];
-            //GR_LOG_DEBUG(d_logger, format("sym %d, carrier %d, stream %i: %d")%s %d_pilot_carriers[c] %i %in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * s]);
-            for (int j = 0; j < d_n; ++j) { // Iterate over N MIMO pilot sequences.
-              // Correlate received pilot symbols with reference. The result is the path coefficient h_ij.
-              //GR_LOG_DEBUG(d_logger, format("nread %d item %d carr %d pilot %d input %d")%(nitems_read(0)) %s %c %j %i);
-              d_channel_state[d_pilot_carriers[c] + d_fft_len / 2][i][j] = correlate_pilots(
-                      &in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * s],
-                      d_pilot_symbols[j],
-                      d_fft_len,
-                      (nitems_read(0)+s)%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
-            }
-          }
-        }
-        //GR_LOG_DEBUG(d_logger, format("item %d: corr %d %d %d %d")%(nitems_read(0)+s) %d_channel_state[11][0][0] %d_channel_state[25][0][0] %d_channel_state[39][0][0] %d_channel_state[53][0][0]);
-        //GR_LOG_DEBUG(d_logger, format("item %d: corr %d %d %d %d")%(nitems_read(0)+s) %d_channel_state[11][0][0] %d_channel_state[11][0][1] %d_channel_state[11][1][0] %d_channel_state[11][1][1]);
 
-
+        estimate_channel_state(input_items, s);
         // We have estimated the CSI for the pilot carriers. Now, lets interpolate over all OFDM carriers.
         interpolate_channel_state();
-
-        // Assign the channel state vector to a PMT vector. Only take the occupied carriers.
-        pmt::pmt_t csi_pmt = pmt::make_vector(d_output_vlen, pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0])));
-        for (unsigned int k = 0; k < d_output_vlen; ++k) {
-          pmt::pmt_t csi_per_carrier = pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0]));
-          for (int i = 0; i < d_n; ++i){
-            pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_n, d_channel_state[0][0][0]);
-            for (int j = 0; j < d_n; ++j) {
-              pmt::c32vector_set(csi_line_vector, j, d_channel_state[d_occupied_carriers[k]+d_fft_len/2][i][j]);
-            }
-            pmt::vector_set(csi_per_carrier, i, csi_line_vector);
-          }
-          pmt::vector_set(csi_pmt, k, csi_per_carrier);
-        }
-        // Add tag to output data.
-        add_item_tag(0, nitems_written(0) + s, pmt::string_to_symbol(std::string("csi")), csi_pmt);
+        // Add tag to output item.
+        add_item_tag(0, nitems_written(0) + s, pmt::string_to_symbol(std::string("csi")), generate_csi_pmt());
       }
 
       // Tell runtime system how many input items we consumed on

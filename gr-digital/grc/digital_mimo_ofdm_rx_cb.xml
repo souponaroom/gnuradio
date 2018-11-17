@@ -4,7 +4,7 @@
   <key>digital_mimo_ofdm_rx_cb</key>
   <import>from gnuradio import digital</import>
   <make>digital.mimo_ofdm_rx_cb(
-	  n=$n, fft_len=$fft_len, cp_len=$cp_len,
+	  n=$n, mimo_technique=$mimo_technique,fft_len=$fft_len, cp_len=$cp_len,
 	  frame_length_tag_key='frame_'+$packet_len_key,
 	  packet_length_tag_key=$packet_len_key,
 	  #if $occupied_carriers()
@@ -24,7 +24,6 @@
 	  #end if
 	  bps_header=$header_mod.bps,
 	  bps_payload=$payload_mod.bps,
-	  debug_log=$log,
 	  scramble_bits=$scramble_bits
 	 )</make>
   <param>
@@ -161,25 +160,16 @@
     </option>
   </param>
   <param>
-    <name>Log Debug Info</name>
-    <key>log</key>
-    <value>False</value>
-    <type>enum</type>
-    <hide> #if $log then 'none' else 'part'#</hide>
-    <option>
-      <name>No</name>
-      <key>False</key>
-    </option>
-    <option>
-      <name>Yes</name>
-      <key>True</key>
-    </option>
-  </param>
-  <param>
     <name>N</name>
     <key>n</key>
     <value>2</value>
     <type>int</type>
+  </param>
+  <param>
+    <name>MIMO technique</name>
+    <key>mimo_technique</key>
+    <value>"vblast"</value>
+    <type>raw</type>
   </param>
   <check>$fft_len &gt; 0</check>
   <check>$cp_len &gt; 0</check>

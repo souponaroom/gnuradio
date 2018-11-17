@@ -39,6 +39,7 @@ namespace gr {
       bool d_on_frame;
       bool d_first_data_symbol;
       float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
+      int d_carrier_freq_offset;
 
       std::vector<gr_complex> d_corr_v;
       std::vector<gr_complex> d_rec_sync_symbol1;
