@@ -35,34 +35,46 @@ namespace gr {
       uint16_t d_n; /*!< Number of receiving antennas N. */
       uint32_t d_fft_len; /*!< FFT length. */
       uint32_t d_cp_len; /*!< Cyclic prefix length. */
-      uint16_t d_symbol_len; /*!< FFT length + cyclic prefic length */
+      uint16_t d_symbol_len; /*!< FFT length + cyclic prefix length */
+      /*! State variable for the synchronizer state machine. True means, that
+       * we found the beginning of a frame and are currently processing it.*/
       bool d_on_frame;
+      /*! Indicates first data symbol of frame (after sync symbols).
+       * This is where we set a 'start' tag. */
       bool d_first_data_symbol;
       float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
-      int d_carrier_freq_offset;
+      int d_carrier_freq_offset; /*!< Estimated carrier frequency offset. */
 
-      std::vector<gr_complex> d_corr_v;
-      std::vector<gr_complex> d_rec_sync_symbol1;
-      std::vector<gr_complex> d_rec_sync_symbol2;
-      fft::fft_complex *d_fft;
-      //! The index of the first carrier with data (index 0 is not DC here, but the lowest frequency)
+      /*! The index of the first carrier with data.
+       *  (index 0 is not DC here, but the lowest frequency) */
       int d_first_active_carrier;
-      //! The index of the last carrier with data
+      //! The index of the last carrier with data.
       int d_last_active_carrier;
-      //! Maximum carrier offset (negative value!)
+      //! Maximum negative carrier offset. (usually a negative value!)
       int d_max_neg_carr_offset;
-      //! Maximum carrier offset (positive value!)
+      //! Maximum positive carrier offset. (usually a positive value)
       int d_max_pos_carr_offset;
 
-      /*! \brief Rotates the phase of a complex pointer
-       * by a phase shift per sample which calculates itself out of the frequency offset.
+      fft::fft_complex *d_fft; //!< Instance of FFT class.
+      std::vector<gr_complex> d_rec_sync_symbol1;
+      std::vector<gr_complex> d_rec_sync_symbol2;
+      std::vector<gr_complex> d_corr_v;
+
+      /*! \brief Rotates the phase of a complex pointer with specified params.
+       * Used to correct a fractional frequency offset in OFDM.
        *
-       * @param fine_freq_off Pointer to buffer with fine frequency offsets per sample.
+       * @param fine_freq_off Buffer with fine frequency offset for each time sample.
        * @param rotation_length Number of samples to rotate over.
        */
       void rotate_phase(const float *fine_freq_off, uint16_t rotation_length);
 
-      /*! Calculate the coarse frequency offset in number of carriers. */
+      /*! \brief Calculate the coarse frequency offset in number of carriers.
+       * @param sync_sym1 Received synchronization symbol 1 with
+       * corrected fractional frequency offset in time domain.
+       * @param sync_sym2 Received synchronization symbol 2 with
+       * corrected fractional frequency offset in time domain.
+       * @return Carrier frequency offset. (even integer; can be negative!)
+       */
       int get_carr_offset(const gr_complex *sync_sym1,
                           const gr_complex *sync_sym2);
 
