@@ -27,21 +27,34 @@
 
 namespace gr {
   namespace digital {
+    /*! \brief Integer carrier frequency corrector for OFDM.
+     * This block corrects an integer frequency offset, indicated by stream tags,
+     * on demodulated OFDM symbols (freqency domain).
+     *
+     * This block supports parallel branch processing (for example for MIMO systems).
+     *
+     * Input:  FFT vectors after OFDM demodulation (frequency domain) which are already
+     *         time-synchronized and with corrected fractional frequency offset.
+     *         Tags indicate the integer carrier offset.
+     * Output: FFT vectors with corrected integer carrier frequency offset.
+     */
 
     class ofdm_correct_carrier_freq_offset_vcvc_impl : public ofdm_correct_carrier_freq_offset_vcvc
     {
      private:
-      uint16_t d_n; /*!< Number of receiving and transmitting antennas. */
+      /*! Number of parallel branches to process parallel
+       * (number of receive antennas in case of MIMO). */
+      uint16_t d_n;
       uint32_t d_fft_len; /*!< Length of the FFT vectors and vlen of the items of this block. */
       uint32_t d_cp_len; /*!< Cyclic prefix length. (Required to correct the frequency offset over time. */
       std::string d_carrier_freq_offset_key; /*!< Key of the required tags which include the carrier frequency offset. */
       pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      int d_carrier_offset; /*!< Local var which remembers the current carrier frequency offset. */
+      int d_carrier_offset; /*!< Current carrier frequency offset. */
 
-      /*! \brief Writes the carrier frequency corrected fft vectors to the output.
+      /*! \brief Writes the freqnency corrected FFT vectors to the output.
        *
-       * @param in Pointer to the input buffer.
-       * @param out Poiner to the output buffer.
+       * @param in Input buffer.
+       * @param out Output buffer.
        * @param length Number of FFT vectors to process.
        */
       void correct_offset(gr_vector_const_void_star &input_items,

@@ -90,7 +90,11 @@ namespace gr {
           memcpy((void *) out, (void *) (in + d_carrier_offset),
                  sizeof(gr_complex) * (d_fft_len * length - d_carrier_offset));
         }
-        // Correct the frequency shift on the symbols.
+        /* The cyclic prefix was cut out somewhere before this block.
+         * But the carrier frequency offset was not yet corrected back then.
+         * (Because it is corrected right now). This leads to a phase shift
+         * between the FFT vectors. */
+        // Correct this phase shift.
         gr_complex phase_correction;
         for (unsigned int i = 0; i < length; i++) {
           phase_correction = gr_expj(-M_TWOPI * d_carrier_offset * d_cp_len / d_fft_len * (i + 1));
