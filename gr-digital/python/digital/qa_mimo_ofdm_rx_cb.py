@@ -48,7 +48,6 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         N=2
         M=2
         channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
-        print "channel matrix" + str(channel_matrix)
         for i in range(0, 1):
 
             src = blocks.vector_source_b(range(packet_len*4), True, 1, ())
@@ -66,7 +65,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
                 m=M, mimo_technique="vblast"
             )
             static_channel = blocks.multiply_matrix_cc(channel_matrix)
-            const = analog.sig_source_c(fft_len, analog.GR_COS_WAVE, 2.0, 1.0)
+            const = analog.sig_source_c(fft_len, analog.GR_COS_WAVE, 5.0, 1.0)
             mult1 = blocks.multiply_cc()
             mult2 = blocks.multiply_cc()
 

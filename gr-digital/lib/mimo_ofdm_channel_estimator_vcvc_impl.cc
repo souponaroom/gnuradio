@@ -24,7 +24,6 @@
 #include "config.h"
 #endif
 
-#include <boost/format.hpp>
 #include <gnuradio/io_signature.h>
 #include "mimo_ofdm_channel_estimator_vcvc_impl.h"
 #include <pmt/pmt.h>
@@ -63,13 +62,19 @@ namespace gr {
               gr::io_signature::make(n, n, sizeof(gr_complex)*occupied_carriers.size())),
         d_n(n),
         d_fft_len(fft_len),
+        d_fft_shift(fft_len/2),
         d_pilot_symbols(pilot_symbols),
         d_pilot_carriers(pilot_carriers),
         d_occupied_carriers(occupied_carriers),
         d_output_vlen(occupied_carriers.size())
     {
+      // Init CSI vector.
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
               (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (n, 1.0)));
+      // Monitor that FFT length is even.
+      if (fft_len%2){
+        throw std::invalid_argument((boost::format("FFT length %d must be even.") %fft_len).str());
+      }
       // Set tag propagation policy.
       set_tag_propagation_policy(TPP_ONE_TO_ONE);
     }
@@ -94,13 +99,14 @@ namespace gr {
             gr_vector_const_void_star &input_items,
             gr_vector_void_star &output_items,
             uint32_t length) {
-
+      // Iterate over MIMO branches.
       for (int i = 0; i < d_n; ++i) {
         const gr_complex *in = (const gr_complex *) input_items[i];
         gr_complex *out = (gr_complex *) output_items[i];
-        for (int j = 0; j < length; ++j) {
+        // Extract data carriers to output buffer and dump zero-carriers and pilot-carriers.
+        for (unsigned int j = 0; j < length; ++j) {
           for (unsigned int k = 0; k < d_output_vlen; ++k) {
-            out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k]+d_fft_len/2];
+            out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k] + d_fft_shift];
           }
         }
       }
@@ -110,13 +116,17 @@ namespace gr {
     mimo_ofdm_channel_estimator_vcvc_impl::estimate_channel_state(
             gr_vector_const_void_star &input_items,
             uint32_t reading_offset) {
-      for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) { // Iterate over pilot carriers
-        for (int i = 0; i < d_n; ++i) { // Iterate over N MIMO input streams.
+      // Iterate over all pilot carriers.
+      for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) {
+        // Iterate over N MIMO input streams.
+        for (int i = 0; i < d_n; ++i) {
           const gr_complex *in = (const gr_complex *) input_items[i];
           for (int j = 0; j < d_n; ++j) { // Iterate over N MIMO pilot sequences.
-            // Correlate received pilot symbols with reference. The result is the path coefficient h_ij.
-            d_channel_state[d_pilot_carriers[c] + d_fft_len / 2][i][j] = correlate_pilots(
-                    &in[d_pilot_carriers[c] + d_fft_len / 2 + d_fft_len * reading_offset],
+            /* Correlate received pilot sequence with transmitted sequence.
+             * The result is the path coefficient h_ij for the current sub-carrier
+             * and the current MIMO branch. */
+            d_channel_state[d_pilot_carriers[c]+d_fft_shift][i][j]
+                    = correlate_pilots(&in[reading_offset*d_fft_len + d_pilot_carriers[c] + d_fft_shift],
                     d_pilot_symbols[j],
                     d_fft_len,
                     (nitems_read(0)+reading_offset)%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
@@ -131,32 +141,33 @@ namespace gr {
                                                             uint32_t distance,
                                                             uint16_t pilot_offset) {
       gr_complex correlation = 0.0;
+      // Correlate the received pilot sequence with the transmitted one.
       for (unsigned int i = 0; i < d_n; ++i) {
         correlation += in[i*distance] * std::conj(pilot[(i+pilot_offset)%d_n]);
       }
-      // Return correlation after normalization.
+      // Return normalized (assuming a normalized pilot sequence) correlation result.
       return correlation/(gr_complex)d_n;
     }
 
     void
     mimo_ofdm_channel_estimator_vcvc_impl::interpolate_channel_state() {
       // Set the CSI for the edge carriers to the same as their nearest estimation.
-      for (unsigned int c = 0; c < d_pilot_carriers[0]+d_fft_len/2; ++c) {
-        d_channel_state[c] = d_channel_state[d_pilot_carriers[0]+d_fft_len/2];
+      for (unsigned int c = 0; c < d_pilot_carriers[0]+d_fft_shift; ++c) {
+        d_channel_state[c] = d_channel_state[d_pilot_carriers[0]+d_fft_shift];
       }
-      for (unsigned int c = d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_len/2+1; c < d_fft_len; ++c) {
-        d_channel_state[c] = d_channel_state[d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_len/2];
+      for (unsigned int c = d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_shift+1; c < d_fft_len; ++c) {
+        d_channel_state[c] = d_channel_state[d_pilot_carriers[d_pilot_carriers.size()-1]+d_fft_shift];
       }
-      // Linear interpolation over the channel estimations of the OFDM carriers.
+      // Linear interpolation over the OFDM sub-carriers of the complex channel coefficients.
       for (unsigned int k = 0; k < d_pilot_carriers.size()-1; ++k) {
-        for (unsigned int c = d_pilot_carriers[k]+d_fft_len/2; c < d_pilot_carriers[k+1]+d_fft_len/2; ++c) {
+        for (unsigned int c = d_pilot_carriers[k]+d_fft_shift; c < d_pilot_carriers[k+1]+d_fft_shift; ++c) {
           for (int i = 0; i < d_n; ++i) {
             for (int j = 0; j < d_n; ++j) {
               d_channel_state[c][i][j] =
-                      d_channel_state[d_pilot_carriers[k]+d_fft_len/2][i][j] +
-                      ((gr_complex)(c-d_pilot_carriers[k]-d_fft_len/2)/(gr_complex)(d_pilot_carriers[k+1]-d_pilot_carriers[k]))*
-                              (d_channel_state[d_pilot_carriers[k+1]+d_fft_len/2][i][j] -
-                                      d_channel_state[d_pilot_carriers[k]+d_fft_len/2][i][j]);
+                      d_channel_state[d_pilot_carriers[k]+d_fft_shift][i][j] +
+                      ((gr_complex)(c-d_pilot_carriers[k]-d_fft_shift)/(gr_complex)(d_pilot_carriers[k+1]-d_pilot_carriers[k]))*
+                              (d_channel_state[d_pilot_carriers[k+1]+d_fft_shift][i][j] -
+                                      d_channel_state[d_pilot_carriers[k]+d_fft_shift][i][j]);
             }
           }
         }
@@ -165,12 +176,15 @@ namespace gr {
 
     pmt::pmt_t
     mimo_ofdm_channel_estimator_vcvc_impl::generate_csi_pmt() {
-      // Assign the channel state vector to a PMT vector. Only take the occupied carriers.
+      // Assign the channel state vector to a PMT vector. Only take the occupied carriers into account.
       pmt::pmt_t csi_pmt = pmt::make_vector(d_output_vlen, pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0])));
+      // Frequency dimension.
       for (unsigned int k = 0; k < d_output_vlen; ++k) {
         pmt::pmt_t csi_per_carrier = pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0]));
+        // TX space dimension.
         for (int i = 0; i < d_n; ++i){
           pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_n, d_channel_state[0][0][0]);
+          // RX space dimension.
           for (int j = 0; j < d_n; ++j) {
             pmt::c32vector_set(csi_line_vector, j, d_channel_state[d_occupied_carriers[k]+d_fft_len/2][i][j]);
           }
@@ -187,15 +201,21 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-
+      /* Copy occupied OFDM sub-carriers to output buffer.
+       * (Neither the zero-carriers nor the pilot carriers) */
       extract_payload_carriers(input_items, output_items, noutput_items);
 
-      for (int s = 0; s < noutput_items; ++s) { // Iterate over OFDM symbols.
-
+      // Iterate over OFDM symbols.
+      for (int s = 0; s < noutput_items; ++s) {
+        // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
         estimate_channel_state(input_items, s);
-        // We have estimated the CSI for the pilot carriers. Now, lets interpolate over all OFDM carriers.
+        /* We have estimated the CSI for the pilot carriers.
+         * Now, lets interpolate over all remaining OFDM sub-carriers. */
         interpolate_channel_state();
-        // Add tag to output item.
+        /* Now we have individual CSI for each sub-carrier of each MIMO-branch.
+         * Add tag with this CSI to the output vector.
+         * All CSI for one time step is stored in one 3-dim vector which is tagged
+         * to the output vector of the first MIMO branch. */
         add_item_tag(0, nitems_written(0) + s, pmt::string_to_symbol(std::string("csi")), generate_csi_pmt());
       }
 
