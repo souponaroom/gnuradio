@@ -32,7 +32,7 @@ import numpy
 from gnuradio import gr
 import digital_swig as digital
 from mimo_encoder_cc import mimo_encoder_cc
-from utils import tagged_streams
+from scipy.linalg import hadamard
 
 try:
     # This will work when feature #505 is added.
@@ -45,8 +45,7 @@ except ImportError:
     import blocks_swig as blocks
     import analog_swig as analog
 
-_def_m = 1
-_def_mimo_technique = 'none'
+# Default parameters.
 _def_fft_len = 64
 _def_cp_len = 16
 _def_frame_length_tag_key = "frame_length"
@@ -55,8 +54,6 @@ _def_packet_num_tag_key = "packet_num"
 # Data and pilot carriers are same as in 802.11a
 _def_occupied_carriers = (range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22, 27),)
 _def_pilot_carriers=((-21, -7, 7, 21,),)
-_def_pilot_carriers_mimo=((-26, -23, -20, -17, -14, -11, -8, -5, -2, 2, 5, 8, 11, 14, 17, 20, 23, 26,),)
-_def_occupied_carriers_mimo = ((-24, -22, -21, -19, -18, -16, -15, -13, -12, -10, -9, -7, -6, -4, -3, -1, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 21, 22, 24),)
 _pilot_sym_scramble_seq = (
         1,1,1,1, -1,-1,-1,1, -1,-1,-1,-1, 1,1,-1,1, -1,-1,1,1, -1,1,1,-1, 1,1,1,1, 1,1,-1,1,
         1,1,-1,1, 1,-1,-1,1, 1,1,-1,1, -1,-1,-1,1, -1,1,-1,-1, 1,-1,-1,1, 1,1,1,1, -1,-1,1,1,
@@ -67,16 +64,12 @@ _def_pilot_symbols= tuple([(x, x, x, -x) for x in _pilot_sym_scramble_seq])
 
 _seq_seed = 42
 
-_walsh_sequences = [
-    [1, 1, 1, 1, 1, 1, 1, 1],
-    [1,-1, 1,-1, 1,-1, 1,-1],
-    [1, 1,-1,-1, 1, 1,-1,-1],
-    [1,-1,-1, 1, 1,-1,-1, 1],
-    [1, 1, 1, 1,-1,-1,-1,-1],
-    [1,-1, 1,-1,-1, 1,-1, 1],
-    [1, 1,-1,-1,-1,-1, 1, 1],
-    [1,-1,-1, 1,-1, 1, 1,-1]
-]
+# Default parameters for MIMO-OFDM.
+_def_m = 1
+_def_mimo_technique = 'none'
+# OFDM carrier allocation.
+_def_pilot_carriers_mimo=[range(-26, 0, 3)+range(2, 27, 3), ]
+_def_occupied_carriers_mimo = [[x for x in range(-24, 25, 1) if x not in _def_pilot_carriers_mimo[0] + [0]], ]
 
 
 def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
@@ -158,11 +151,14 @@ class ofdm_tx(gr.hier_block2):
     scramble_bits: Activates the scramblers (set this to True unless debugging)
 
     """
-    def __init__(self, fft_len=_def_fft_len, cp_len=_def_cp_len,
+    def __init__(self,
+                 m=_def_m,
+                 fft_len=_def_fft_len,
+                 cp_len=_def_cp_len,
                  packet_length_tag_key=_def_packet_length_tag_key,
-                 occupied_carriers=_def_occupied_carriers_mimo,
-                 pilot_carriers=_def_pilot_carriers_mimo,
-                 pilot_symbols=_def_pilot_symbols,
+                 occupied_carriers=None,
+                 pilot_carriers=None,
+                 pilot_symbols=None,
                  bps_header=1,
                  bps_payload=1,
                  sync_word1=None,
@@ -170,33 +166,50 @@ class ofdm_tx(gr.hier_block2):
                  rolloff=0,
                  debug_log=False,
                  scramble_bits=False,
-                 m=_def_m, mimo_technique=_def_mimo_technique
-                 ):
+                 mimo_technique=_def_mimo_technique):
         gr.hier_block2.__init__(self, "ofdm_tx",
                     gr.io_signature(1, 1, gr.sizeof_char),
                     gr.io_signature(m, m, gr.sizeof_gr_complex))
-        ### Param init / sanity check ########################################
+        '''
+        Param init / sanity check
+        '''
         self.fft_len           = fft_len
         self.cp_len            = cp_len
         self.packet_length_tag_key = packet_length_tag_key
-        self.occupied_carriers = occupied_carriers
-        self.m                 = m
-        self.mimo_technique    = mimo_technique
-        self.pilot_carriers    = pilot_carriers
-        self.pilot_symbols     = pilot_symbols
         self.bps_header        = bps_header
         self.bps_payload       = bps_payload
         self.sync_word1 = sync_word1
+        self.m = m
+        self.mimo_technique = mimo_technique
+
+        # Change SISO/MIMO specific default parameters.
+        if occupied_carriers is None:
+            if self.m == 1:
+                self.occupied_carriers = _def_occupied_carriers
+            else:
+                self.occupied_carriers = _def_occupied_carriers_mimo
+        if pilot_carriers is None:
+            if self.m == 1:
+                self.pilot_carriers = _def_pilot_carriers
+            else:
+                self.pilot_carriers = _def_pilot_carriers_mimo
+        if pilot_symbols is None:
+            if self.m == 1:
+                self.pilot_symbols = _def_pilot_symbols
+            else:
+                # Generate Hadamard matrix as orthogonal pilot sequences.
+                self.pilot_symbols = hadamard(self.m)
+
         if m < 1:
             raise ValueError("A negative number of antennas (m=%d) is not valid." % m)
         if sync_word1 is None:
-            self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
+            self.sync_word1 = _make_sync_word1(fft_len, self.occupied_carriers, self.pilot_carriers)
         else:
             if len(sync_word1) != self.fft_len:
                 raise ValueError("Length of sync sequence(s) must be FFT length.")
         self.sync_words = [self.sync_word1,]
         if sync_word2 is None:
-            self.sync_word2 = _make_sync_word2(fft_len, occupied_carriers, pilot_carriers)
+            self.sync_word2 = _make_sync_word2(fft_len, self.occupied_carriers, self.pilot_carriers)
         else:
             self.sync_word2 = sync_word2
         if len(self.sync_word2):
@@ -208,12 +221,15 @@ class ofdm_tx(gr.hier_block2):
             self.scramble_seed = 0x7f
         else:
             self.scramble_seed = 0x00 # We deactivate the scrambler by init'ing it with zeros
-        ### Header modulation ################################################
+
+        '''
+        Header modulation
+        '''
         crc = digital.crc32_bb(False, self.packet_length_tag_key)
         header_constellation  = _get_constellation(bps_header)
         header_mod = digital.chunks_to_symbols_bc(header_constellation.points())
         formatter_object = digital.packet_header_ofdm(
-            occupied_carriers=occupied_carriers, n_syms=1,
+            occupied_carriers=self.occupied_carriers, n_syms=1,
             bits_per_header_sym=self.bps_header,
             bits_per_payload_sym=self.bps_payload,
             scramble_header=scramble_bits
@@ -233,7 +249,10 @@ class ofdm_tx(gr.hier_block2):
         )
         if debug_log:
             self.connect(header_gen, blocks.file_sink(1, 'tx-hdr.dat'))
-        ### Payload modulation ###############################################
+
+        '''
+        Payload modulation
+        '''
         payload_constellation = _get_constellation(bps_payload)
         payload_mod = digital.chunks_to_symbols_bc(payload_constellation.points())
         payload_scrambler = digital.additive_scrambler_bb(
@@ -256,9 +275,10 @@ class ofdm_tx(gr.hier_block2):
             payload_mod,
             (header_payload_mux, 1)
         )
-        ### Create OFDM frame ################################################
-        if self.m == 1:
-            # SISO case.
+        '''
+        Create OFDM frame
+        '''
+        if self.m == 1:  # SISO case.
             allocator = digital.ofdm_carrier_allocator_cvc(
                 self.fft_len,
                 occupied_carriers=self.occupied_carriers,
@@ -284,21 +304,22 @@ class ofdm_tx(gr.hier_block2):
             if debug_log:
                 self.connect(allocator,       blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'tx-post-allocator.dat'))
                 self.connect(cyclic_prefixer, blocks.file_sink(gr.sizeof_gr_complex,           'tx-signal.dat'))
-        else:
-            # MIMO case.
+        else:  # MIMO case.
             mimo_encoder = mimo_encoder_cc(
                 M=self.m,
                 mimo_technique=self.mimo_technique
             )
             self.connect(header_payload_mux, mimo_encoder)
             self.connect(header_payload_mux, blocks.file_sink(gr.sizeof_gr_complex, "tx_symbols.dat"))
-            #self.connect(mimo_encoder, blocks.tag_debug(gr.sizeof_gr_complex, 'MIMO encoder'))
             allocator = []
             ffter = []
             cyclic_prefixer = []
             normalize = []
             for i in range(0, self.m):
-                mimo_pilot_symbols = numpy.repeat(_walsh_sequences[i][:self.m], len(pilot_carriers[0])).reshape((self.m, len(pilot_carriers[0])))
+                mimo_pilot_symbols = numpy.repeat(self.pilot_symbols[i],
+                                                  len(self.pilot_carriers[0])).reshape(
+                    (self.m, len(self.pilot_carriers[0])))
+
                 allocator.append(
                     digital.ofdm_carrier_allocator_cvc(
                         self.fft_len,
