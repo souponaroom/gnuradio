@@ -37,30 +37,27 @@ except ImportError:
     import analog_swig as analog
 
 import numpy as np
+from scipy.linalg import hadamard
 
+''' 
+Default values for Receiver.
+'''
+# Number of receiving antennas.
 _def_n = 2
-_def_mimo_technique = 'none'
+_def_mimo_technique = 'vblast'
 _def_fft_len = 64
 _def_cp_len = 16
+_seq_seed = 42
+# Modulation order of header and payload symbols
+_def_bps_header = 1
+_def_bps_payload = 1
+# Tag keys.
 _def_frame_length_tag_key = "frame_length"
 _def_packet_length_tag_key = "packet_length"
 _def_packet_num_tag_key = "packet_num"
-# Data and pilot carriers are same as in 802.11a
-_def_occupied_carriers_mimo = ((-24, -22, -21, -19, -18, -16, -15, -13, -12, -10, -9, -7, -6, -4, -3, -1, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 21, 22, 24),)
-_def_pilot_carriers_mimo=((-26, -23, -20, -17, -14, -11, -8, -5, -2, 2, 5, 8, 11, 14, 17, 20, 23, 26,),)
-_seq_seed = 42
-
-_walsh_sequences = np.array([
-    [1, 1, 1, 1, 1, 1, 1, 1],
-    [1,-1, 1,-1, 1,-1, 1,-1],
-    [1, 1,-1,-1, 1, 1,-1,-1],
-    [1,-1,-1, 1, 1,-1,-1, 1],
-    [1, 1, 1, 1,-1,-1,-1,-1],
-    [1,-1, 1,-1,-1, 1,-1, 1],
-    [1, 1,-1,-1,-1,-1, 1, 1],
-    [1,-1,-1, 1,-1, 1, 1,-1]
-])
-
+# OFDM carrier allocation.
+_def_pilot_carriers_mimo=[range(-26, 0, 3)+range(2, 27, 3), ]
+_def_occupied_carriers_mimo = [[x for x in range(-24, 25, 1) if x not in _def_pilot_carriers_mimo[0] + [0]], ]
 
 def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
     """ Returns a list of all carriers that at some point carry data or pilots. """
@@ -70,7 +67,6 @@ def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
             carrier += fft_len
         active_carriers.append(carrier)
     return active_carriers
-
 
 def _make_sync_word1(fft_len, occupied_carriers, pilot_carriers):
     """ Creates a random sync sequence for fine frequency offset and timing
@@ -121,7 +117,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     """
     Hierarchical block for MIMO-OFDM demodulation.
 
-    The input are N complex baseband signals (e.g. from UHD sources).
+    The inputs are N complex baseband signals (e.g. from UHD sources).
     The detected packets are output as a stream of packed bits on the output.
 
     Args:
@@ -146,16 +142,19 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     |           entirely. Also used for coarse frequency offset and
     |           channel estimation.
     """
-    def __init__(self, n=_def_n, mimo_technique=_def_mimo_technique,
-                 fft_len=_def_fft_len, cp_len=_def_cp_len,
+    def __init__(self,
+                 n=_def_n,
+                 mimo_technique=_def_mimo_technique,
+                 fft_len=_def_fft_len,
+                 cp_len=_def_cp_len,
                  frame_length_tag_key=_def_frame_length_tag_key,
                  packet_length_tag_key=_def_packet_length_tag_key,
                  packet_num_tag_key=_def_packet_num_tag_key,
                  occupied_carriers=_def_occupied_carriers_mimo,
                  pilot_carriers=_def_pilot_carriers_mimo,
-                 pilot_symbols=_walsh_sequences,
-                 bps_header=1,
-                 bps_payload=1,
+                 pilot_symbols=None,
+                 bps_header=_def_bps_header,
+                 bps_payload=_def_bps_payload,
                  sync_word1=None,
                  sync_word2=None,
                  scramble_bits=False):
@@ -174,10 +173,16 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.frame_length_tag_key = frame_length_tag_key
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
-        self.pilot_carriers =pilot_carriers,
-        self.pilot_symbols = np.array(pilot_symbols)
+        self.pilot_carriers = pilot_carriers,
         self.bps_header = bps_header
         self.bps_payload = bps_payload
+
+        if pilot_symbols is None:
+            # Generate Hadamard matrix as orthogonal pilot sequences.
+            self.pilot_symbols = hadamard(_def_n)
+        else:
+            self.pilot_symbols = pilot_symbols
+
 
         if sync_word1 is None:
             self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
@@ -196,8 +201,9 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             self.scramble_seed = 0x7f
         else:
             self.scramble_seed = 0x00 # We deactivate the scrambler by init'ing it with zeros
+
         """
-        Synchronization of the superposition of the N received signals
+        Synchronization (timing sync and fractional carrier frequency sync) 
         """
         add = blocks.add_cc()
         sum_sync_detect = digital.ofdm_sync_sc_cfb(fft_len, cp_len)
@@ -207,15 +213,21 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                                                          self.cp_len,
                                                          self.sync_word1,
                                                          self.sync_word2)
+        # Factor for OFDM energy normalization.
+        rx_normalize = 1.0 / np.sqrt(self.fft_len)
         for i in range(0, self.n):
-           self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), (add, i))
-           self.connect((self, i), blocks.multiply_const_cc(1.0 / np.sqrt(self.fft_len)), blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 3+i))
+            # Add up MIMO signals to do the sync on this reference signal.
+            self.connect((self, i), blocks.multiply_const_cc(rx_normalize), (add, i))
+            self.connect((self, i), blocks.multiply_const_cc(rx_normalize),
+                        blocks.delay(gr.sizeof_gr_complex, fft_len),
+                        (mimo_sync, 3+i))
         self.connect(add, sum_sync_detect)
         self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
         self.connect((sum_sync_detect, 1), (mimo_sync, 1))  # Trigger signal.
-        self.connect(add, blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 2)) # Sum signal.
+        self.connect(add, blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 2))  # Sum signal.
+
         """
-        OFDM demod
+        OFDM demodulation
         """
         ofdm_demod = []
         for i in range(0, self.n):
@@ -236,7 +248,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         channel_est = digital.mimo_ofdm_channel_estimator_vcvc(
             n=self.n,
             fft_len=fft_len,
-            pilot_symbols=self.pilot_symbols[:self.n, :self.n],
+            pilot_symbols=self.pilot_symbols,
             pilot_carriers=pilot_carriers[0],
             occupied_carriers=self.occupied_carriers[0])
         for i in range(0, self.n):
@@ -252,9 +264,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
 
-
         """
-        Header reader
+        Header reader/parser
         """
         header_constellation = _get_constellation(bps_header)
         header_formatter = digital.packet_header_ofdm(
@@ -268,7 +279,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.connect(mimo_decoder, header_reader)
 
         """
-        Payload demod
+        Payload demodulation + CRC
         """
         payload_constellation = _get_constellation(bps_payload)
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
