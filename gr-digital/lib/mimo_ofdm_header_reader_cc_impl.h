@@ -27,30 +27,66 @@
 
 namespace gr {
   namespace digital {
+    /*! \brief Parses header and adds header tags to extracted payload stream.
+     *
+     * -Input: Synchronized and equalized sample stream with 'start' tags on the beginning of each frame.
+     * -Read and demodulate header. Parse and validate header info.
+     * -Add header info with stream tags to the beginning of each packet.
+     * -Output: Payload stream (not yet demodulated) with header tags at the beginning of each packet.
+     */
 
     class mimo_ofdm_header_reader_cc_impl : public mimo_ofdm_header_reader_cc
     {
      private:
+      //! Constellation object, defining the applied digital constellation.
       constellation_sptr d_constellation;
+      //! Dimensionality of the applied digital constellation.
       unsigned int d_dim;
+      //! Header formatter object.
       packet_header_default::sptr d_header_formatter;
-      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      //uint32_t d_symbol_counter;
+      /*! PMT stores the key of the CSI tag. */
+      static const pmt::pmt_t d_key;
+      //! Length of header in number of complex symbols.
       uint32_t d_header_length;
+      //! Payload length of packet in number of complex symbols (without header length).
       uint32_t d_packet_length;
+      //! Length of a frame in number of complex symbols (1 frame can contain multiple packets).
       uint32_t d_frame_length;
+      //! Identification number of packet (usually counting up from 0).
       uint32_t d_packet_num;
+      //! Indicates whether we are currently processing a packet.
       bool d_on_packet;
+      //! Buffer in which we write the demodulated header.
       unsigned char* d_header_data;
 
+      /*! PMT stores the key of the packet (payload) length tag. */
       pmt::pmt_t d_len_tag_key;
+      /*! PMT stores the key of the frame length tag. */
       pmt::pmt_t d_frame_len_tag_key;
+      /*! PMT stores the key of the identification number tag. */
       pmt::pmt_t d_num_tag_key;
 
+      //! Vector which stores all extracted tags from the current packet header.
       std::vector<tag_t> d_header_tags;
 
+      /*! \brief Demodulation of the header symbols.
+       * Decides for the constellation point with the minimal distance
+       * to the sample, using the Euclidean distance as a metric.
+       *
+       * @param src Input buffer with received header samples.
+       * @param dest Output buffer where the demodulated symbols are written to.
+       */
       void demod_header(const gr_complex *src, unsigned char *dest);
+
+      /*! \brief Check header for validity and parse header info.
+       *
+       * @return True if header is valid, false if not.
+       */
       bool parse_header();
+      /*! \brief Add stream tags with header info to payload stream.
+       *
+       * @param offset Position of the added tags in the output buffer.
+       */
       void add_tags(uint32_t offset);
 
      public:

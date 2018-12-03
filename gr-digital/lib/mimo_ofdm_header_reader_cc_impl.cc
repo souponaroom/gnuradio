@@ -64,12 +64,18 @@ namespace gr {
         d_frame_len_tag_key(pmt::string_to_symbol("frame_length")),
         d_num_tag_key(pmt::string_to_symbol("packet_num"))
     {
+      // Allocate space for demodulated header data.
       d_header_data = new unsigned char[header_formatter->header_len()/d_dim];
-      // Check if header_length is a multiple of the constellation dimensionality
+      // Check if header_length is a multiple of the constellation dimensionality.
       if (d_header_length % d_dim != 0){
-        throw std::invalid_argument("Header length must be a multiple of the constellation dimension.");
+        throw std::invalid_argument((format("Header length (%d) must be a multiple "
+                                                    "of the constellation dimension (%d).")
+                                     % d_header_length
+                                     % d_dim).str());
       }
+      /* Don't propagate any tags, because we add new tags (header info). */
       set_tag_propagation_policy(TPP_DONT);
+      // The input buffer must be large enough to carry at least the samples of one header.
       set_min_noutput_items(d_header_length);
     }
 
@@ -112,7 +118,7 @@ namespace gr {
           } else if (pmt::equal(header_tags[c].key, d_num_tag_key)){
             d_packet_num = pmt::to_long(header_tags[c].value);
           } else{
-            GR_LOG_INFO(d_logger, format("Unknown header tag %s")%pmt::symbol_to_string(header_tags[c].key));
+            GR_LOG_INFO(d_logger, format("Received unknown header component: %s.")%pmt::symbol_to_string(header_tags[c].key));
           }
         }
         d_header_tags = header_tags;
@@ -158,7 +164,7 @@ namespace gr {
           nconsumed = d_packet_length;
           nwritten = d_packet_length;
         }
-        // We finished this packet.
+        // We are finished with this packet.
         d_on_packet = false;
       }
       // We are not on a packet and search for the next packet.
@@ -180,7 +186,7 @@ namespace gr {
           segment_length = tags[i + 1].offset - tags[i].offset;
           // Check if the next tag arrives within this header.
           if (d_header_length > segment_length){
-            // Dump this samples.
+            // Dump these samples.
             nconsumed += segment_length;
             GR_LOG_INFO(d_logger, format("Provided segment between 'start' tags is smaller than the expected header length."));
             continue;
@@ -191,7 +197,6 @@ namespace gr {
           nconsumed += d_header_length;
           // Parse header.
           if(parse_header()){
-            //GR_LOG_DEBUG(d_logger, format("Valid segment at %d.")%tags[i].offset);
             // This header is valid.
             // Check if this packet is interrupted by a new packet.
             if (d_packet_length > segment_length-d_header_length){
