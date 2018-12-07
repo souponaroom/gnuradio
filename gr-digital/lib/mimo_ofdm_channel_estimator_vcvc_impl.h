@@ -52,10 +52,10 @@ namespace gr {
       /*! OFDM sub-carriers which are occupied with data.
        * (All not-zero and not-pilot carriers)*/
       std::vector<int> d_occupied_carriers;
+      pmt::pmt_t d_csi_key; //!< Key for the CSI stream tags.
       /*! Length of the output vector.
        * (Number of occupied carriers = FFT length - the pilot carriers and the zero carriers)*/
       uint32_t d_output_vlen;
-
       /*! 3-dimensional vector, storing the MIMO CSI from the current OFDM symbol for
        * each sub-carrier.
        * The dimensions of this vector are FFT length x N x N.
@@ -113,7 +113,8 @@ namespace gr {
                                             uint32_t fft_len,
                                             std::vector<std::vector<gr_complex> > pilot_symbols,
                                             std::vector<int> pilot_carriers,
-                                            std::vector<int> occupied_carriers);
+                                            std::vector<int> occupied_carriers,
+                                            const std::string &csi_key);
       ~mimo_ofdm_channel_estimator_vcvc_impl();
 
       // Where all the action really happens

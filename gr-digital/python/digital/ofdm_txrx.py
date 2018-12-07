@@ -353,10 +353,6 @@ class ofdm_tx(gr.hier_block2):
                              cyclic_prefixer[i],
                              normalize[i],
                              (self, i))
-                self.connect(cyclic_prefixer[i],
-                             blocks.file_sink(gr.sizeof_gr_complex, "tx_nach_cp.dat"))
-            self.connect(allocator[0], blocks.file_sink(gr.sizeof_gr_complex * fft_len, "tx_freq.dat"))
-            self.connect(ffter[0], blocks.file_sink(gr.sizeof_gr_complex * 64, "tx_time.dat"))
 
 
 class ofdm_rx(gr.hier_block2):

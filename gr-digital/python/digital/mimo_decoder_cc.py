@@ -31,7 +31,7 @@ class mimo_decoder_cc(gr.hier_block2):
     -decoder block with selected MIMO algorithm (default 'none' is no block at all)
     -1 output port
     """
-    def __init__(self, N=2, mimo_technique='none', vlen=1):
+    def __init__(self, N=2, mimo_technique='none', vlen=1, csi_key="csi"):
         gr.hier_block2.__init__(self,
             "mimo_decoder_cc",
             gr.io_signature(N, N, gr.sizeof_gr_complex*vlen),  # Input signature

@@ -33,14 +33,13 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const pmt::pmt_t mimo_ofdm_header_reader_cc_impl::d_key = pmt::string_to_symbol("start");
-
     mimo_ofdm_header_reader_cc::sptr
     mimo_ofdm_header_reader_cc::make(constellation_sptr constellation,
-                                     const gr::digital::packet_header_default::sptr &header_formatter)
+                                     const gr::digital::packet_header_default::sptr &header_formatter,
+                                     const std::string &start_key)
     {
       return gnuradio::get_initial_sptr
-        (new mimo_ofdm_header_reader_cc_impl(constellation, header_formatter));
+        (new mimo_ofdm_header_reader_cc_impl(constellation, header_formatter, start_key));
     }
 
     /*
@@ -48,7 +47,8 @@ namespace gr {
      */
     mimo_ofdm_header_reader_cc_impl::mimo_ofdm_header_reader_cc_impl(
             constellation_sptr constellation,
-            const gr::digital::packet_header_default::sptr &header_formatter)
+            const gr::digital::packet_header_default::sptr &header_formatter,
+            const std::string &start_key)
       : gr::block("mimo_ofdm_header_reader_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(gr_complex))),
@@ -56,6 +56,7 @@ namespace gr {
         d_dim(constellation->dimensionality()),
         d_header_formatter(header_formatter),
         d_header_length(header_formatter->header_len()),
+        d_start_key(pmt::string_to_symbol(start_key)),
         d_packet_length(0),
         d_frame_length(0),
         d_packet_num(0),
@@ -152,7 +153,7 @@ namespace gr {
         // We are at the beginning of the payload of the current packet, which is completely in this buffer.
         // Check if this packet is interrupted by a new packet.
         std::vector <gr::tag_t> interrupt_tags;
-        get_tags_in_window(interrupt_tags, 0, 0, d_packet_length, d_key);
+        get_tags_in_window(interrupt_tags, 0, 0, d_packet_length, d_start_key);
         if(interrupt_tags.size() > 0){
           // We get interrupted. Dump current packet to the beginning of the next packet.
           nconsumed = interrupt_tags[0].offset - nitems_read(0);
@@ -169,7 +170,7 @@ namespace gr {
       }
       // We are not on a packet and search for the next packet.
       std::vector <gr::tag_t> tags;
-      get_tags_in_window(tags, 0, nconsumed, noutput_items, d_key);
+      get_tags_in_window(tags, 0, nconsumed, noutput_items, d_start_key);
       // Dump everything until the next packet arrives.
       if(tags.size() == 0){
         // There are no tags in this buffer. Dump samples.

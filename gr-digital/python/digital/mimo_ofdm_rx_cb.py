@@ -52,6 +52,8 @@ _seq_seed = 42
 _def_bps_header = 1
 _def_bps_payload = 1
 # Tag keys.
+_def_start_key = "start"
+_def_csi_key = "csi"
 _def_frame_length_tag_key = "frame_length"
 _def_packet_length_tag_key = "packet_length"
 _def_packet_num_tag_key = "packet_num"
@@ -147,6 +149,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                  mimo_technique=_def_mimo_technique,
                  fft_len=_def_fft_len,
                  cp_len=_def_cp_len,
+                 start_key=_def_start_key,
+                 csi_key = _def_csi_key,
                  frame_length_tag_key=_def_frame_length_tag_key,
                  packet_length_tag_key=_def_packet_length_tag_key,
                  packet_num_tag_key=_def_packet_num_tag_key,
@@ -170,6 +174,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.mimo_technique = mimo_technique
         self.fft_len = fft_len
         self.cp_len = cp_len
+        self.start_key = start_key
+        self.csi_key = csi_key
         self.frame_length_tag_key = frame_length_tag_key
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
@@ -212,7 +218,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                                                          self.fft_len,
                                                          self.cp_len,
                                                          self.sync_word1,
-                                                         self.sync_word2)
+                                                         self.sync_word2,
+                                                         self.start_key)
         # Factor for OFDM energy normalization.
         rx_normalize = 1.0 / np.sqrt(self.fft_len)
         for i in range(0, self.n):
@@ -250,7 +257,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             fft_len=fft_len,
             pilot_symbols=self.pilot_symbols,
             pilot_carriers=pilot_carriers[0],
-            occupied_carriers=self.occupied_carriers[0])
+            occupied_carriers=self.occupied_carriers[0],
+            csi_key=self.csi_key)
         for i in range(0, self.n):
             self.connect((carrier_freq_corrector, i), (channel_est, i))
 
@@ -260,7 +268,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         mimo_decoder = mimo_decoder_cc(
             N=self.n,
             mimo_technique=self.mimo_technique,
-            vlen=len(self.occupied_carriers[0]))
+            vlen=len(self.occupied_carriers[0]),
+            csi_key=self.csi_key)
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
 
@@ -275,7 +284,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             packet_num_tag_key,
             bps_header, bps_payload)
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
-                                                           header_formatter.formatter())
+                                                           header_formatter.formatter(),
+                                                           self.start_key)
         self.connect(mimo_decoder, header_reader)
 
         """

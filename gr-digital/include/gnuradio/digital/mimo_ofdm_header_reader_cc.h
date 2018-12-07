@@ -50,7 +50,7 @@ namespace gr {
        * class. digital::mimo_ofdm_header_reader_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(constellation_sptr constellation, const gr::digital::packet_header_default::sptr &header_formatter);
+      static sptr make(constellation_sptr constellation, const gr::digital::packet_header_default::sptr &header_formatter, const std::string &start_key);
     };
 
   } // namespace digital

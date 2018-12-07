@@ -38,14 +38,16 @@ namespace gr {
                                            uint32_t fft_len,
                                            std::vector<std::vector<gr_complex> > pilot_symbols,
                                            std::vector<int> pilot_carriers,
-                                           std::vector<int> occupied_carriers)
+                                           std::vector<int> occupied_carriers,
+                                           const std::string &csi_key)
     {
       return gnuradio::get_initial_sptr
         (new mimo_ofdm_channel_estimator_vcvc_impl(n,
                                                    fft_len,
                                                    pilot_symbols,
                                                    pilot_carriers,
-                                                   occupied_carriers));
+                                                   occupied_carriers,
+                                                   csi_key));
     }
 
     /*
@@ -56,7 +58,8 @@ namespace gr {
             uint32_t fft_len, 
             std::vector<std::vector<gr_complex> > pilot_symbols, 
             std::vector<int> pilot_carriers,
-            std::vector<int> occupied_carriers)
+            std::vector<int> occupied_carriers,
+            const std::string &csi_key)
       : gr::block("mimo_ofdm_channel_estimator_vcvc",
               gr::io_signature::make(n, n, sizeof(gr_complex)*fft_len),
               gr::io_signature::make(n, n, sizeof(gr_complex)*occupied_carriers.size())),
@@ -66,7 +69,8 @@ namespace gr {
         d_pilot_symbols(pilot_symbols),
         d_pilot_carriers(pilot_carriers),
         d_occupied_carriers(occupied_carriers),
-        d_output_vlen(occupied_carriers.size())
+        d_output_vlen(occupied_carriers.size()),
+        d_csi_key(pmt::string_to_symbol(csi_key))
     {
       // Init CSI vector.
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
@@ -216,7 +220,7 @@ namespace gr {
          * Add tag with this CSI to the output vector.
          * All CSI for one time step is stored in one 3-dim vector which is tagged
          * to the output vector of the first MIMO branch. */
-        add_item_tag(0, nitems_written(0) + s, pmt::string_to_symbol(std::string("csi")), generate_csi_pmt());
+        add_item_tag(0, nitems_written(0) + s, d_csi_key, generate_csi_pmt());
       }
 
       // Tell runtime system how many input items we consumed on

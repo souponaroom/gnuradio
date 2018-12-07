@@ -59,6 +59,7 @@ namespace gr {
       std::vector<gr_complex> d_rec_sync_symbol1;
       std::vector<gr_complex> d_rec_sync_symbol2;
       std::vector<gr_complex> d_corr_v;
+      pmt::pmt_t d_start_key;
 
       /*! \brief Rotates the phase of a complex pointer with specified params.
        * Used to correct a fractional frequency offset in OFDM.
@@ -83,7 +84,8 @@ namespace gr {
                                         uint32_t fft_len,
                                         uint32_t cp_len,
                                         const std::vector<gr_complex> &sync_symbol1,
-                                        const std::vector<gr_complex> &sync_symbol2);
+                                        const std::vector<gr_complex> &sync_symbol2,
+                                        const std::string &start_key);
       ~mimo_ofdm_synchronizer_fbcvc_impl();
 
       // Where all the action really happens

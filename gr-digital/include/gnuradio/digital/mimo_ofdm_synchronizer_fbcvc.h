@@ -48,7 +48,10 @@ namespace gr {
        * class. digital::mimo_ofdm_synchronizer_fbcvc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t n, uint32_t fft_len, uint32_t cp_len, const std::vector<gr_complex> &sync_symbol1, const std::vector<gr_complex> &sync_symbol2);
+      static sptr make(uint16_t n, uint32_t fft_len, uint32_t cp_len, 
+                       const std::vector<gr_complex> &sync_symbol1, 
+                       const std::vector<gr_complex> &sync_symbol2,
+                       const std::string &start_key);
     };
 
   } // namespace digital

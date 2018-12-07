@@ -40,14 +40,16 @@ namespace gr {
                                        uint32_t fft_len,
                                        uint32_t cp_len,
                                        const std::vector<gr_complex> &sync_symbol1,
-                                       const std::vector<gr_complex> &sync_symbol2)
+                                       const std::vector<gr_complex> &sync_symbol2,
+                                       const std::string &start_key)
     {
       return gnuradio::get_initial_sptr
         (new mimo_ofdm_synchronizer_fbcvc_impl(n,
                                                fft_len,
                                                cp_len,
                                                sync_symbol1,
-                                               sync_symbol2));
+                                               sync_symbol2,
+                                               start_key));
     }
 
     /*
@@ -58,7 +60,8 @@ namespace gr {
             uint32_t fft_len,
             uint32_t cp_len,
             const std::vector<gr_complex> &sync_symbol1,
-            const std::vector<gr_complex> &sync_symbol2)
+            const std::vector<gr_complex> &sync_symbol2,
+            const std::string &start_key)
       : gr::block("mimo_ofdm_synchronizer_fbcvc",
               gr::io_signature::make3(3+n, 3+n, sizeof(float), sizeof(unsigned char), sizeof(gr_complex)),
               gr::io_signature::make(n, n, sizeof(gr_complex) * fft_len)),
@@ -72,7 +75,8 @@ namespace gr {
         d_carrier_freq_offset(0),
         d_first_active_carrier(0),
         d_last_active_carrier(sync_symbol2.size()-1),
-        d_corr_v(sync_symbol2)
+        d_corr_v(sync_symbol2),
+        d_start_key(pmt::string_to_symbol(start_key))
     {
       // Check if both sync symbols have the length fft_len
       if (sync_symbol1.size() != sync_symbol2.size()) {
@@ -222,7 +226,7 @@ namespace gr {
               for (int n = 0; n < d_n; ++n) {
                 add_item_tag(n,
                              nitems_written(0) + nwritten / d_fft_len,
-                             pmt::string_to_symbol("start"),
+                             d_start_key,
                              pmt::from_long(0));
               }
               d_first_data_symbol = false;

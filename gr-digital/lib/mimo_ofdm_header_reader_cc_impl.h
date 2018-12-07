@@ -44,8 +44,7 @@ namespace gr {
       unsigned int d_dim;
       //! Header formatter object.
       packet_header_default::sptr d_header_formatter;
-      /*! PMT stores the key of the CSI tag. */
-      static const pmt::pmt_t d_key;
+      pmt::pmt_t d_start_key; //!< Key of the start stream tags.
       //! Length of header in number of complex symbols.
       uint32_t d_header_length;
       //! Payload length of packet in number of complex symbols (without header length).
@@ -91,7 +90,8 @@ namespace gr {
 
      public:
       mimo_ofdm_header_reader_cc_impl(constellation_sptr constellation,
-                                      const gr::digital::packet_header_default::sptr &header_formatter);
+                                      const gr::digital::packet_header_default::sptr &header_formatter,
+                                      const std::string &start_key);
       ~mimo_ofdm_header_reader_cc_impl();
 
       // Where all the action really happens
