@@ -53,7 +53,8 @@ namespace gr {
                        std::vector<std::vector<gr_complex> > pilot_symbols, 
                        std::vector<int> pilot_carriers,
                        std::vector<int> occupied_carriers,
-                       const std::string &csi_key);
+                       const std::string &csi_key,
+                       const std::string &start_key);
     };
 
   } // namespace digital

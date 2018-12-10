@@ -53,6 +53,8 @@ namespace gr {
        * (All not-zero and not-pilot carriers)*/
       std::vector<int> d_occupied_carriers;
       pmt::pmt_t d_csi_key; //!< Key for the CSI stream tags.
+      pmt::pmt_t d_start_key; //!< Key for the CSI stream tags.
+      uint64_t d_last_tag_offset; //!< Indicates the absolute beginning of the last start tag.
       /*! Length of the output vector.
        * (Number of occupied carriers = FFT length - the pilot carriers and the zero carriers)*/
       uint32_t d_output_vlen;
@@ -79,9 +81,11 @@ namespace gr {
        *
        * @param input_items Input buffers.
        * @param reading_offset Offset, indicating where to estimate in the input buffer.
+       * @param correlation_offset Offset of the pilot sequence (cyclic shift).
        */
       void estimate_channel_state(gr_vector_const_void_star &input_items,
-                                  uint32_t reading_offset);
+                                  uint32_t reading_offset,
+                                  uint16_t correlation_offset);
 
       /*! \brief Converts channel state vector to a PMT.
        *
@@ -114,7 +118,8 @@ namespace gr {
                                             std::vector<std::vector<gr_complex> > pilot_symbols,
                                             std::vector<int> pilot_carriers,
                                             std::vector<int> occupied_carriers,
-                                            const std::string &csi_key);
+                                            const std::string &csi_key,
+                                            const std::string &start_key);
       ~mimo_ofdm_channel_estimator_vcvc_impl();
 
       // Where all the action really happens

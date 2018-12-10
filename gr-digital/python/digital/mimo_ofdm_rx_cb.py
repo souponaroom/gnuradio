@@ -258,7 +258,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             pilot_symbols=self.pilot_symbols,
             pilot_carriers=pilot_carriers[0],
             occupied_carriers=self.occupied_carriers[0],
-            csi_key=self.csi_key)
+            csi_key=self.csi_key,
+            start_key=self.start_key)
         for i in range(0, self.n):
             self.connect((carrier_freq_corrector, i), (channel_est, i))
 

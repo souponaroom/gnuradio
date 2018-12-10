@@ -39,7 +39,8 @@ namespace gr {
                                            std::vector<std::vector<gr_complex> > pilot_symbols,
                                            std::vector<int> pilot_carriers,
                                            std::vector<int> occupied_carriers,
-                                           const std::string &csi_key)
+                                           const std::string &csi_key,
+                                           const std::string &start_key)
     {
       return gnuradio::get_initial_sptr
         (new mimo_ofdm_channel_estimator_vcvc_impl(n,
@@ -47,7 +48,8 @@ namespace gr {
                                                    pilot_symbols,
                                                    pilot_carriers,
                                                    occupied_carriers,
-                                                   csi_key));
+                                                   csi_key,
+                                                   start_key));
     }
 
     /*
@@ -59,7 +61,8 @@ namespace gr {
             std::vector<std::vector<gr_complex> > pilot_symbols, 
             std::vector<int> pilot_carriers,
             std::vector<int> occupied_carriers,
-            const std::string &csi_key)
+            const std::string &csi_key,
+            const std::string &start_key)
       : gr::block("mimo_ofdm_channel_estimator_vcvc",
               gr::io_signature::make(n, n, sizeof(gr_complex)*fft_len),
               gr::io_signature::make(n, n, sizeof(gr_complex)*occupied_carriers.size())),
@@ -70,7 +73,9 @@ namespace gr {
         d_pilot_carriers(pilot_carriers),
         d_occupied_carriers(occupied_carriers),
         d_output_vlen(occupied_carriers.size()),
-        d_csi_key(pmt::string_to_symbol(csi_key))
+        d_csi_key(pmt::string_to_symbol(csi_key)),
+        d_start_key(pmt::string_to_symbol(start_key)),
+        d_last_tag_offset(0)
     {
       // Init CSI vector.
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
@@ -119,7 +124,8 @@ namespace gr {
     void
     mimo_ofdm_channel_estimator_vcvc_impl::estimate_channel_state(
             gr_vector_const_void_star &input_items,
-            uint32_t reading_offset) {
+            uint32_t reading_offset,
+            uint16_t correlation_offset) {
       // Iterate over all pilot carriers.
       for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) {
         // Iterate over N MIMO input streams.
@@ -133,7 +139,7 @@ namespace gr {
                     = correlate_pilots(&in[reading_offset*d_fft_len + d_pilot_carriers[c] + d_fft_shift],
                     d_pilot_symbols[j],
                     d_fft_len,
-                    (nitems_read(0)+reading_offset)%d_n); //TODO This only applies for the synced case. Otherwise, read 'start' tag!
+                    correlation_offset);
           }
         }
       }
@@ -209,10 +215,27 @@ namespace gr {
        * (Neither the zero-carriers nor the pilot carriers) */
       extract_payload_carriers(input_items, output_items, noutput_items);
 
+      // Read start tags to sync the pilot correlation.
+      std::vector <gr::tag_t> start_tags;
+      get_tags_in_window(start_tags, 0, 0, noutput_items, d_start_key);
+
+      uint32_t tag_offset_correction = 0;
+      if (nitems_read(0) >= d_last_tag_offset){
+                tag_offset_correction = nitems_read(0)-d_last_tag_offset;
+      }
+      uint16_t tag_index = 0;
+
       // Iterate over OFDM symbols.
       for (int s = 0; s < noutput_items; ++s) {
+        if(start_tags.size() > 0 && nitems_read(0)+s >= start_tags[tag_index].offset){
+          // Update current start offset.
+          tag_offset_correction = d_n - (s%d_n);
+          if(tag_index < start_tags.size()-1){
+            tag_index++;
+          }
+        }
         // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
-        estimate_channel_state(input_items, s);
+        estimate_channel_state(input_items, s, (s+tag_offset_correction)%d_n);
         /* We have estimated the CSI for the pilot carriers.
          * Now, lets interpolate over all remaining OFDM sub-carriers. */
         interpolate_channel_state();
@@ -221,6 +244,11 @@ namespace gr {
          * All CSI for one time step is stored in one 3-dim vector which is tagged
          * to the output vector of the first MIMO branch. */
         add_item_tag(0, nitems_written(0) + s, d_csi_key, generate_csi_pmt());
+      }
+
+      // Update last_tag_offset.
+      if (start_tags.size() > 0){
+        d_last_tag_offset = start_tags[start_tags.size()-1].offset;
       }
 
       // Tell runtime system how many input items we consumed on
