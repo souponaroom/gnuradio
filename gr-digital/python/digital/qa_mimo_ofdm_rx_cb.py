@@ -31,74 +31,156 @@ from gnuradio.digital.mimo_ofdm_rx_cb import mimo_ofdm_rx_cb
 import numpy as np
 
 class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
-
+    '''
+    4 basic loopback tests of the whole MIMO-OFDM transceiver with a
+    random channel, no noise and different kinds of frequency offsets.
+        '''
     def setUp (self):
         self.tb = gr.top_block ()
 
     def tearDown (self):
         self.tb = None
 
+    def simulate_loopback(self, data,
+                          m, n, mimo_technique,
+                          packet_len, packet_len_tag_key,
+                          fft_len, cp_len,
+                          f_off_rel):
+        channel_matrix = (np.random.randn(n, m) + 1j * np.random.randn(n, m))
 
-    def test_001_t (self):
-        # Define test params.
+        # Source.
+        src = blocks.vector_source_b(data, True, 1, ())
+        s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
+                                                         packet_len,
+                                                         packet_len_tag_key)
+        # MIMO-OFDM TX
+        tx = ofdm_tx(
+            fft_len=fft_len, cp_len=cp_len,
+            packet_length_tag_key=packet_len_tag_key,
+            bps_header=1,
+            bps_payload=1,
+            rolloff=0,
+            debug_log=False,
+            scramble_bits=False,
+            m=m, mimo_technique=mimo_technique
+        )
+        # Static channel simulation.
+        static_channel = blocks.multiply_matrix_cc(channel_matrix)
+        # Apply frequency offset.
+        const = analog.sig_source_c(fft_len, analog.GR_COS_WAVE, f_off_rel, 1.0)
+        mult1 = blocks.multiply_cc()
+        mult2 = blocks.multiply_cc()
+
+        # MIMO-OFDM RX
+        rx = mimo_ofdm_rx_cb(
+            n=n,
+            mimo_technique=mimo_technique,
+            fft_len=fft_len,
+            cp_len=cp_len,
+            packet_length_tag_key=packet_len_tag_key,
+            bps_header=1,
+            bps_payload=1
+        )
+        sink = blocks.vector_sink_b()
+
+        # Connect everything.
+        self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len * 100), s2tagged_stream, tx)
+        self.tb.connect((tx, 0), (static_channel, 0), mult1, (rx, 0))
+        self.tb.connect((tx, 1), (static_channel, 1), mult2, (rx, 1))
+        self.tb.connect(const, (mult1, 1))
+        self.tb.connect(const, (mult2, 1))
+        self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len), sink)
+        self.tb.run()
+
+        return sink.data()
+
+
+    def test_001_basic_t (self):
+        """
+        Basic test.
+        """
+        # Define test parameters.
+        f_off_rel = 0.0
         packet_len = 8
-        len_tag_key = 'packet_length'
         fft_len = 64
         cp_len = fft_len/4
-        N=2
-        M=2
-        channel_matrix = (np.random.randn(N, M) + 1j * np.random.randn(N, M))
-        for i in range(0, 1):
+        n = 2
+        m = 2
+        mimo_technique = "vblast"
+        packet_len_tag_key = "packet_length"
 
-            src = blocks.vector_source_b(range(packet_len*4), True, 1, ())
-            s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
-                                                             packet_len,
-                                                             len_tag_key)
-            tx = ofdm_tx(
-                fft_len=fft_len, cp_len=cp_len,
-                packet_length_tag_key=len_tag_key,
-                bps_header=1,
-                bps_payload=1,
-                rolloff=0,
-                debug_log=False,
-                scramble_bits=False,
-                m=M, mimo_technique="vblast"
-            )
-            static_channel = blocks.multiply_matrix_cc(channel_matrix)
-            const = analog.sig_source_c(fft_len, analog.GR_COS_WAVE, 5.0, 1.0)
-            mult1 = blocks.multiply_cc()
-            mult2 = blocks.multiply_cc()
+        data = range(packet_len)
+        result = self.simulate_loopback(data, m, n, mimo_technique,
+                                        packet_len, packet_len_tag_key,
+                                        fft_len, cp_len,
+                                        f_off_rel)
 
-            rx = mimo_ofdm_rx_cb(
-                n=N,
-                mimo_technique='vblast',
-                fft_len=fft_len,
-                cp_len=cp_len,
-                packet_length_tag_key=len_tag_key,
-                bps_header=1,
-                bps_payload=1
-            )
+        self.assertComplexTuplesAlmostEqual(data, result, 2)
 
-            sink = blocks.vector_sink_b()
+    def test_002_fract_carr_freq_off_t (self):
+        """
+        Test with fractional carrier frequency offset.
+        """
+        # Define test parameters.
+        f_off_rel = 0.5
+        packet_len = 8
+        fft_len = 64
+        cp_len = fft_len/4
+        n = 2
+        m = 2
+        mimo_technique = "vblast"
+        packet_len_tag_key = "packet_length"
 
-            self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len*100), s2tagged_stream, tx)
-            self.tb.connect((tx, 0), (static_channel, 0), mult1, (rx, 0))
-            self.tb.connect((tx, 1), (static_channel, 1), mult2, (rx, 1))
-            self.tb.connect(const, (mult1, 1))
-            self.tb.connect(const, (mult2, 1))
-            # self.tb.connect((tx, 0), chan_sink1)
-            # self.tb.connect((tx, 1), chan_sink2)
-            # self.tb.connect(chan_src1, (rx, 0))
-            # self.tb.connect(chan_src2, (rx, 1))
-            self.tb.connect(rx, blocks.head(gr.sizeof_char, (packet_len+4)*4), sink)
+        data = range(packet_len)
+        result = self.simulate_loopback(data, m, n, mimo_technique,
+                                        packet_len, packet_len_tag_key,
+                                        fft_len, cp_len,
+                                        f_off_rel)
 
-            self.tb.run ()
-            # check data
-            print 'result'
-            for i in range(0, len(sink.data()) / (packet_len+4)):
-                print sink.data()[i * (packet_len+4):(i + 1) * (packet_len+4)]
-            #self.assertComplexTuplesAlmostEqual(range(packet_len*10), sink.data(), 2)
+        self.assertComplexTuplesAlmostEqual(data, result, 2)
 
+
+    def test_003_int_carr_freq_off_t (self):
+        """
+        Test with integer carrier frequency offset.
+        """
+        # Define test parameters.
+        f_off_rel = 4.0
+        packet_len = 8
+        fft_len = 64
+        cp_len = fft_len/4
+        n = 2
+        m = 2
+        mimo_technique = "vblast"
+        packet_len_tag_key = "packet_length"
+
+        data = range(packet_len)
+        result = self.simulate_loopback(data, m, n, mimo_technique,
+                                        packet_len, packet_len_tag_key,
+                                        fft_len, cp_len,
+                                        f_off_rel)
+        self.assertComplexTuplesAlmostEqual(data, result, 2)
+
+    def test_004_arbitrary_freq_off_t (self):
+        """
+        Test with arbitrary frequency offset (int + fractional offset).
+        """
+        # Define test parameters.
+        f_off_rel = 5.3
+        packet_len = 8
+        fft_len = 64
+        cp_len = fft_len/4
+        n = 2
+        m = 2
+        mimo_technique = "vblast"
+        packet_len_tag_key = "packet_length"
+
+        data = range(packet_len)
+        result = self.simulate_loopback(data, m, n, mimo_technique,
+                                        packet_len, packet_len_tag_key,
+                                        fft_len, cp_len,
+                                        f_off_rel)
+        self.assertComplexTuplesAlmostEqual(data, result, 2)
 
 
 if __name__ == '__main__':
