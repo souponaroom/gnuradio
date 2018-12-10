@@ -32,6 +32,7 @@ import numpy
 from gnuradio import gr
 import digital_swig as digital
 from mimo_encoder_cc import mimo_encoder_cc
+from mimo_ofdm_rx_cb import mimo_ofdm_rx_cb
 from scipy.linalg import hadamard
 
 try:
@@ -378,171 +379,201 @@ class ofdm_rx(gr.hier_block2):
     |           entirely. Also used for coarse frequency offset and
     |           channel estimation.
     """
-    def __init__(self, fft_len=_def_fft_len, cp_len=_def_cp_len,
+    def __init__(self,
+                 n=1,
+                 fft_len=_def_fft_len,
+                 cp_len=_def_cp_len,
                  frame_length_tag_key=_def_frame_length_tag_key,
                  packet_length_tag_key=_def_packet_length_tag_key,
                  packet_num_tag_key=_def_packet_num_tag_key,
-                 occupied_carriers=_def_occupied_carriers,
-                 pilot_carriers=_def_pilot_carriers,
-                 pilot_symbols=_def_pilot_symbols,
+                 occupied_carriers=_def_occupied_carriers_mimo,
+                 pilot_carriers=_def_pilot_carriers_mimo,
+                 pilot_symbols=None,
                  bps_header=1,
                  bps_payload=1,
                  sync_word1=None,
                  sync_word2=None,
-                 debug_log=False,
-                 scramble_bits=False
-                 ):
+                 scramble_bits=False,
+                 mimo_technique=_def_mimo_technique,
+                 start_key="start",
+                 csi_key="csi"):
         gr.hier_block2.__init__(self, "ofdm_rx",
-                    gr.io_signature(1, 1, gr.sizeof_gr_complex),
+                    gr.io_signature(n, n, gr.sizeof_gr_complex),
                     gr.io_signature(1, 1, gr.sizeof_char))
-        ### Param init / sanity check ########################################
-        self.fft_len           = fft_len
-        self.cp_len            = cp_len
-        self.frame_length_tag_key    = frame_length_tag_key
-        self.packet_length_tag_key   = packet_length_tag_key
-        self.occupied_carriers = occupied_carriers
-        self.bps_header        = bps_header
-        self.bps_payload       = bps_payload
-        n_sync_words = 1
-        if sync_word1 is None:
-            self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
-        else:
-            if len(sync_word1) != self.fft_len:
-                raise ValueError("Length of sync sequence(s) must be FFT length.")
-            self.sync_word1 = sync_word1
-        self.sync_word2 = ()
-        if sync_word2 is None:
-            self.sync_word2 = _make_sync_word2(fft_len, occupied_carriers, pilot_carriers)
-            n_sync_words = 2
-        elif len(sync_word2):
-            if len(sync_word2) != fft_len:
-                raise ValueError("Length of sync sequence(s) must be FFT length.")
-            self.sync_word2 = sync_word2
-            n_sync_words = 2
-        if scramble_bits:
-            self.scramble_seed = 0x7f
-        else:
-            self.scramble_seed = 0x00 # We deactivate the scrambler by init'ing it with zeros
-        ### Sync ############################################################
-        sync_detect = digital.ofdm_sync_sc_cfb(fft_len, cp_len)
-        delay = blocks.delay(gr.sizeof_gr_complex, fft_len+cp_len)
-        oscillator = analog.frequency_modulator_fc(-2.0 / fft_len)
-        mixer = blocks.multiply_cc()
-        hpd = digital.header_payload_demux(
-            n_sync_words+1,       # Number of OFDM symbols before payload (sync + 1 sym header)
-            fft_len, cp_len,      # FFT length, guard interval
-            frame_length_tag_key, # Frame length tag key
-            "",                   # We're not using trigger tags
-            True                  # One output item is one OFDM symbol (False would output complex scalars)
-        )
-        self.connect(self, sync_detect)
-        self.connect(self, delay, (mixer, 0), (hpd, 0))
-        self.connect((sync_detect, 0), oscillator, (mixer, 1))
-        self.connect((sync_detect, 1), (hpd, 1))
-        if debug_log:
-            self.connect((sync_detect, 0), blocks.file_sink(gr.sizeof_float, 'freq-offset.dat'))
-            self.connect((sync_detect, 1), blocks.file_sink(gr.sizeof_char, 'sync-detect.dat'))
-        ### Header demodulation ##############################################
-        header_fft           = fft.fft_vcc(self.fft_len, True, (), True)
-        chanest              = digital.ofdm_chanest_vcvc(self.sync_word1, self.sync_word2, 1)
-        header_constellation = _get_constellation(bps_header)
-        header_equalizer     = digital.ofdm_equalizer_simpledfe(
-            fft_len,
-            header_constellation.base(),
-            occupied_carriers,
-            pilot_carriers,
-            pilot_symbols,
-            symbols_skipped=0,
-        )
-        header_eq = digital.ofdm_frame_equalizer_vcvc(
-                header_equalizer.base(),
-                cp_len,
-                self.frame_length_tag_key,
-                True,
-                1 # Header is 1 symbol long
-        )
-        header_serializer = digital.ofdm_serializer_vcc(
-                fft_len, occupied_carriers,
-                self.frame_length_tag_key
-        )
-        header_demod     = digital.constellation_decoder_cb(header_constellation.base())
-        header_formatter = digital.packet_header_ofdm(
-                occupied_carriers, 1,
-                packet_length_tag_key,
-                frame_length_tag_key,
-                packet_num_tag_key,
-                bps_header,
-                bps_payload,
-                scramble_header=scramble_bits
-        )
-        header_parser = digital.packet_headerparser_b(header_formatter.formatter())
-        self.connect(
-                (hpd, 0),
-                header_fft,
-                chanest,
-                header_eq,
-                header_serializer,
-                header_demod,
-                header_parser
-        )
-        self.msg_connect(header_parser, "header_data", hpd, "header_data")
-        if debug_log:
-            self.connect((chanest, 1),      blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'channel-estimate.dat'))
-            self.connect((chanest, 0),      blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'post-hdr-chanest.dat'))
-            self.connect((chanest, 0),      blocks.tag_debug(gr.sizeof_gr_complex * fft_len, 'post-hdr-chanest'))
-            self.connect(header_eq,         blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'post-hdr-eq.dat'))
-            self.connect(header_serializer, blocks.file_sink(gr.sizeof_gr_complex,           'post-hdr-serializer.dat'))
-            self.connect(header_descrambler, blocks.file_sink(1,                             'post-hdr-demod.dat'))
-        ### Payload demod ####################################################
-        payload_fft = fft.fft_vcc(self.fft_len, True, (), True)
-        payload_constellation = _get_constellation(bps_payload)
-        payload_equalizer = digital.ofdm_equalizer_simpledfe(
+        if n == 1:
+            # SISO
+            ### Param init / sanity check ########################################
+            self.fft_len           = fft_len
+            self.cp_len            = cp_len
+            self.frame_length_tag_key    = frame_length_tag_key
+            self.packet_length_tag_key   = packet_length_tag_key
+            self.occupied_carriers = occupied_carriers
+            self.bps_header        = bps_header
+            self.bps_payload       = bps_payload
+            n_sync_words = 1
+            if sync_word1 is None:
+                self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
+            else:
+                if len(sync_word1) != self.fft_len:
+                    raise ValueError("Length of sync sequence(s) must be FFT length.")
+                self.sync_word1 = sync_word1
+            self.sync_word2 = ()
+            if sync_word2 is None:
+                self.sync_word2 = _make_sync_word2(fft_len, occupied_carriers, pilot_carriers)
+                n_sync_words = 2
+            elif len(sync_word2):
+                if len(sync_word2) != fft_len:
+                    raise ValueError("Length of sync sequence(s) must be FFT length.")
+                self.sync_word2 = sync_word2
+                n_sync_words = 2
+            if scramble_bits:
+                self.scramble_seed = 0x7f
+            else:
+                self.scramble_seed = 0x00 # We deactivate the scrambler by init'ing it with zeros
+            ### Sync ############################################################
+            sync_detect = digital.ofdm_sync_sc_cfb(fft_len, cp_len)
+            delay = blocks.delay(gr.sizeof_gr_complex, fft_len+cp_len)
+            oscillator = analog.frequency_modulator_fc(-2.0 / fft_len)
+            mixer = blocks.multiply_cc()
+            hpd = digital.header_payload_demux(
+                n_sync_words+1,       # Number of OFDM symbols before payload (sync + 1 sym header)
+                fft_len, cp_len,      # FFT length, guard interval
+                frame_length_tag_key, # Frame length tag key
+                "",                   # We're not using trigger tags
+                True                  # One output item is one OFDM symbol (False would output complex scalars)
+            )
+            self.connect(self, sync_detect)
+            self.connect(self, delay, (mixer, 0), (hpd, 0))
+            self.connect((sync_detect, 0), oscillator, (mixer, 1))
+            self.connect((sync_detect, 1), (hpd, 1))
+            if debug_log:
+                self.connect((sync_detect, 0), blocks.file_sink(gr.sizeof_float, 'freq-offset.dat'))
+                self.connect((sync_detect, 1), blocks.file_sink(gr.sizeof_char, 'sync-detect.dat'))
+            ### Header demodulation ##############################################
+            header_fft           = fft.fft_vcc(self.fft_len, True, (), True)
+            chanest              = digital.ofdm_chanest_vcvc(self.sync_word1, self.sync_word2, 1)
+            header_constellation = _get_constellation(bps_header)
+            header_equalizer     = digital.ofdm_equalizer_simpledfe(
                 fft_len,
-                payload_constellation.base(),
+                header_constellation.base(),
                 occupied_carriers,
                 pilot_carriers,
                 pilot_symbols,
-                symbols_skipped=1, # (that was already in the header)
-                alpha=0.1
-        )
-        payload_eq = digital.ofdm_frame_equalizer_vcvc(
-                payload_equalizer.base(),
-                cp_len,
-                self.frame_length_tag_key
-        )
-        payload_serializer = digital.ofdm_serializer_vcc(
-                fft_len, occupied_carriers,
-                self.frame_length_tag_key,
-                self.packet_length_tag_key,
-                1 # Skip 1 symbol (that was already in the header)
-        )
-        payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
-        self.payload_descrambler = digital.additive_scrambler_bb(
-            0x8a,
-            self.scramble_seed,
-            7,
-            0, # Don't reset after fixed length
-            bits_per_byte=8, # This is after packing
-            reset_tag_key=self.packet_length_tag_key
-        )
-        payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
-        self.crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(
-                (hpd, 1),
-                payload_fft,
-                payload_eq,
-                payload_serializer,
-                payload_demod,
-                payload_pack,
-                self.payload_descrambler,
-                self.crc,
-                self
-        )
-        if debug_log:
-            self.connect((hpd, 1),           blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'post-hpd'))
-            self.connect(payload_fft,        blocks.file_sink(gr.sizeof_gr_complex*fft_len, 'post-payload-fft.dat'))
-            self.connect(payload_eq,         blocks.file_sink(gr.sizeof_gr_complex*fft_len, 'post-payload-eq.dat'))
-            self.connect(payload_serializer, blocks.file_sink(gr.sizeof_gr_complex,         'post-payload-serializer.dat'))
-            self.connect(payload_demod,      blocks.file_sink(1,                            'post-payload-demod.dat'))
-            self.connect(payload_pack,       blocks.file_sink(1,                            'post-payload-pack.dat'))
-            self.connect(crc,                blocks.file_sink(1,                            'post-payload-crc.dat'))
+                symbols_skipped=0,
+            )
+            header_eq = digital.ofdm_frame_equalizer_vcvc(
+                    header_equalizer.base(),
+                    cp_len,
+                    self.frame_length_tag_key,
+                    True,
+                    1 # Header is 1 symbol long
+            )
+            header_serializer = digital.ofdm_serializer_vcc(
+                    fft_len, occupied_carriers,
+                    self.frame_length_tag_key
+            )
+            header_demod     = digital.constellation_decoder_cb(header_constellation.base())
+            header_formatter = digital.packet_header_ofdm(
+                    occupied_carriers, 1,
+                    packet_length_tag_key,
+                    frame_length_tag_key,
+                    packet_num_tag_key,
+                    bps_header,
+                    bps_payload,
+                    scramble_header=scramble_bits
+            )
+            header_parser = digital.packet_headerparser_b(header_formatter.formatter())
+            self.connect(
+                    (hpd, 0),
+                    header_fft,
+                    chanest,
+                    header_eq,
+                    header_serializer,
+                    header_demod,
+                    header_parser
+            )
+            self.msg_connect(header_parser, "header_data", hpd, "header_data")
+            if debug_log:
+                self.connect((chanest, 1),      blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'channel-estimate.dat'))
+                self.connect((chanest, 0),      blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'post-hdr-chanest.dat'))
+                self.connect((chanest, 0),      blocks.tag_debug(gr.sizeof_gr_complex * fft_len, 'post-hdr-chanest'))
+                self.connect(header_eq,         blocks.file_sink(gr.sizeof_gr_complex * fft_len, 'post-hdr-eq.dat'))
+                self.connect(header_serializer, blocks.file_sink(gr.sizeof_gr_complex,           'post-hdr-serializer.dat'))
+                self.connect(header_descrambler, blocks.file_sink(1,                             'post-hdr-demod.dat'))
+            ### Payload demod ####################################################
+            payload_fft = fft.fft_vcc(self.fft_len, True, (), True)
+            payload_constellation = _get_constellation(bps_payload)
+            payload_equalizer = digital.ofdm_equalizer_simpledfe(
+                    fft_len,
+                    payload_constellation.base(),
+                    occupied_carriers,
+                    pilot_carriers,
+                    pilot_symbols,
+                    symbols_skipped=1, # (that was already in the header)
+                    alpha=0.1
+            )
+            payload_eq = digital.ofdm_frame_equalizer_vcvc(
+                    payload_equalizer.base(),
+                    cp_len,
+                    self.frame_length_tag_key
+            )
+            payload_serializer = digital.ofdm_serializer_vcc(
+                    fft_len, occupied_carriers,
+                    self.frame_length_tag_key,
+                    self.packet_length_tag_key,
+                    1 # Skip 1 symbol (that was already in the header)
+            )
+            payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
+            self.payload_descrambler = digital.additive_scrambler_bb(
+                0x8a,
+                self.scramble_seed,
+                7,
+                0, # Don't reset after fixed length
+                bits_per_byte=8, # This is after packing
+                reset_tag_key=self.packet_length_tag_key
+            )
+            payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
+            self.crc = digital.crc32_bb(True, self.packet_length_tag_key)
+            self.connect(
+                    (hpd, 1),
+                    payload_fft,
+                    payload_eq,
+                    payload_serializer,
+                    payload_demod,
+                    payload_pack,
+                    self.payload_descrambler,
+                    self.crc,
+                    self
+            )
+            if debug_log:
+                self.connect((hpd, 1),           blocks.tag_debug(gr.sizeof_gr_complex*fft_len, 'post-hpd'))
+                self.connect(payload_fft,        blocks.file_sink(gr.sizeof_gr_complex*fft_len, 'post-payload-fft.dat'))
+                self.connect(payload_eq,         blocks.file_sink(gr.sizeof_gr_complex*fft_len, 'post-payload-eq.dat'))
+                self.connect(payload_serializer, blocks.file_sink(gr.sizeof_gr_complex,         'post-payload-serializer.dat'))
+                self.connect(payload_demod,      blocks.file_sink(1,                            'post-payload-demod.dat'))
+                self.connect(payload_pack,       blocks.file_sink(1,                            'post-payload-pack.dat'))
+                self.connect(crc,                blocks.file_sink(1,                            'post-payload-crc.dat'))
+        else:
+            # MIMO
+            self.mimo_ofdm_rx = mimo_ofdm_rx_cb(
+                n=n,
+                mimo_technique=mimo_technique,
+                fft_len=fft_len,
+                cp_len=cp_len,
+                start_key=start_key,
+                csi_key=csi_key,
+                frame_length_tag_key=frame_length_tag_key,
+                packet_length_tag_key=packet_length_tag_key,
+                packet_num_tag_key=packet_num_tag_key,
+                occupied_carriers=occupied_carriers,
+                pilot_carriers=pilot_carriers,
+                pilot_symbols=pilot_symbols,
+                bps_header=bps_header,
+                bps_payload=bps_payload,
+                sync_word1=sync_word1,
+                sync_word2=sync_word2,
+                scramble_bits=scramble_bits
+            )
+            for i in range(0, n):
+                self.connect((self, i), (self.mimo_ofdm_rx, i))
+            self.connect(self.mimo_ofdm_rx, self)
