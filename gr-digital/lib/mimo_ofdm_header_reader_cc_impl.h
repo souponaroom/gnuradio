@@ -58,6 +58,8 @@ namespace gr {
       //! Buffer in which we write the demodulated header.
       unsigned char* d_header_data;
 
+      uint32_t d_remaining_packet_len;
+
       /*! PMT stores the key of the packet (payload) length tag. */
       pmt::pmt_t d_len_tag_key;
       /*! PMT stores the key of the frame length tag. */
@@ -67,6 +69,8 @@ namespace gr {
 
       //! Vector which stores all extracted tags from the current packet header.
       std::vector<tag_t> d_header_tags;
+
+      uint32_t locate_next_tag(uint32_t offset, uint32_t buffer_length);
 
       /*! \brief Demodulation of the header symbols.
        * Decides for the constellation point with the minimal distance

@@ -61,6 +61,7 @@ namespace gr {
         d_frame_length(0),
         d_packet_num(0),
         d_on_packet(false),
+        d_remaining_packet_len(0),
         d_len_tag_key(pmt::string_to_symbol("packet_length")),
         d_frame_len_tag_key(pmt::string_to_symbol("frame_length")),
         d_num_tag_key(pmt::string_to_symbol("packet_num"))
@@ -93,6 +94,22 @@ namespace gr {
       ninput_items_required[0] = noutput_items;
     }
 
+    uint32_t
+    mimo_ofdm_header_reader_cc_impl::locate_next_tag(uint32_t offset,
+                                                     uint32_t buffer_length) {
+      // Find tags in buffer.
+      std::vector <gr::tag_t> tags;
+      get_tags_in_window(tags, 0, offset, buffer_length, d_start_key);
+
+      if (tags.size() > 0){
+        // Take next tag.
+        return tags[0].offset - nitems_read(0);
+      } else {
+        // No further tags in this buffer.
+        return buffer_length;
+      }
+    }
+
     void
     mimo_ofdm_header_reader_cc_impl::demod_header(const gr_complex *src, unsigned char *dest){
       for (unsigned int j = 0; j < d_header_length / d_dim; ++j) {
@@ -119,7 +136,7 @@ namespace gr {
           } else if (pmt::equal(header_tags[c].key, d_num_tag_key)){
             d_packet_num = pmt::to_long(header_tags[c].value);
           } else{
-            GR_LOG_INFO(d_logger, format("Received unknown header component: %s.")%pmt::symbol_to_string(header_tags[c].key));
+            //GR_LOG_INFO(d_logger, format("Received unknown header component: %s.")%pmt::symbol_to_string(header_tags[c].key));
           }
         }
         d_header_tags = header_tags;
@@ -148,112 +165,77 @@ namespace gr {
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
 
-      // Check if we are currently on a packet.
+      GR_LOG_INFO(d_logger, format("Noutput items %d.")%noutput_items);
       if (d_on_packet){
-        // We are at the beginning of the payload of the current packet, which is completely in this buffer.
-        // Check if this packet is interrupted by a new packet.
-        std::vector <gr::tag_t> interrupt_tags;
-        get_tags_in_window(interrupt_tags, 0, 0, d_packet_length, d_start_key);
-        if(interrupt_tags.size() > 0){
-          // We get interrupted. Dump current packet to the beginning of the next packet.
-          nconsumed = interrupt_tags[0].offset - nitems_read(0);
-        } else {
-          // We don't get interrupted.
-          // Copy payload to output and add tags.
-          memcpy(out, in, sizeof(gr_complex) * d_packet_length);
+        GR_LOG_INFO(d_logger, format("--On packet"));
+        // We are still on the packet.
+        // Check if this is the beginning of the packet.
+        if (d_remaining_packet_len == d_packet_length){
+          GR_LOG_INFO(d_logger, format("----Set tag on %d.")%nitems_written(0));
+          // Set tags.
           add_tags(0);
-          nconsumed = d_packet_length;
-          nwritten = d_packet_length;
         }
-        // We are finished with this packet.
-        d_on_packet = false;
-      }
-      // We are not on a packet and search for the next packet.
-      std::vector <gr::tag_t> tags;
-      get_tags_in_window(tags, 0, nconsumed, noutput_items, d_start_key);
-      // Dump everything until the next packet arrives.
-      if(tags.size() == 0){
-        // There are no tags in this buffer. Dump samples.
-        nconsumed = noutput_items;
+        // Copy remaining packet.
+        if (d_remaining_packet_len < noutput_items){
+          GR_LOG_INFO(d_logger, format("----Remaining packet in buffer."));
+          // Remaining packet is within this buffer.
+          // Copy remaining packet.
+          memcpy(out, in, sizeof(gr_complex) * d_remaining_packet_len);
+          nconsumed = d_remaining_packet_len;
+          nwritten = d_remaining_packet_len;
+          d_remaining_packet_len = 0;
+          d_on_packet = false;
+
+        } else {
+          GR_LOG_INFO(d_logger, format("----Packet exceeds buffer."));
+          // The remaining packet length exceeds the current buffer.
+          // Copy whole buffer.
+          memcpy(out, in, sizeof(gr_complex) * noutput_items);
+          nconsumed = noutput_items;
+          nwritten = noutput_items;
+          d_remaining_packet_len -= noutput_items;
+        }
       } else {
-        // There are tags in this buffer. Dump samples before the first tag.
-        nconsumed = tags[0].offset - nitems_read(0);
-      }
-      // Iterate over tags.
-      uint32_t segment_length;
-      for (unsigned int i = 0; i < tags.size(); ++i){
-        if (i < tags.size() - 1) {
-          // This is not the last tag.
-          segment_length = tags[i + 1].offset - tags[i].offset;
-          // Check if the next tag arrives within this header.
-          if (d_header_length > segment_length){
-            // Dump these samples.
-            nconsumed += segment_length;
-            GR_LOG_INFO(d_logger, format("Provided segment between 'start' tags is smaller than the expected header length."));
-            continue;
-          }
-          // Demodulate header.
-          demod_header(&in[nconsumed], d_header_data);
-          // Consume header.
-          nconsumed += d_header_length;
-          // Parse header.
-          if(parse_header()){
-            // This header is valid.
-            // Check if this packet is interrupted by a new packet.
-            if (d_packet_length > segment_length-d_header_length){
-              // We get interrupted. Dump current packet to the beginning of the next packet.
-              GR_LOG_INFO(d_logger, format("A packet of length %d gets interrupted by a new 'start' tag.")%d_packet_length);
-              nconsumed += segment_length-d_header_length;
-            } else{
-              // We don't get interrupted.
-              // Copy payload to output and add tags.
-              memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex) * d_packet_length);
-              add_tags(nwritten);
-              nconsumed += segment_length-d_header_length;
-              nwritten += d_packet_length;
-            }
+        GR_LOG_INFO(d_logger, format("--Not on packet."));
+        // We are not on a packet.
+        // Find next 'start' tag in buffer.
+        uint32_t next_start_pos;
+        next_start_pos = locate_next_tag(0, noutput_items);
+        if (next_start_pos < noutput_items){
+          GR_LOG_INFO(d_logger, format("----Found start tag at %d + %d.")%nitems_read(0) %next_start_pos);
+          // The next start tag is within this buffer.
+          // Dump samples until this next tag.
+          nconsumed = next_start_pos;
+          if (noutput_items-next_start_pos < d_header_length){
+            GR_LOG_INFO(d_logger, format("----Header exceeds buffer."));
+            // The remaining buffer size is smaller than the header length.
+            // Process header in the next work() call where the whole header is available.
           } else {
-            // This header is invalid.
-            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
-            // Dump the segment.
-            nconsumed += segment_length-d_header_length;
+            GR_LOG_INFO(d_logger, format("----Read header."));
+            // The whole header is in this buffer.
+            // Demodulate header.
+            demod_header(&in[nconsumed], d_header_data);
+            // Consume header.
+            nconsumed += d_header_length;
+            // Parse header.
+            if (parse_header()) {
+              GR_LOG_INFO(d_logger, format("------Valid header at %d.") %
+                                    (nitems_read(0) + nconsumed - d_header_length));
+              // This header is valid.
+              d_on_packet = true;
+              d_remaining_packet_len = d_packet_length;
+            } else {
+              // This header is invalid.
+              GR_LOG_INFO(d_logger, format("------Invalid header at %d.") %
+                                    (nitems_read(0) + nconsumed - d_header_length));
+              // Dump the segment.
+              d_on_packet = false;
+            }
           }
         } else {
-          // This is the last tag.
-          segment_length = noutput_items - nconsumed;
-          // Check if there are header_length samples left in the input buffer.
-          if (d_header_length > segment_length) {
-            // Process header in the next work() call where the whole packet is available.
-            set_min_noutput_items(d_header_length);
-            break;
-          }
-          // Demodulate header.
-          demod_header(&in[nconsumed], d_header_data);
-          // Consume header.
-          nconsumed += d_header_length;
-          // Parse header.
-          if(parse_header()){
-            // This header is valid.
-            // Check if there are packet_length samples left in the input buffer.
-            if (d_packet_length > segment_length-d_header_length){
-              // Process packet in the next work() call where the whole packet is available.
-              d_on_packet = true;
-              set_min_noutput_items(d_packet_length);
-            } else{
-              // Copy payload to output and add tags.
-              memcpy(&out[nwritten], &in[nconsumed], sizeof(gr_complex) * d_packet_length);
-              add_tags(nwritten);
-              nconsumed += segment_length-d_header_length;
-              nwritten += d_packet_length;
-              // Reset min_noutput_items to default for this block.
-              set_min_noutput_items(d_header_length);
-            }
-          } else{
-            // This header is invalid.
-            GR_LOG_INFO(d_logger, format("Invalid header at %d.") %(nitems_read(0)+nconsumed-d_header_length));
-            // Dump the segment.
-            nconsumed += segment_length-d_header_length;
-          }
+          // There are no start tags in this buffer.
+          // Drop samples.
+          nconsumed = noutput_items;
         }
       }
 
