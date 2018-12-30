@@ -39,6 +39,8 @@ namespace gr {
       /*! State variable for the synchronizer state machine. True means, that
        * we found the beginning of a frame and are currently processing it.*/
       bool d_on_frame;
+      bool d_sync_read;
+      uint32_t d_packet_id;
       /*! Indicates first data symbol of frame (after sync symbols).
        * This is where we set a 'start' tag. */
       bool d_first_data_symbol;
@@ -61,6 +63,8 @@ namespace gr {
       std::vector<gr_complex> d_corr_v;
       pmt::pmt_t d_start_key;
 
+      uint32_t find_trigger(const unsigned char *trigger, uint32_t start, uint32_t end);
+
       /*! \brief Rotates the phase of a complex pointer with specified params.
        * Used to correct a fractional frequency offset in OFDM.
        *
@@ -68,6 +72,12 @@ namespace gr {
        * @param rotation_length Number of samples to rotate over.
        */
       void rotate_phase(const float *fine_freq_off, uint16_t rotation_length);
+
+      void extract_symbols(gr_vector_const_void_star &input_items,
+                           uint32_t input_offset,
+                           gr_vector_void_star &output_items,
+                           uint32_t output_offset,
+                           uint32_t num_symbols);
 
       /*! \brief Calculate the coarse frequency offset in number of carriers.
        * @param sync_sym1 Received synchronization symbol 1 with

@@ -165,7 +165,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         gr.hier_block2.__init__(self,
             "mimo_ofdm_rx_cb",
             gr.io_signature(n, n, gr.sizeof_gr_complex),  # Input signature
-            gr.io_signature(1, 1, gr.sizeof_char)) # Output signature
+            gr.io_signature(1, 1, gr.sizeof_gr_complex)) # Output signature
 
         """
         Parameter initalization
@@ -183,11 +183,18 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.bps_header = bps_header
         self.bps_payload = bps_payload
 
+        # Change SISO/MIMO specific default parameters.
+        if occupied_carriers is None:
+            self.occupied_carriers = _def_occupied_carriers_mimo
+        if pilot_carriers is None:
+            self.pilot_carriers = _def_pilot_carriers_mimo
+
         if pilot_symbols is None:
             # Generate Hadamard matrix as orthogonal pilot sequences.
             self.pilot_symbols = hadamard(_def_n)
         else:
             self.pilot_symbols = pilot_symbols
+
 
 
         if sync_word1 is None:
@@ -222,16 +229,30 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                                                          self.start_key)
         # Factor for OFDM energy normalization.
         rx_normalize = 1.0 / np.sqrt(self.fft_len)
+        symbol_len = fft_len + cp_len
+        manual_adjusting_factor = 4
         for i in range(0, self.n):
-            # Add up MIMO signals to do the sync on this reference signal.
+            # Add up MIMO signals to do the sync on this reference signal. #TODO delays set properly???
             self.connect((self, i), blocks.multiply_const_cc(rx_normalize), (add, i))
             self.connect((self, i), blocks.multiply_const_cc(rx_normalize),
-                        blocks.delay(gr.sizeof_gr_complex, fft_len),
+                        blocks.delay(gr.sizeof_gr_complex, symbol_len),
                         (mimo_sync, 3+i))
         self.connect(add, sum_sync_detect)
         self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
-        self.connect((sum_sync_detect, 1), (mimo_sync, 1))  # Trigger signal.
-        self.connect(add, blocks.delay(gr.sizeof_gr_complex, fft_len), (mimo_sync, 2))  # Sum signal.
+        self.connect((sum_sync_detect, 1), blocks.delay(gr.sizeof_char, manual_adjusting_factor), (mimo_sync, 1))  # Trigger signal.
+        self.connect(add, blocks.delay(gr.sizeof_gr_complex, symbol_len), (mimo_sync, 2))  # Sum signal.
+
+        # TODO remove
+        # rm_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, 16)
+        # rm_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, 16)
+        # s2v1 = blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len)
+        # s2v2 = blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len)
+        # rm_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
+        # rm_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
+        # add_tag1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, 2, "start")
+        # add_tag2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, 2, "start")
+        # self.connect((self, 0), rm_cp1, s2v1, rm_sync1, add_tag1)
+        # self.connect((self, 1), rm_cp2, s2v2, rm_sync2, add_tag2)
 
         """
         OFDM demodulation
@@ -240,6 +261,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         for i in range(0, self.n):
             ofdm_demod.append(fft.fft_vcc(self.fft_len, True, (), True))
             self.connect((mimo_sync, i), ofdm_demod[i])
+        # self.connect(add_tag1, ofdm_demod[0])
+        # self.connect(add_tag2, ofdm_demod[1])
 
         """
         Carrier frequency correction
@@ -287,7 +310,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter(),
                                                            self.start_key)
-        self.connect(mimo_decoder, header_reader)
+        #self.connect(mimo_decoder, header_reader)
 
         """
         Payload demodulation + CRC
@@ -296,4 +319,5 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(header_reader, payload_demod, payload_pack, crc, self)
+        #self.connect(header_reader, payload_demod, payload_pack, self) #TODO insert crc
+        self.connect(mimo_decoder, self)

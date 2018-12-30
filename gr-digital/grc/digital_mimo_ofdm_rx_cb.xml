@@ -181,7 +181,7 @@
   </sink>
   <source>
     <name>out</name>
-    <type>byte</type>
+    <type>complex</type>
   </source>
 </block>
 

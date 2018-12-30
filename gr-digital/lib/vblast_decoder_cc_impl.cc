@@ -258,7 +258,7 @@ namespace gr {
         add_item_tag(0,
                      (length_tags[i].offset)*(d_num_inputs*d_vlen),
                      length_tags[i].key,
-                     pmt::from_long(0));
+                     length_tags[i].value);
       }
 
       // Tell runtime system how many output items we produced.
