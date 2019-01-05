@@ -165,7 +165,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         gr.hier_block2.__init__(self,
             "mimo_ofdm_rx_cb",
             gr.io_signature(n, n, gr.sizeof_gr_complex),  # Input signature
-            gr.io_signature(1, 1, gr.sizeof_gr_complex)) # Output signature
+            gr.io_signature2(2, 2, gr.sizeof_char, gr.sizeof_gr_complex))  # Output signature
 
         """
         Parameter initalization
@@ -310,7 +310,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter(),
                                                            self.start_key)
-        #self.connect(mimo_decoder, header_reader)
+        self.connect(mimo_decoder, header_reader)
 
         """
         Payload demodulation + CRC
@@ -319,5 +319,5 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        #self.connect(header_reader, payload_demod, payload_pack, self) #TODO insert crc
-        self.connect(mimo_decoder, self)
+        self.connect(header_reader, payload_demod, payload_pack, crc, self)
+        self.connect(mimo_decoder, (self, 1))

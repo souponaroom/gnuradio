@@ -184,12 +184,13 @@ namespace gr {
       for (unsigned int j = 0; j < num_symbols; ++j) {
         // Rotate phase over cp.
         rotate_phase(&fine_freq_off[input_offset + j * d_symbol_len], d_cp_len);
+        GR_LOG_INFO(d_logger, format("$$$$ freq off = %d")%fine_freq_off[input_offset]);
         // Copy symbol.
         for (unsigned int i = 0; i < d_fft_len; ++i) {
           for (int n = 0; n < d_n; ++n) {
             ((gr_complex *) output_items[n])[output_offset + j * d_fft_len + i] =
-                    ((const gr_complex *) input_items[3 + n])[input_offset + j * d_symbol_len + d_cp_len + i];
-                    //* std::polar((float) 1.0, -d_phase); TODO enable fine freq correction
+                    ((const gr_complex *) input_items[3 + n])[input_offset + j * d_symbol_len + d_cp_len + i] *
+                    std::polar((float) 1.0, -d_phase);
           }
           // Rotate phase for fractional frequency correction.
           rotate_phase(&fine_freq_off[input_offset + j * d_symbol_len + d_cp_len * i], 1);
@@ -198,14 +199,40 @@ namespace gr {
     }
 
     int
-    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(const gr_complex *sync_sym1_fft,
-                                                       const gr_complex *sync_sym2_fft)
+    mimo_ofdm_synchronizer_fbcvc_impl::get_carr_offset(gr_vector_const_void_star &input_items,
+                                                       uint32_t input_offset)
     {
+      const gr_complex *ref_sig = (const gr_complex *) input_items[2];
+      const float *fine_freq_off = (const float *) input_items[0];
+      // Calculate FFT of the (fine frequency corrected) sync symbol 1.
+      for (unsigned int i = 0; i < d_fft_len; ++i) {
+        d_fft->get_inbuf()[i] = ref_sig[i]*std::polar((float)1.0, -d_phase);
+        // Rotate phase for fractional frequency correction.
+        rotate_phase(&fine_freq_off[i], 1);
+      }
+      d_fft->execute();
+      // Save FFT vector to array.
+      gr_complex sync_sym1_fft[d_fft_len];
+      memcpy(sync_sym1_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+
+      // Rotate CP between the sync symbols.
+      rotate_phase(&fine_freq_off[d_fft_len], d_cp_len); // TODO not necessary?
+
+      // Calculate FFT of the (fine frequency corrected) sync symbol 2.
+      for (unsigned int i = 0; i < d_fft_len; ++i) {
+        d_fft->get_inbuf()[i] = ref_sig[i+d_symbol_len]*std::polar((float)1.0, -d_phase);
+        // Rotate phase for fractional frequency correction.
+        rotate_phase(&fine_freq_off[i+d_symbol_len], 1);
+      }
+      d_fft->execute();
+      // Save FFT vector to array.
+      gr_complex sync_sym2_fft[d_fft_len];
+      memcpy(sync_sym2_fft, d_fft->get_outbuf(), d_fft_len*sizeof(gr_complex));
+
       int carr_offset = 0;
       // Use method of Schmidl and Cox: "Robust Frequency and Timing Synchronization for OFDM."
       float Bg_max = 0;
       // g here is 2g in the paper.
-
       for (int g = d_max_neg_carr_offset; g <= d_max_pos_carr_offset; g += 2) {
         gr_complex tmp = gr_complex(0, 0);
         for (unsigned int k = 0; k < d_fft_len; k++) {
@@ -251,23 +278,25 @@ namespace gr {
           // Process symbols of the current frame.
           uint32_t num_syms = (trigger_pos+d_cp_len)/d_symbol_len; // The flooring is included in the implicit integer cast.
           //todo check if symbol_len*num_syms is in input buffer
-          //extract_symbols(input_items, 0, output_items, 0, num_syms); TODO enable
+          extract_symbols(input_items, 0, output_items, 0, num_syms);
           // TODO disable this
-          const gr_complex *in1 = (const gr_complex *) input_items[3];
-          const gr_complex *in2 = (const gr_complex *) input_items[4];
-          gr_complex *out1 = (gr_complex*)output_items[0];
-          gr_complex *out2 = (gr_complex*)output_items[1];
-          GR_LOG_INFO(d_logger, format("---- Write %d syms at %d (packet %d)")%num_syms %(nitems_written(0)) %(d_packet_id));
-          for (int i = 0; i < num_syms; ++i) {
-            GR_LOG_INFO(d_logger, format("------ Read at %d")%(1.0*(nitems_read(0)+i*d_symbol_len)/d_symbol_len));
-            memcpy(&out1[i*d_fft_len], &in1[d_cp_len+i*d_symbol_len], sizeof(gr_complex)*d_fft_len);
-            memcpy(&out2[i*d_fft_len], &in2[d_cp_len+i*d_symbol_len], sizeof(gr_complex)*d_fft_len);
-          }
+//          const gr_complex *in1 = (const gr_complex *) input_items[3];
+//          const gr_complex *in2 = (const gr_complex *) input_items[4];
+//          gr_complex *out1 = (gr_complex*)output_items[0];
+//          gr_complex *out2 = (gr_complex*)output_items[1];
+//          GR_LOG_INFO(d_logger, format("---- Write %d syms at %d (packet %d)")%num_syms %(nitems_written(0)) %(d_packet_id));
+//          for (int i = 0; i < num_syms; ++i) {
+//            GR_LOG_INFO(d_logger, format("------ Read at %d")%(1.0*(nitems_read(0)+i*d_symbol_len)/d_symbol_len));
+//            memcpy(&out1[i*d_fft_len], &in1[d_cp_len+i*d_symbol_len], sizeof(gr_complex)*d_fft_len);
+//            memcpy(&out2[i*d_fft_len], &in2[d_cp_len+i*d_symbol_len], sizeof(gr_complex)*d_fft_len);
+//          }
 
           // Set start tag if it is the first data symbol.
           if(d_first_data_symbol) {
             for (int n = 0; n < d_n; ++n) {
-              add_item_tag(n, nitems_written(0) + 0, d_start_key, pmt::from_long(noutput_samples));
+              add_item_tag(n, nitems_written(0) + 0, d_start_key, pmt::from_long(trigger_pos));
+              add_item_tag(n, nitems_written(0) + 0, pmt::string_to_symbol("carrier_freq_offset"),
+                             pmt::from_long(d_carrier_freq_offset));
             }
             d_first_data_symbol = false;
           }
@@ -289,7 +318,9 @@ namespace gr {
           // We are at the beginning of the frame.
           GR_LOG_INFO(d_logger, format("---- Read sync syms"));
           // Read sync symbols first.
-          // TODO est freq (carr+int) offset by methods
+          // Estimate integer carrier frequency offset.
+          d_carrier_freq_offset = get_carr_offset(input_items, 0);
+          GR_LOG_INFO(d_logger, format("###### Carrier offset = %d")%d_carrier_freq_offset);
           nconsumed = 2*d_symbol_len;
           d_sync_read = true;
           d_first_data_symbol = true;

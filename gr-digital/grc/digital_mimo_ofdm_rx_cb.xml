@@ -181,6 +181,10 @@
   </sink>
   <source>
     <name>out</name>
+    <type>byte</type>
+  </source>
+  <source>
+    <name>out_debug</name>
     <type>complex</type>
   </source>
 </block>

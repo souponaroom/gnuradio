@@ -86,8 +86,8 @@ namespace gr {
        * corrected fractional frequency offset in time domain.
        * @return Carrier frequency offset. (even integer; can be negative!)
        */
-      int get_carr_offset(const gr_complex *sync_sym1,
-                          const gr_complex *sync_sym2);
+      int get_carr_offset(gr_vector_const_void_star &input_items,
+                          uint32_t input_offset);
 
      public:
       mimo_ofdm_synchronizer_fbcvc_impl(uint16_t n,
