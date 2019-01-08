@@ -230,7 +230,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         # Factor for OFDM energy normalization.
         rx_normalize = 1.0 / np.sqrt(self.fft_len)
         symbol_len = fft_len + cp_len
-        manual_adjusting_factor = 4
+        manual_adjusting_factor = 3 + cp_len
         for i in range(0, self.n):
             # Add up MIMO signals to do the sync on this reference signal. #TODO delays set properly???
             self.connect((self, i), blocks.multiply_const_cc(rx_normalize), (add, i))

@@ -230,12 +230,14 @@ namespace gr {
         if(start_tags.size() > 0 && nitems_read(0)+s >= start_tags[tag_index].offset){
           // Update current start offset.
           tag_offset_correction = d_n - (s%d_n);
+          GR_LOG_INFO(d_logger, format("Symbol %d, Tag correction %d ")%(nitems_written(0)+s)%((s+tag_offset_correction)%d_n));
           if(tag_index < start_tags.size()-1){
             tag_index++;
           }
         }
         // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
         estimate_channel_state(input_items, s, (s+tag_offset_correction)%d_n);
+        GR_LOG_INFO(d_logger, format("Symbol %d = %d")%(nitems_written(0)+s) %d_channel_state[d_pilot_carriers[0]+d_fft_shift][0][0]);
         /* We have estimated the CSI for the pilot carriers.
          * Now, lets interpolate over all remaining OFDM sub-carriers. */
         interpolate_channel_state();

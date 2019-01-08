@@ -39,14 +39,14 @@ namespace gr {
       /*! State variable for the synchronizer state machine. True means, that
        * we found the beginning of a frame and are currently processing it.*/
       bool d_on_frame;
+      /*! State variable indicating if the sync symbols at the beginning of
+       * the frame were already processed.*/
       bool d_sync_read;
-      uint32_t d_packet_id;
       /*! Indicates first data symbol of frame (after sync symbols).
        * This is where we set a 'start' tag. */
       bool d_first_data_symbol;
       float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
       int d_carrier_freq_offset; /*!< Estimated carrier frequency offset. */
-
       /*! The index of the first carrier with data.
        *  (index 0 is not DC here, but the lowest frequency) */
       int d_first_active_carrier;
@@ -73,6 +73,15 @@ namespace gr {
        */
       void rotate_phase(const float *fine_freq_off, uint16_t rotation_length);
 
+      /*! \brief Extracts the data OFDM symbols of the input stream.
+       * The sync symbols are dumped and the cyclic prefix.
+       *
+       * @param input_items Pointer to input buffers.
+       * @param input_offset Reading offset.
+       * @param output_items Pointer to output buffers.
+       * @param output_offset Writing offset.
+       * @param num_symbols Number of OFDM symbols to process.
+       */
       void extract_symbols(gr_vector_const_void_star &input_items,
                            uint32_t input_offset,
                            gr_vector_void_star &output_items,
