@@ -28,6 +28,15 @@
 
 namespace gr {
   namespace digital {
+    /*! \brief MIMO-OFDM synchronization for frame, timing, fractional and integer frequency carrier offset.
+     * The following steps are applied:
+     * - Trigger channel indicates the start of a frame.
+     * - Frequency channel indicates fractional frequency carrier offset.
+     * - Read Schmidl & Cox synchronization symbols and estimate frequency carrier offset.
+     *   (Estimated offset is tagged to stream)
+     * - Copy (fractional carrier frequency corrected) data OFDM symbols to output.
+     *   (Start of frame is tagged)
+     */
 
     class mimo_ofdm_synchronizer_fbcvc_impl : public mimo_ofdm_synchronizer_fbcvc
     {
