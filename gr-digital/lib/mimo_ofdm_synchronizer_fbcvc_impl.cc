@@ -285,7 +285,7 @@ namespace gr {
           // Check if we arrived at the end of the frame.
           if (trigger_pos < noutput_samples){
             // Detected start of new symbol.
-            nconsumed = 160;//trigger_pos; // TODO remove
+            nconsumed = trigger_pos; // TODO remove
           } else {
             // Frame continues with the next buffer.
             nconsumed = num_syms*d_symbol_len;
@@ -293,6 +293,7 @@ namespace gr {
         } else {
           // We are at the beginning of the frame (--> 2 sync symbols).
           // Read sync symbols and estimate integer carrier frequency offset.
+          //d_phase = 0.0;
           d_carrier_freq_offset = get_carr_offset(input_items, 0);
           nconsumed = 2*d_symbol_len;
           d_sync_read = true;

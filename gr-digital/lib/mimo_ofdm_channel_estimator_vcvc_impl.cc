@@ -217,7 +217,7 @@ namespace gr {
 
       // Read start tags to sync the pilot correlation.
       std::vector <gr::tag_t> start_tags;
-      get_tags_in_window(start_tags, 0, 0, noutput_items, d_start_key);
+      get_tags_in_window(start_tags, 0, 0, noutput_items+d_n-1, d_start_key);
 
       uint32_t tag_offset_correction = 0;
       if (nitems_read(0) >= d_last_tag_offset){
@@ -230,17 +230,24 @@ namespace gr {
         if(start_tags.size() > 0 && nitems_read(0)+s >= start_tags[tag_index].offset){
           // Update current start offset.
           tag_offset_correction = d_n - (s%d_n);
-          GR_LOG_INFO(d_logger, format("Symbol %d, Tag correction %d ")%(nitems_written(0)+s)%((s+tag_offset_correction)%d_n));
           if(tag_index < start_tags.size()-1){
             tag_index++;
           }
+          GR_LOG_INFO(d_logger, format("New tag at %d")%start_tags[tag_index].offset);
         }
-        // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
-        estimate_channel_state(input_items, s, (s+tag_offset_correction)%d_n);
-        GR_LOG_INFO(d_logger, format("Symbol %d = %d")%(nitems_written(0)+s) %d_channel_state[d_pilot_carriers[0]+d_fft_shift][0][0]);
-        /* We have estimated the CSI for the pilot carriers.
-         * Now, lets interpolate over all remaining OFDM sub-carriers. */
-        interpolate_channel_state();
+        // Experimental feature todo generalize to sequences of length > 2
+        if(start_tags.size() > 0 && nitems_read(0)+s+1 == start_tags[tag_index].offset){
+          GR_LOG_INFO(d_logger, format("Last item of symbol at %d")%(nitems_read(0)+s+1));
+          // This is the last symbol of the frame.
+          // Use old estimation.
+        } else {
+          // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
+          estimate_channel_state(input_items, s, (s + tag_offset_correction) % d_n);
+          /* We have estimated the CSI for the pilot carriers.
+           * Now, lets interpolate over all remaining OFDM sub-carriers. */
+          interpolate_channel_state();
+        }
+        //GR_LOG_INFO(d_logger, format("Symbol %d = %d")%(nitems_written(0)+s) %d_channel_state[d_pilot_carriers[0]+d_fft_shift][0][0]);
         /* Now we have individual CSI for each sub-carrier of each MIMO-branch.
          * Add tag with this CSI to the output vector.
          * All CSI for one time step is stored in one 3-dim vector which is tagged

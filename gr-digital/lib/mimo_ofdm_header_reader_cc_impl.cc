@@ -165,19 +165,15 @@ namespace gr {
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
 
-      GR_LOG_INFO(d_logger, format("Noutput items %d.")%noutput_items);
       if (d_on_packet){
-        GR_LOG_INFO(d_logger, format("--On packet"));
         // We are still on the packet.
         // Check if this is the beginning of the packet.
         if (d_remaining_packet_len == d_packet_length){
-          GR_LOG_INFO(d_logger, format("----Set tag on %d.")%nitems_written(0));
           // Set tags.
           add_tags(0);
         }
         // Copy remaining packet.
         if (d_remaining_packet_len < noutput_items){
-          GR_LOG_INFO(d_logger, format("----Remaining packet in buffer."));
           // Remaining packet is within this buffer.
           // Copy remaining packet.
           memcpy(out, in, sizeof(gr_complex) * d_remaining_packet_len);
@@ -187,7 +183,6 @@ namespace gr {
           d_on_packet = false;
 
         } else {
-          GR_LOG_INFO(d_logger, format("----Packet exceeds buffer."));
           // The remaining packet length exceeds the current buffer.
           // Copy whole buffer.
           memcpy(out, in, sizeof(gr_complex) * noutput_items);
@@ -196,22 +191,18 @@ namespace gr {
           d_remaining_packet_len -= noutput_items;
         }
       } else {
-        GR_LOG_INFO(d_logger, format("--Not on packet."));
         // We are not on a packet.
         // Find next 'start' tag in buffer.
         uint32_t next_start_pos;
         next_start_pos = locate_next_tag(0, noutput_items);
         if (next_start_pos < noutput_items){
-          GR_LOG_INFO(d_logger, format("----Found start tag at %d + %d.")%nitems_read(0) %next_start_pos);
           // The next start tag is within this buffer.
           // Dump samples until this next tag.
           nconsumed = next_start_pos;
           if (noutput_items-next_start_pos < d_header_length){
-            GR_LOG_INFO(d_logger, format("----Header exceeds buffer."));
             // The remaining buffer size is smaller than the header length.
             // Process header in the next work() call where the whole header is available.
           } else {
-            GR_LOG_INFO(d_logger, format("----Read header."));
             // The whole header is in this buffer.
             // Demodulate header.
             demod_header(&in[nconsumed], d_header_data);
@@ -219,15 +210,13 @@ namespace gr {
             nconsumed += d_header_length;
             // Parse header.
             if (parse_header()) {
-              GR_LOG_INFO(d_logger, format("------Valid header at %d.") %
-                                    (nitems_read(0) + nconsumed - d_header_length));
               // This header is valid.
               d_on_packet = true;
               d_remaining_packet_len = d_packet_length;
             } else {
               // This header is invalid.
-              GR_LOG_INFO(d_logger, format("------Invalid header at %d.") %
-                                    (nitems_read(0) + nconsumed - d_header_length));
+//              GR_LOG_INFO(d_logger, format("------Invalid header at %d.") %
+//                                    (nitems_read(0) + nconsumed - d_header_length));
               // Dump the segment.
               d_on_packet = false;
             }
