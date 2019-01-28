@@ -71,7 +71,7 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
         # MIMO-OFDM RX
         rx = mimo_ofdm_rx_cb(
-            n=n,
+            m=m, n=n,
             mimo_technique=mimo_technique,
             fft_len=fft_len,
             cp_len=cp_len,
@@ -115,7 +115,6 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
                                         packet_len, packet_len_tag_key,
                                         fft_len, cp_len,
                                         f_off_rel)
-
         self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
 
     def test_001_basic_t (self):

@@ -40,6 +40,7 @@ namespace gr {
     class mimo_ofdm_channel_estimator_vcvc_impl : public mimo_ofdm_channel_estimator_vcvc
     {
      private:
+      uint16_t d_m; /*!< Number of transmitting antennas. */
       uint16_t d_n; /*!< Number of receiving antennas. */
       uint32_t d_fft_len; /*!< FFT length = Number of OFDM sub-carriers. */
       uint32_t d_fft_shift; /*!< FFT length/2. Used to convert centralized fft indices to vector indices. */
@@ -113,7 +114,7 @@ namespace gr {
       void interpolate_channel_state();
 
      public:
-      mimo_ofdm_channel_estimator_vcvc_impl(uint16_t n,
+      mimo_ofdm_channel_estimator_vcvc_impl(uint16_t m, uint16_t n,
                                             uint32_t fft_len,
                                             std::vector<std::vector<gr_complex> > pilot_symbols,
                                             std::vector<int> pilot_carriers,

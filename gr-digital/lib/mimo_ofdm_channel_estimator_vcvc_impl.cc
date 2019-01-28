@@ -34,7 +34,7 @@ namespace gr {
   namespace digital {
 
     mimo_ofdm_channel_estimator_vcvc::sptr
-    mimo_ofdm_channel_estimator_vcvc::make(uint16_t n,
+    mimo_ofdm_channel_estimator_vcvc::make(uint16_t m, uint16_t n,
                                            uint32_t fft_len,
                                            std::vector<std::vector<gr_complex> > pilot_symbols,
                                            std::vector<int> pilot_carriers,
@@ -43,7 +43,7 @@ namespace gr {
                                            const std::string &start_key)
     {
       return gnuradio::get_initial_sptr
-        (new mimo_ofdm_channel_estimator_vcvc_impl(n,
+        (new mimo_ofdm_channel_estimator_vcvc_impl(m, n,
                                                    fft_len,
                                                    pilot_symbols,
                                                    pilot_carriers,
@@ -56,7 +56,7 @@ namespace gr {
      * The private constructor
      */
     mimo_ofdm_channel_estimator_vcvc_impl::mimo_ofdm_channel_estimator_vcvc_impl(
-            uint16_t n, 
+            uint16_t m, uint16_t n,
             uint32_t fft_len, 
             std::vector<std::vector<gr_complex> > pilot_symbols, 
             std::vector<int> pilot_carriers,
@@ -66,7 +66,7 @@ namespace gr {
       : gr::block("mimo_ofdm_channel_estimator_vcvc",
               gr::io_signature::make(n, n, sizeof(gr_complex)*fft_len),
               gr::io_signature::make(n, n, sizeof(gr_complex)*occupied_carriers.size())),
-        d_n(n),
+        d_m(m), d_n(n),
         d_fft_len(fft_len),
         d_fft_shift(fft_len/2),
         d_pilot_symbols(pilot_symbols),
@@ -79,7 +79,7 @@ namespace gr {
     {
       // Init CSI vector.
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
-              (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (n, 1.0)));
+              (d_fft_len, std::vector<std::vector<gr_complex> > (n, std::vector<gr_complex> (m, 1.0)));
       // Monitor that FFT length is even.
       if (fft_len%2){
         throw std::invalid_argument((boost::format("FFT length %d must be even.") %fft_len).str());
@@ -131,7 +131,7 @@ namespace gr {
         // Iterate over N MIMO input streams.
         for (int i = 0; i < d_n; ++i) {
           const gr_complex *in = (const gr_complex *) input_items[i];
-          for (int j = 0; j < d_n; ++j) { // Iterate over N MIMO pilot sequences.
+          for (int j = 0; j < d_m; ++j) { // Iterate over M MIMO pilot sequences.
             /* Correlate received pilot sequence with transmitted sequence.
              * The result is the path coefficient h_ij for the current sub-carrier
              * and the current MIMO branch. */
@@ -174,7 +174,7 @@ namespace gr {
       for (unsigned int k = 0; k < d_pilot_carriers.size()-1; ++k) {
         for (unsigned int c = d_pilot_carriers[k]+d_fft_shift; c < d_pilot_carriers[k+1]+d_fft_shift; ++c) {
           for (int i = 0; i < d_n; ++i) {
-            for (int j = 0; j < d_n; ++j) {
+            for (int j = 0; j < d_m; ++j) {
               d_channel_state[c][i][j] =
                       d_channel_state[d_pilot_carriers[k]+d_fft_shift][i][j] +
                       ((gr_complex)(c-d_pilot_carriers[k]-d_fft_shift)/(gr_complex)(d_pilot_carriers[k+1]-d_pilot_carriers[k]))*
@@ -189,15 +189,15 @@ namespace gr {
     pmt::pmt_t
     mimo_ofdm_channel_estimator_vcvc_impl::generate_csi_pmt() {
       // Assign the channel state vector to a PMT vector. Only take the occupied carriers into account.
-      pmt::pmt_t csi_pmt = pmt::make_vector(d_output_vlen, pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0])));
+      pmt::pmt_t csi_pmt = pmt::make_vector(d_output_vlen, pmt::make_vector(d_n, pmt::make_c32vector(d_m, d_channel_state[0][0][0])));
       // Frequency dimension.
       for (unsigned int k = 0; k < d_output_vlen; ++k) {
-        pmt::pmt_t csi_per_carrier = pmt::make_vector(d_n, pmt::make_c32vector(d_n, d_channel_state[0][0][0]));
+        pmt::pmt_t csi_per_carrier = pmt::make_vector(d_n, pmt::make_c32vector(d_m, d_channel_state[0][0][0]));
         // TX space dimension.
         for (int i = 0; i < d_n; ++i){
-          pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_n, d_channel_state[0][0][0]);
+          pmt::pmt_t csi_line_vector = pmt::make_c32vector(d_m, d_channel_state[0][0][0]);
           // RX space dimension.
-          for (int j = 0; j < d_n; ++j) {
+          for (int j = 0; j < d_m; ++j) {
             pmt::c32vector_set(csi_line_vector, j, d_channel_state[d_occupied_carriers[k]+d_fft_len/2][i][j]);
           }
           pmt::vector_set(csi_per_carrier, i, csi_line_vector);

@@ -43,8 +43,9 @@ from scipy.linalg import hadamard
 Default values for Receiver.
 '''
 # Number of receiving antennas.
+_def_m = 1
 _def_n = 2
-_def_mimo_technique = 'vblast'
+_def_mimo_technique = 'diversity_combining_SC'
 _def_fft_len = 64
 _def_cp_len = 16
 _seq_seed = 42
@@ -145,7 +146,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     |           channel estimation.
     """
     def __init__(self,
-                 n=_def_n,
+                 m = _def_m, n=_def_n,
                  mimo_technique=_def_mimo_technique,
                  fft_len=_def_fft_len,
                  cp_len=_def_cp_len,
@@ -170,6 +171,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         """
         Parameter initalization
         """
+        self.m = m
         self.n = n
         self.mimo_technique = mimo_technique
         self.fft_len = fft_len
@@ -263,7 +265,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         MIMO channel estimation
         """
         channel_est = digital.mimo_ofdm_channel_estimator_vcvc(
-            n=self.n,
+            m=self.m, n=self.n,
             fft_len=fft_len,
             pilot_symbols=self.pilot_symbols,
             pilot_carriers=pilot_carriers[0],

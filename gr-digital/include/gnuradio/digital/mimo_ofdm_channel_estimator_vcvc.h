@@ -48,7 +48,7 @@ namespace gr {
        * class. digital::mimo_ofdm_channel_estimator_vcvc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t n, 
+      static sptr make(uint16_t m, uint16_t n, 
                        uint32_t fft_len, 
                        std::vector<std::vector<gr_complex> > pilot_symbols, 
                        std::vector<int> pilot_carriers,
