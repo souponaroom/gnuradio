@@ -3,7 +3,7 @@
   <key>digital_mimo_ofdm_synchronizer_fbcvc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.mimo_ofdm_synchronizer_fbcvc($n, $fft_len, $cp_len, $sync_symbol1, $sync_symbol2)</make>
+  <make>digital.mimo_ofdm_synchronizer_fbcvc($n, $fft_len, $cp_len, $sync_symbol1, $sync_symbol2, $start_key)</make>
   <param>
     <name>N</name>
     <key>n</key>
@@ -28,6 +28,11 @@
     <name>Sync symbol 2</name>
     <key>sync_symbol2</key>
     <type>complex_vector</type>
+  </param>
+  <param>
+    <name>Start Tag Key</name>
+    <key>start_key</key>
+    <type>string</type>
   </param>
   <sink>
     <name>fine_freq_off</name>

@@ -220,7 +220,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         """
         add = blocks.add_cc()
         sum_sync_detect = digital.ofdm_sync_sc_cfb(fft_len, cp_len)
-
         mimo_sync = digital.mimo_ofdm_synchronizer_fbcvc(self.n,
                                                          self.fft_len,
                                                          self.cp_len,
@@ -241,18 +240,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.connect((sum_sync_detect, 0), (mimo_sync, 0))  # Fine frequency offset signal.
         self.connect((sum_sync_detect, 1), blocks.delay(gr.sizeof_char, manual_adjusting_factor), (mimo_sync, 1))  # Trigger signal.
         self.connect(add, blocks.delay(gr.sizeof_gr_complex, symbol_len), (mimo_sync, 2))  # Sum signal.
-
-        # TODO remove
-        # rm_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, 16)
-        # rm_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, 16)
-        # s2v1 = blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len)
-        # s2v2 = blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len)
-        # rm_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
-        # rm_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
-        # add_tag1 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, 2, "start")
-        # add_tag2 = blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, fft_len, 2, "start")
-        # self.connect((self, 0), rm_cp1, s2v1, rm_sync1, add_tag1)
-        # self.connect((self, 1), rm_cp2, s2v2, rm_sync2, add_tag2)
 
         """
         OFDM demodulation

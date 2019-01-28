@@ -151,9 +151,11 @@ namespace gr {
                                                             uint32_t distance,
                                                             uint16_t pilot_offset) {
       gr_complex correlation = 0.0;
+      gr_complex energy = 0.0;
       // Correlate the received pilot sequence with the transmitted one.
       for (unsigned int i = 0; i < d_n; ++i) {
         correlation += in[i*distance] * std::conj(pilot[(i+pilot_offset)%d_n]);
+        energy += in[i*distance]*std::conj(in[i*distance]);
       }
       // Return normalized (assuming a normalized pilot sequence) correlation result.
       return correlation/(gr_complex)d_n;
@@ -233,11 +235,9 @@ namespace gr {
           if(tag_index < start_tags.size()-1){
             tag_index++;
           }
-          GR_LOG_INFO(d_logger, format("New tag at %d")%start_tags[tag_index].offset);
         }
         // Experimental feature todo generalize to sequences of length > 2
         if(start_tags.size() > 0 && nitems_read(0)+s+1 == start_tags[tag_index].offset){
-          GR_LOG_INFO(d_logger, format("Last item of symbol at %d")%(nitems_read(0)+s+1));
           // This is the last symbol of the frame.
           // Use old estimation.
         } else {
@@ -247,7 +247,6 @@ namespace gr {
            * Now, lets interpolate over all remaining OFDM sub-carriers. */
           interpolate_channel_state();
         }
-        //GR_LOG_INFO(d_logger, format("Symbol %d = %d")%(nitems_written(0)+s) %d_channel_state[d_pilot_carriers[0]+d_fft_shift][0][0]);
         /* Now we have individual CSI for each sub-carrier of each MIMO-branch.
          * Add tag with this CSI to the output vector.
          * All CSI for one time step is stored in one 3-dim vector which is tagged

@@ -3,7 +3,7 @@
   <key>digital_mimo_ofdm_channel_estimator_vcvc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.mimo_ofdm_channel_estimator_vcvc($n, $fft_len, $pilot_symbols, $pilot_carriers, $occupied_carriers)</make>
+  <make>digital.mimo_ofdm_channel_estimator_vcvc($n, $fft_len, $pilot_symbols, $pilot_carriers, $occupied_carriers, $csi_key, $start_key)</make>
   <param>
     <name>N</name>
     <key>n</key>
@@ -33,6 +33,18 @@
     <key>occupied_carriers</key>
     <value>()</value>
     <type>int_vector</type>
+  </param>
+  <param>
+    <name>CSI Tag Key</name>
+    <key>csi_key</key>
+    <value>"csi"</value>
+    <type>string</type>
+  </param>
+  <param>
+    <name>Start Tag Key</name>
+    <key>start_key</key>
+    <value>"start"</value>
+    <type>string</type>
   </param>
   <sink>
     <name>in</name>
