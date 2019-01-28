@@ -74,32 +74,31 @@ namespace gr {
     ofdm_correct_carrier_freq_offset_vcvc_impl::correct_offset(gr_vector_const_void_star &input_items,
                                                                gr_vector_void_star &output_items,
                                                                uint32_t offset, uint32_t length) {
-      // Iterate over branches.
-      for (int n = 0; n < d_n; ++n) {
-        const gr_complex *in = &(((const gr_complex *) input_items[n])[offset]);
-        gr_complex *out = &(((gr_complex *) output_items[n])[offset]);
-
-        // Copy the fft vectors such that the symbols are shifted to the correct position.
-        if (d_carrier_offset < 0) {
-          memset((void *) out, 0x00, sizeof(gr_complex) * (-d_carrier_offset));
-          memcpy((void *) &out[-d_carrier_offset], (void *) in,
-                 sizeof(gr_complex) * (d_fft_len * length + d_carrier_offset));
-        } else {
-          memset((void *) (out + d_fft_len * length - d_carrier_offset),
-                 0x00, sizeof(gr_complex) * d_carrier_offset);
-          memcpy((void *) out, (void *) (in + d_carrier_offset),
-                 sizeof(gr_complex) * (d_fft_len * length - d_carrier_offset));
-        }
-        /* The cyclic prefix was cut out somewhere before this block.
-         * But the carrier frequency offset was not yet corrected back then.
-         * (Because it is corrected right now). This leads to a phase shift
-         * between the FFT vectors. */
-        // Correct this phase shift.
-        gr_complex phase_correction;
-        for (unsigned int i = 0; i < length; i++) {
-          phase_correction = gr_expj(-M_TWOPI * d_carrier_offset * d_cp_len / d_fft_len * (i + 1));
-          for (unsigned int k = 0; k < d_fft_len; k++) {
-            out[i * d_fft_len + k] *= phase_correction;
+      if (length > 0) {
+        // Iterate over branches.
+        for (int n = 0; n < d_n; ++n) {
+          const gr_complex *in = &(((const gr_complex *) input_items[n])[offset]);
+          gr_complex *out = &(((gr_complex *) output_items[n])[offset]);
+          // Copy the fft vectors such that the symbols are shifted to the correct position.
+          if (d_carrier_offset < 0) {
+            memset(out, 0x00, sizeof(gr_complex) * (-d_carrier_offset));
+            memcpy(&out[-d_carrier_offset], in, sizeof(gr_complex) * (d_fft_len * length + d_carrier_offset));
+          } else {
+            memset(&out[d_fft_len * length - d_carrier_offset], 0x00, sizeof(gr_complex) * d_carrier_offset);
+            memcpy(out, &in[d_carrier_offset], sizeof(gr_complex) * (d_fft_len * length - d_carrier_offset));
+          }
+          /* The cyclic prefix was cut out somewhere before this block.
+           * But the carrier frequency offset was not yet corrected back then.
+           * (Because it is corrected right now). This leads to a phase shift
+           * between the FFT vectors. */
+          // Correct this phase shift.
+          gr_complex phase_correction;
+          for (unsigned int i = 0; i < length; i++) {
+            phase_correction = gr_expj(
+                    -M_TWOPI * d_carrier_offset * d_cp_len / d_fft_len * (i + 1));
+            for (unsigned int k = 0; k < d_fft_len; k++) {
+              out[i * d_fft_len + k] *= phase_correction;
+            }
           }
         }
       }
@@ -148,7 +147,7 @@ namespace gr {
       }
 
       // Tell runtime system how many output items we produced.
-      return noutput_items;
+      return nprocessed;
     }
 
   } /* namespace digital */
