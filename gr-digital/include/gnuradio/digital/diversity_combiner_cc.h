@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -25,7 +25,7 @@
 #define INCLUDED_DIGITAL_DIVERSITY_COMBINER_CC_H
 
 #include <gnuradio/digital/api.h>
-#include <gnuradio/sync_block.h>
+#include <gnuradio/sync_interpolator.h>
 
 namespace gr {
   namespace digital {
@@ -50,7 +50,7 @@ namespace gr {
      * maximum-ratio combining ('MRC').
      */
 
-    class DIGITAL_API diversity_combiner_cc : virtual public gr::sync_block
+    class DIGITAL_API diversity_combiner_cc : virtual public gr::sync_interpolator
     {
      public:
       typedef boost::shared_ptr<diversity_combiner_cc> sptr;
