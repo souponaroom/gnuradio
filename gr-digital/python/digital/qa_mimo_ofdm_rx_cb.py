@@ -68,8 +68,6 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         static_channel = blocks.multiply_matrix_cc(channel_matrix)
         # Apply frequency offset.
         const = analog.sig_source_c(fft_len, analog.GR_COS_WAVE, f_off_rel, 1.0)
-        mult1 = blocks.multiply_cc()
-        mult2 = blocks.multiply_cc()
 
         # MIMO-OFDM RX
         rx = mimo_ofdm_rx_cb(
@@ -85,15 +83,40 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
 
         # Connect everything.
         self.tb.connect(src, blocks.head(gr.sizeof_char, packet_len * 100), s2tagged_stream, tx)
-        self.tb.connect((tx, 0), (static_channel, 0), mult1, (rx, 0))
-        self.tb.connect((tx, 1), (static_channel, 1), mult2, (rx, 1))
-        self.tb.connect(const, (mult1, 1))
-        self.tb.connect(const, (mult2, 1))
+        for i in range(0, m):
+            self.tb.connect((tx, i), (static_channel, i))
+        mult = []
+        for j in range(0, n):
+            mult.append(blocks.multiply_cc())
+            self.tb.connect((static_channel, j), mult[j], (rx, j))
+            self.tb.connect(const, (mult[j], 1))
         self.tb.connect(rx, blocks.head(gr.sizeof_char, packet_len), sink)
         self.tb.run()
-
+        
         return sink.data()
 
+
+    def test_diversity_combining_t (self):
+        """
+        Diversity combining.
+        """
+        # Define test parameters.
+        f_off_rel = 0.0
+        packet_len = 8
+        fft_len = 64
+        cp_len = fft_len/4
+        n = 2
+        m = 1
+        mimo_technique = "diversity_combining_SC"
+        packet_len_tag_key = "packet_length"
+
+        data = np.random.randint(0, 256, packet_len * 6)
+        result = self.simulate_loopback(data, m, n, mimo_technique,
+                                        packet_len, packet_len_tag_key,
+                                        fft_len, cp_len,
+                                        f_off_rel)
+
+        self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
 
     def test_001_basic_t (self):
         """
@@ -109,13 +132,13 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         mimo_technique = "vblast"
         packet_len_tag_key = "packet_length"
 
-        data = range(packet_len)
+        data = np.random.randint(0, 256, packet_len*6)
         result = self.simulate_loopback(data, m, n, mimo_technique,
                                         packet_len, packet_len_tag_key,
                                         fft_len, cp_len,
                                         f_off_rel)
 
-        self.assertComplexTuplesAlmostEqual(data, result, 2)
+        self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
 
     def test_002_fract_carr_freq_off_t (self):
         """

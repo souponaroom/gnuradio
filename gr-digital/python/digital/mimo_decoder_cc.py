@@ -38,9 +38,15 @@ class mimo_decoder_cc(gr.hier_block2):
             gr.io_signature(1, 1, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into decoder blocks.
-        mimo_algorithm = {'alamouti' : digital.alamouti_decoder_cc_make(),
-                          'diff_stbc' : digital.diff_stbc_decoder_cc_make(),
-                          'vblast' : digital.vblast_decoder_cc_make(num_inputs=N,
+        mimo_algorithm = {'diversity_combining_SC': digital.diversity_combiner_cc_make(num_inputs=N,
+                                                                                  vlen=vlen,
+                                                                                  combining_technique='SC'),
+                          'diversity_combining_MRC': digital.diversity_combiner_cc_make(num_inputs=N,
+                                                                                    vlen=vlen,
+                                                                                    combining_technique='MRC'),
+                          'alamouti': digital.alamouti_decoder_cc_make(),
+                          'diff_stbc': digital.diff_stbc_decoder_cc_make(),
+                          'vblast': digital.vblast_decoder_cc_make(num_inputs=N,
                                                                     equalizer_type='ZF',
                                                                     vlen=vlen)}
 
