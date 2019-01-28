@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright 2018 Free Software Foundation, Inc.
+# Copyright 2018, 2019 Free Software Foundation, Inc.
 #
 # This file is part of GNU Radio
 #
@@ -34,6 +34,38 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
 
     def tearDown (self):
         self.tb = None
+
+    def run_test(self, data_length, mode, num_inputs, vlen, tag_pos, num_tags):
+        # Generate random input data.
+        data = np.array(
+            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
+        for i in range(1, num_inputs):
+            data = np.vstack((data, [
+                np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
+
+        # Generate the CSI vectors and calculate the expected result.
+        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
+                                                   data=data,
+                                                   vlen=vlen,
+                                                   num_tags=num_tags,
+                                                   tag_pos=tag_pos,
+                                                   combining_technique=mode)
+
+        # Build up the test flowgraph and run it.
+        src1 = blocks.vector_source_c(data=data[0],
+                                      repeat=False,
+                                      vlen=vlen,
+                                      tags=tags)
+        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
+        sink = blocks.vector_sink_c()
+        self.tb.connect(src1, comb, sink)
+        # Connect all other sources.
+        for i in range(1, num_inputs):
+            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
+        # Run flowgraph.
+        self.tb.run()
+
+        return sink.data(), expected_result
 
     # Function which randomly generates the CSI vectors and calculates the expected result.
     def dice_csi_tags (self, num_inputs, data, vlen, num_tags, tag_pos, combining_technique):
@@ -79,35 +111,12 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         vlen = 1
         tag_pos = np.array([2, 5, 6, 8])  # Vector-wise indexing.
         num_tags = len(tag_pos)
-        # Generate random input data.
-        data = np.array(
-            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
-        for i in range(1, num_inputs):
-            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        # Generate the CSI vectors and calculate the expected result.
-        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
-                                                   data=data,
-                                                   vlen=vlen,
-                                                   num_tags=num_tags,
-                                                   tag_pos=tag_pos,
-                                                   combining_technique=mode)
+        # Run test and calculate expected data.
+        result, expected_result = self.run_test(data_length, mode, num_inputs, vlen, tag_pos, num_tags)
 
-        # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data[0],
-                                      repeat=False,
-                                      vlen=vlen,
-                                      tags=tags)
-        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c()
-        self.tb.connect(src1, comb, sink)
-        # Connect all other sources.
-        for i in range(1, num_inputs):
-            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
-        # Run flowgraph.
-        self.tb.run()
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+        self.assertComplexTuplesAlmostEqual(expected_result, result, 4)
 
     # Test for SC: inputs: 3, vector length: 2, random CSI changes: 5.
     def test_002_t (self):
@@ -118,35 +127,12 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         vlen = 2
         tag_pos = [0, 3, 6, 7, 8]  # Vector-wise indexing.
         num_tags = len(tag_pos)
-        # Generate random input data.
-        data = np.array(
-            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
-        for i in range(1, num_inputs):
-            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        # Generate the CSI vectors and calculate the expected result.
-        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
-                                                   data=data,
-                                                   vlen=vlen,
-                                                   num_tags=num_tags,
-                                                   tag_pos=tag_pos,
-                                                   combining_technique=mode)
+        # Run test and calculate expected data.
+        result, expected_result = self.run_test(data_length, mode, num_inputs, vlen, tag_pos, num_tags)
 
-        # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data[0],
-                                      repeat=False,
-                                      vlen=vlen,
-                                      tags=tags)
-        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c(vlen=vlen)
-        self.tb.connect(src1, comb, sink)
-        # Connect all other sources.
-        for i in range(1, num_inputs):
-            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
-        # Run flowgraph.
-        self.tb.run()
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+        self.assertComplexTuplesAlmostEqual(expected_result, result, 4)
 
     # Test for SC: inputs: 8, vector length: 4, random CSI changes: 4.
     def test_003_t(self):
@@ -157,34 +143,12 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         vlen = 4
         tag_pos = np.array([3, 5, 6, 8])  # Vector-wise indexing.
         num_tags = len(tag_pos)
-        # Generate random input data.
-        data = np.array([(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
-        for i in range(1, num_inputs):
-            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        # Generate the CSI vectors and calculate the expected result.
-        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
-                                                   data=data,
-                                                   vlen=vlen,
-                                                   num_tags=num_tags,
-                                                   tag_pos=tag_pos,
-                                                   combining_technique=mode)
+        # Run test and calculate expected data.
+        result, expected_result = self.run_test(data_length, mode, num_inputs, vlen, tag_pos, num_tags)
 
-        # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data[0],
-                                      repeat=False,
-                                      vlen=vlen,
-                                      tags=tags)
-        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c(vlen=vlen)
-        self.tb.connect(src1, comb, sink)
-        # Connect all other
-        for i in range(1, num_inputs):
-            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
-        # Run flowgraph.
-        self.tb.run()
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+        self.assertComplexTuplesAlmostEqual(expected_result, result, 4)
 
     # Test for MRC: inputs: 2, vector length: 1, 4 random CSI changes.
     def test_004_t(self):
@@ -195,36 +159,12 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         vlen = 1
         tag_pos = [2, 4, 5, 9]  # Vector-wise indexing.
         num_tags = len(tag_pos)
-        # Generate random input data.
-        data = np.array(
-            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
-        for i in range(1, num_inputs):
-            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        # Generate the CSI vectors and calculate the expected result.
-        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
-                                                   data=data,
-                                                   vlen=vlen,
-                                                   num_tags=num_tags,
-                                                   tag_pos=tag_pos,
-                                                   combining_technique=mode)
-
-        # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data[0],
-                                      repeat=False,
-                                      vlen=vlen,
-                                      tags=tags)
-        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c(vlen=vlen)
-        self.tb.connect(src1, comb, sink)
-        # Connect all other sources.
-        for i in range(1, num_inputs):
-            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
-        # Run flowgraph.
-        self.tb.run()
+        # Run test and calculate expected data.
+        result, expected_result = self.run_test(data_length, mode, num_inputs, vlen, tag_pos, num_tags)
 
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+        self.assertComplexTuplesAlmostEqual(expected_result, result, 4)
 
     # Test for MRC: inputs: 3, vector length: 2, 6 random CSI changes.
     def test_005_t(self):
@@ -235,36 +175,12 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         vlen = 2
         tag_pos = [1, 3, 4, 8, 9]  # Vector-wise indexing.
         num_tags = len(tag_pos)
-        # Generate random input data.
-        data = np.array(
-            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
-        for i in range(1, num_inputs):
-            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        # Generate the CSI vectors and calculate the expected result.
-        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
-                                                   data=data,
-                                                   vlen=vlen,
-                                                   num_tags=num_tags,
-                                                   tag_pos=tag_pos,
-                                                   combining_technique=mode)
-
-        # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data[0],
-                                      repeat=False,
-                                      vlen=vlen,
-                                      tags=tags)
-        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c(vlen=vlen)
-        self.tb.connect(src1, comb, sink)
-        # Connect all other sources.
-        for i in range(1, num_inputs):
-            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
-        # Run flowgraph.
-        self.tb.run()
+        # Run test and calculate expected data.
+        result, expected_result = self.run_test(data_length, mode, num_inputs, vlen, tag_pos, num_tags)
 
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+        self.assertComplexTuplesAlmostEqual(expected_result, result, 4)
 
     # Test for MRC: inputs: 8, vector length: 5, 2 random CSI changes.
     def test_006_t(self):
@@ -275,36 +191,12 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
         vlen = 5
         tag_pos = [1, 2]  # Vector-wise indexing.
         num_tags = len(tag_pos)
-        # Generate random input data.
-        data = np.array(
-            [(np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen))])
-        for i in range(1, num_inputs):
-            data = np.vstack((data, [np.random.randn(data_length * vlen) + 1j * np.random.randn(data_length * vlen)]))
 
-        # Generate the CSI vectors and calculate the expected result.
-        tags, expected_result = self.dice_csi_tags(num_inputs=num_inputs,
-                                                   data=data,
-                                                   vlen=vlen,
-                                                   num_tags=num_tags,
-                                                   tag_pos=tag_pos,
-                                                   combining_technique=mode)
-
-        # Build up the test flowgraph and run it.
-        src1 = blocks.vector_source_c(data=data[0],
-                                      repeat=False,
-                                      vlen=vlen,
-                                      tags=tags)
-        comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c(vlen=vlen)
-        self.tb.connect(src1, comb, sink)
-        # Connect all other sources.
-        for i in range(1, num_inputs):
-            self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
-        # Run flowgraph.
-        self.tb.run()
+        # Run test and calculate expected data.
+        result, expected_result = self.run_test(data_length, mode, num_inputs, vlen, tag_pos, num_tags)
 
         # Check if the expected result equals the actual result.
-        self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+        self.assertComplexTuplesAlmostEqual(expected_result, result, 4)
 
 if __name__ == '__main__':
     gr_unittest.run(qa_diversity_combiner_cc, "qa_diversity_combiner_cc.xml")
