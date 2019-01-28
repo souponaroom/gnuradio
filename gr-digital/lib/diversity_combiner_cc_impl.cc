@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -56,9 +56,9 @@ namespace gr {
     diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs,
                                                            uint16_t vlen,
                                                            std::string combining_technique)
-      : gr::sync_block("diversity_combiner_cc",
+      : gr::sync_interpolator("diversity_combiner_cc",
               gr::io_signature::make(num_inputs, num_inputs, vlen*sizeof(gr_complex)),
-              gr::io_signature::make(1, 1, vlen*sizeof(gr_complex))),
+              gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
         d_num_inputs(num_inputs),
         d_vlen(vlen),
         d_combining_technique(combining_technique),
@@ -135,15 +135,15 @@ namespace gr {
     {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
-
+      int ninput_items = noutput_items/d_vlen;
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+      get_tags_in_window(tags, 0, 0, ninput_items, d_key);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
-        symbol_length = noutput_items;
+        symbol_length = ninput_items;
         process_symbol(input_items, out, 0, symbol_length);
         nprocessed += symbol_length;
       } else { // Input buffer includes tags.
