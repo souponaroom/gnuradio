@@ -56,9 +56,9 @@ namespace gr {
     diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs,
                                                            uint16_t vlen,
                                                            std::string combining_technique)
-      : gr::sync_interpolator("diversity_combiner_cc",
+      : gr::sync_block("diversity_combiner_cc",
               gr::io_signature::make(num_inputs, num_inputs, vlen*sizeof(gr_complex)),
-              gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
+              gr::io_signature::make(1, 1, vlen*sizeof(gr_complex))),
         d_num_inputs(num_inputs),
         d_vlen(vlen),
         d_combining_technique(combining_technique)
@@ -138,6 +138,17 @@ namespace gr {
       }
     }
 
+    pmt::pmt_t
+    diversity_combiner_cc_impl::generate_csi_pmt() { //TODO MRC CSI generation
+      // Assign the channel state vector to a PMT vector. Only take the occupied carriers into account.
+      pmt::pmt_t csi_pmt = pmt::make_vector(d_vlen, pmt::make_vector(1, pmt::make_c32vector(1, d_csi[0][0][0])));
+      // Frequency dimension.
+      for (unsigned int k = 0; k < d_vlen; ++k) {
+        pmt::pmt_t csi_per_carrier = pmt::make_vector(1, pmt::make_c32vector(1, d_csi[k][d_best_path[k]][0]));
+      }
+      return csi_pmt;
+    }
+
     int
     diversity_combiner_cc_impl::work(int noutput_items,
                                      gr_vector_const_void_star &input_items,
@@ -145,15 +156,14 @@ namespace gr {
     {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
-      int ninput_items = noutput_items/d_vlen;
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, ninput_items, d_key);
+      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
       if(tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
-        symbol_length = ninput_items;
+        symbol_length = noutput_items;
         process_symbol(input_items, out, 0, symbol_length);
         nprocessed += symbol_length;
       } else { // Input buffer includes tags.
@@ -183,6 +193,8 @@ namespace gr {
           combine_inputs(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
           // Process the symbol with the calculated weighting vector.
           process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
+          // Generate new CSI tags for equalization and add them to stream.
+          add_item_tag(0, nitems_written(0) + nprocessed*d_vlen, d_key, generate_csi_pmt());
           nprocessed += symbol_length;
         }
       }

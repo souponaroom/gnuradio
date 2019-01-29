@@ -96,26 +96,26 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         return sink.data()
 
 
-    def test_diversity_combining_t (self):
-        """
-        Diversity combining.
-        """
-        # Define test parameters.
-        f_off_rel = 0.0
-        packet_len = 8
-        fft_len = 64
-        cp_len = fft_len/4
-        n = 2
-        m = 1
-        mimo_technique = "diversity_combining_SC"
-        packet_len_tag_key = "packet_length"
-
-        data = np.random.randint(0, 256, packet_len * 6)
-        result = self.simulate_loopback(data, m, n, mimo_technique,
-                                        packet_len, packet_len_tag_key,
-                                        fft_len, cp_len,
-                                        f_off_rel)
-        self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
+    # def test_diversity_combining_t (self):
+    #     """
+    #     Diversity combining.
+    #     """
+    #     # Define test parameters.
+    #     f_off_rel = 0.0
+    #     packet_len = 8
+    #     fft_len = 64
+    #     cp_len = fft_len/4
+    #     n = 2
+    #     m = 1
+    #     mimo_technique = "diversity_combining_SC"
+    #     packet_len_tag_key = "packet_length"
+    #
+    #     data = np.random.randint(0, 256, packet_len * 6)
+    #     result = self.simulate_loopback(data, m, n, mimo_technique,
+    #                                     packet_len, packet_len_tag_key,
+    #                                     fft_len, cp_len,
+    #                                     f_off_rel)
+    #     self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
 
     def test_001_basic_t (self):
         """

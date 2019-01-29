@@ -57,7 +57,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
                                       vlen=vlen,
                                       tags=tags)
         comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
-        sink = blocks.vector_sink_c()
+        sink = blocks.vector_sink_c(vlen)
         self.tb.connect(src1, comb, sink)
         # Connect all other sources.
         for i in range(1, num_inputs):

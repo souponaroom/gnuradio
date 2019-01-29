@@ -55,6 +55,7 @@ _def_bps_payload = 1
 # Tag keys.
 _def_start_key = "start"
 _def_csi_key = "csi"
+_def_carrier_freq_off_key = "carrier_freq_offset"
 _def_frame_length_tag_key = "frame_length"
 _def_packet_length_tag_key = "packet_length"
 _def_packet_num_tag_key = "packet_num"
@@ -148,10 +149,10 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     def __init__(self,
                  m = _def_m, n=_def_n,
                  mimo_technique=_def_mimo_technique,
-                 fft_len=_def_fft_len,
-                 cp_len=_def_cp_len,
+                 fft_len=_def_fft_len, cp_len=_def_cp_len,
                  start_key=_def_start_key,
                  csi_key = _def_csi_key,
+                 carrier_freq_off_key = _def_carrier_freq_off_key,
                  frame_length_tag_key=_def_frame_length_tag_key,
                  packet_length_tag_key=_def_packet_length_tag_key,
                  packet_num_tag_key=_def_packet_num_tag_key,
@@ -178,6 +179,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.cp_len = cp_len
         self.start_key = start_key
         self.csi_key = csi_key
+        self.carrier_freq_off_key = carrier_freq_off_key
         self.frame_length_tag_key = frame_length_tag_key
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
@@ -185,20 +187,21 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.bps_header = bps_header
         self.bps_payload = bps_payload
 
-        # Change SISO/MIMO specific default parameters.
+
+        # Change SISO/MIMO specific default parameters, if not defined.
+        if self.m < 1:
+            raise ValueError("Number of TX antennas must be a natural number.")
+        if self.n < 1:
+            raise ValueError("Number of RX antennas must be a natural number.")
         if occupied_carriers is None:
             self.occupied_carriers = _def_occupied_carriers_mimo
         if pilot_carriers is None:
             self.pilot_carriers = _def_pilot_carriers_mimo
-
         if pilot_symbols is None:
             # Generate Hadamard matrix as orthogonal pilot sequences.
             self.pilot_symbols = hadamard(_def_n)
         else:
             self.pilot_symbols = pilot_symbols
-
-
-
         if sync_word1 is None:
             self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
         else:
@@ -233,7 +236,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         symbol_len = fft_len + cp_len
         manual_adjusting_factor = 3 + cp_len
         for i in range(0, self.n):
-            # Add up MIMO signals to do the sync on this reference signal. #TODO delays set properly???
+            # Add up MIMO signals to do the sync on this reference signal.
             self.connect((self, i), blocks.multiply_const_cc(rx_normalize), (add, i))
             self.connect((self, i), blocks.multiply_const_cc(rx_normalize),
                         blocks.delay(gr.sizeof_gr_complex, symbol_len),
@@ -250,14 +253,12 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         for i in range(0, self.n):
             ofdm_demod.append(fft.fft_vcc(self.fft_len, True, (), True))
             self.connect((mimo_sync, i), ofdm_demod[i])
-        # self.connect(add_tag1, ofdm_demod[0])
-        # self.connect(add_tag2, ofdm_demod[1])
 
         """
         Carrier frequency correction
         """
         carrier_freq_corrector = digital.ofdm_correct_carrier_freq_offset_vcvc(
-            self.n, self.fft_len, self.cp_len, "carrier_freq_offset")
+            self.n, self.fft_len, self.cp_len, self.carrier_freq_off_key)
         for i in range(0, self.n):
             self.connect(ofdm_demod[i], (carrier_freq_corrector, i))
 

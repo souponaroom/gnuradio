@@ -263,8 +263,6 @@ namespace gr {
       if (d_on_frame){
         // We are currently on a frame.
         if (d_sync_read){
-          // We already read the sync symbols.
-          d_sync_read = false;
           // Search for new triggers in the buffer (indicating the beginning of a new frame).
           uint32_t trigger_pos = find_trigger(trigger, 0, noutput_samples);
           // Process symbols of the current frame.
@@ -285,7 +283,9 @@ namespace gr {
           // Check if we arrived at the end of the frame.
           if (trigger_pos < noutput_samples){
             // Detected start of new symbol.
-            nconsumed = trigger_pos; // TODO remove
+            nconsumed = trigger_pos;
+            // Fpr the new symbol, we have to read the sync symbols at first.
+            d_sync_read = false;
           } else {
             // Frame continues with the next buffer.
             nconsumed = num_syms*d_symbol_len;

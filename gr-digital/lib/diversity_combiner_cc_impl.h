@@ -91,6 +91,12 @@ namespace gr {
        * @param length Number of items of the current symbol in the current buffer.
        */
 
+      /*! \brief Converts channel state vector to a PMT.
+       *
+       * @return PMT object (3-dim vector) with channel state information (CSI).
+       */
+      pmt::pmt_t generate_csi_pmt();
+
     public:
       diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
       ~diversity_combiner_cc_impl();

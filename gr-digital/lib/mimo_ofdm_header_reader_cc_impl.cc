@@ -211,6 +211,9 @@ namespace gr {
             // Parse header.
             if (parse_header()) {
               // This header is valid.
+              // This header is invalid.
+              //GR_LOG_INFO(d_logger, format("Valid header at %d.") %
+              //                      (nitems_read(0) + nconsumed - d_header_length));
               d_on_packet = true;
               d_remaining_packet_len = d_packet_length;
             } else {

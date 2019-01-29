@@ -3,7 +3,7 @@
   <key>digital_mimo_ofdm_header_reader_cc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.mimo_ofdm_header_reader_cc($constellation, $header_formatter)</make>
+  <make>digital.mimo_ofdm_header_reader_cc($constellation, $header_formatter, $start_key)</make>
   <param>
     <name>Constellation Object</name>
     <key>constellation</key>
@@ -13,6 +13,11 @@
     <name>Header Format Object</name>
     <key>header_formatter</key>
     <type>raw</type>
+  </param>
+  <param>
+    <name>Start Tag Key</name>
+    <key>start_key</key>
+    <type>string</type>
   </param>
   <sink>
     <name>in</name>

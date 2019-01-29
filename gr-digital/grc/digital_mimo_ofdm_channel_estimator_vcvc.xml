@@ -3,7 +3,13 @@
   <key>digital_mimo_ofdm_channel_estimator_vcvc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.mimo_ofdm_channel_estimator_vcvc($n, $fft_len, $pilot_symbols, $pilot_carriers, $occupied_carriers, $csi_key, $start_key)</make>
+  <make>digital.mimo_ofdm_channel_estimator_vcvc($n, $n, $fft_len, $pilot_symbols, $pilot_carriers, $occupied_carriers, $csi_key, $start_key)</make>
+  <param>
+    <name>M</name>
+    <key>m</key>
+    <value>2</value>
+    <type>int</type>
+  </param>
   <param>
     <name>N</name>
     <key>n</key>
