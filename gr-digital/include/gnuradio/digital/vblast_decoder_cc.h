@@ -41,7 +41,7 @@ namespace gr {
  * there is provided a separate channel matrix for each vector element. Set vlen>1 if you use a
  * multicarrier system like OFDM (in this case it would be vlen=number of occupied sub-carriers).
  * To generate a proper CSI tag, use the pmt structure pmt_vector(pmt_vector(pmt_c32vector))).
- * Initially the CSI is set to 1.0 + 0j for both branches and are updated
+ * Initially the CSI is set to 1.0 + 0j for all branches and are updated
  * with each incoming CSI. The SNR is initially set to 1.0e6; in this case is the MMSE equalizer equal
  * to the ZF equalizer. The CSI and SNR tags are processed separately and they can therefore arrive
  * at different positions of the stream and occur in different frequencies.

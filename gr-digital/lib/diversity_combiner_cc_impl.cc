@@ -61,15 +61,13 @@ namespace gr {
               gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
         d_num_inputs(num_inputs),
         d_vlen(vlen),
-        d_combining_technique(combining_technique),
-        d_best_path(0) // Initially, the SC algorithm selects channel 0, until it is changed by CSI.
+        d_combining_technique(combining_technique)
     {
-      // Resize vectors csi, csi_squared and mrc_weighting.
-      d_csi.resize(num_inputs);
-      d_csi_squared.resize(num_inputs);
-      d_mrc_weighting.resize(num_inputs);
+      d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (1, 1.0)));
+      d_csi_squared = std::vector<std::vector<float> >(vlen, std::vector<float>(num_inputs, 1.0));
+      d_best_path = std::vector<uint16_t> (vlen, 0); // Initially, the SC algorithm selects channel 0, until it is changed by CSI.
       // Initially, the MRC algorithm weights each channel equally, until it is changed by CSI.
-      std::fill(d_mrc_weighting.begin(), d_mrc_weighting.end(), 1.0/num_inputs);
+      d_mrc_weighting = std::vector<std::vector<gr_complex> >(vlen, std::vector<gr_complex>(num_inputs, 1.0/num_inputs));
       // Set tag propagation policy to 'All to All'.
       set_tag_propagation_policy(TPP_ALL_TO_ALL);
     }
@@ -87,20 +85,26 @@ namespace gr {
                                                uint64_t offset,
                                                uint64_t length){
       // Calculate the magnitude square of the complex CSI vector.
-      for (int i = 0; i < d_num_inputs; ++i) {
-        d_csi_squared[i] = std::norm(d_csi[i]);
+      for (int k = 0; k < d_vlen; ++k) {
+        for (int i = 0; i < d_num_inputs; ++i) {
+          d_csi_squared[k][i] = std::norm(d_csi[k][i][0]);
+        }
       }
       if(d_combining_technique.compare("SC") == 0) { // Selection combining
         // Search for path coefficient with maximum magnitude.
-        d_best_path = std::distance(d_csi_squared.begin(),
-                                    std::max_element(d_csi_squared.begin(),
-                                                     d_csi_squared.end()));
+        for (int k = 0; k < d_vlen; ++k) {
+          d_best_path[k] = std::distance(d_csi_squared[k].begin(),
+                                      std::max_element(d_csi_squared[k].begin(),
+                                                       d_csi_squared[k].end()));
+        }
       }
       else if(d_combining_technique.compare("MRC") == 0) { // Maximum-Ratio combining
         // Calculate the normalized weighting coefficients.
-        float total_path_energy = std::accumulate(d_csi_squared.begin(), d_csi_squared.end(), 0.0);
-        for (int i = 0; i < d_num_inputs; ++i) {
-          d_mrc_weighting[i] = std::polar(std::sqrt(d_csi_squared[i]/total_path_energy), -std::arg(d_csi[i]));
+        for (int k = 0; k < d_vlen; ++k){
+          float total_path_energy = std::accumulate(d_csi_squared[k].begin(), d_csi_squared[k].end(), 0.0);
+          for (int i = 0; i < d_num_inputs; ++i) {
+            d_mrc_weighting[k][i] = std::polar(std::sqrt(d_csi_squared[k][i]/total_path_energy), -std::arg(d_csi[k][i][0]));
+          }
         }
       }
 
@@ -112,17 +116,23 @@ namespace gr {
                                                uint64_t offset,
                                                uint64_t length){
       if(d_combining_technique.compare("SC") == 0) { // Selection combining
-        const gr_complex *in = &((const gr_complex *) input[d_best_path])[offset];
         // Copy items of the current symbol from best_path to output.
-        std::copy(in, &in[length*d_vlen], out);
+        for (int k = 0; k < d_vlen; ++k) {
+          const gr_complex *in = &((const gr_complex *) input[d_best_path[k]])[offset];
+          for (int i = 0; i < length; ++i) {
+            out[d_vlen*i+k] = in[d_vlen*i+k];
+          }
+        }
       }
       else if(d_combining_technique.compare("MRC") == 0) { // Maximum-Ratio combining
         // Calculate the output stream as the weighted sum of the input streams.
-        std::fill(out, &out[length*d_vlen], 0.0);
-        for (int inport = 0; inport < d_num_inputs; ++inport) {
-          const gr_complex *in = &((const gr_complex *) input[inport])[offset];
-          for (unsigned int l = 0; l < length * d_vlen; ++l) {
-            out[l] += d_mrc_weighting[inport] * in[l];
+        std::fill(out, &out[length * d_vlen], 0.0);
+        for (int k = 0; k < d_vlen; ++k) {
+          for (int inport = 0; inport < d_num_inputs; ++inport) {
+            const gr_complex *in = &((const gr_complex *) input[inport])[offset];
+            for (unsigned int l = 0; l < length; ++l) {
+              out[l*d_vlen+k] += d_mrc_weighting[k][inport] * in[l*d_vlen+k];
+            }
           }
         }
       }
@@ -163,7 +173,12 @@ namespace gr {
             symbol_length = noutput_items - tags[i].offset + nitems_read(0);
           }
           // Get CSI from tag.
-          d_csi = pmt::c32vector_elements(tags[i].value);
+          for (unsigned int k = 0; k < pmt::length(tags[i].value); ++k) {
+            pmt::pmt_t carrier_csi = pmt::vector_ref(tags[i].value, k);
+            for (unsigned int j = 0; j < pmt::length(carrier_csi); ++j) {
+              d_csi[k][j] = pmt::c32vector_elements(pmt::vector_ref(carrier_csi, j));
+            }
+          }
           // Calculate the weighting vector for the next symbol with the received CSI.
           combine_inputs(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
           // Process the symbol with the calculated weighting vector.

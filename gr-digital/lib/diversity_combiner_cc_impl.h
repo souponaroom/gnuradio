@@ -41,6 +41,11 @@ namespace gr {
  * and are updated with each incoming CSI. The items between two tags are referred to as "symbols"
  * in this documentation. The length of a symbol can vary.
  *
+ * The CSI must be a 3-dimensional vector with the dimensions vlen, num_inputs, 1. For vlen>1
+ * there is provided a separate channel matrix for each vector element. Set vlen>1 if you use a
+ * multicarrier system like OFDM (in this case it would be vlen=number of occupied sub-carriers).
+ * To generate a proper CSI tag, use the pmt structure pmt_vector(pmt_vector(pmt_c32vector))).
+ *
  * \param num_inputs Number of inputs ports.
  * \param vlen Vector length of the input and output items.
  * \param combining_technique Combining technique. Selection combining ('SC') or
@@ -56,19 +61,16 @@ namespace gr {
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
       static const std::string s; /*!< String that matches the key of the CSI tags. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
-      std::vector<gr_complex> d_csi;
-      /*!< Vector of length d_num_inputs which stores the current channel
-       * state information (CSI). The vector is being updated which each
-       * received tag of the key='csi'.
+      std::vector<std::vector<std::vector<gr_complex> > > d_csi; /*!< Current channel matrix. */
+      std::vector<std::vector<float> > d_csi_squared;
+      /*!< The current squared channel state information (CSI). The matrix is being updated which each
+       * received tag of the key='csi'. The last dimension M (number of TX antennas) equals 1 in case
+       * of diversity combining. Therefore this matrix is reduced by one dimension. The d_csi channel
+       * matrix is not reduced, to keep the MIMO interface with 3D CSI tags unified for all MIMO cases.
        */
-      std::vector<float> d_csi_squared;
-      /*!< Vector of length d_num_inputs which stores the current squared channel
-       * state information (CSI). The vector is being updated which each
-       * received tag of the key='csi'.
-       */
-      uint16_t d_best_path;
+      std::vector<uint16_t> d_best_path;
       /*!< Number of the input port which is selected as output for the current symbol. */
-      std::vector<gr_complex> d_mrc_weighting;
+      std::vector<std::vector<gr_complex> > d_mrc_weighting;
       /*!< Vector of length d_num_inputs which stores the current normalized weighting vector. */
 
       void combine_inputs(gr_vector_const_void_star input, gr_complex* out, uint64_t offset, uint64_t length);

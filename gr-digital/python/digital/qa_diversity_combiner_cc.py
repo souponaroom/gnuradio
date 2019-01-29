@@ -81,9 +81,14 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
             # Randomly generate CSI for one symbol.
             csi = (np.random.randn(num_inputs) + 1j * np.random.randn(num_inputs))
             # Assign the CSI vector to a PMT vector.
-            csi_pmt = pmt.make_c32vector(num_inputs, csi[0])
-            for k, channel in enumerate(csi):
-                pmt.c32vector_set(v=csi_pmt, k=k, x=channel)
+            csi_pmt = pmt.make_vector(vlen, pmt.make_vector(num_inputs, pmt.make_c32vector(1, 1.0)))
+            for k in range(0, vlen):
+                carrier_vector_pmt = pmt.make_vector(num_inputs, pmt.make_c32vector(1, csi[0]))
+                for l in range(0, num_inputs):
+                    line_vector_pmt = pmt.make_c32vector(1, csi[0])
+                    pmt.c32vector_set(v=line_vector_pmt, k=0, x=csi[l])
+                    pmt.vector_set(carrier_vector_pmt, l, line_vector_pmt)
+                pmt.vector_set(csi_pmt, k, carrier_vector_pmt)
             # Append stream tags with CSI to data stream.
             tags.append(gr.tag_utils.python_to_tag((tag_pos[i],
                                                     pmt.string_to_symbol("csi"),
