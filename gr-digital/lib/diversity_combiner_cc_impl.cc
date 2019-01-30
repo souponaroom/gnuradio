@@ -69,7 +69,7 @@ namespace gr {
       // Initially, the MRC algorithm weights each channel equally, until it is changed by CSI.
       d_mrc_weighting = std::vector<std::vector<gr_complex> >(vlen, std::vector<gr_complex>(num_inputs, 1.0/num_inputs));
       // Set tag propagation policy to 'All to All'.
-      set_tag_propagation_policy(TPP_ALL_TO_ALL);
+      set_tag_propagation_policy(TPP_DONT);
     }
 
     /*
@@ -144,7 +144,17 @@ namespace gr {
       pmt::pmt_t csi_pmt = pmt::make_vector(d_vlen, pmt::make_vector(1, pmt::make_c32vector(1, d_csi[0][0][0])));
       // Frequency dimension.
       for (unsigned int k = 0; k < d_vlen; ++k) {
-        pmt::pmt_t csi_per_carrier = pmt::make_vector(1, pmt::make_c32vector(1, d_csi[k][d_best_path[k]][0]));
+        pmt::pmt_t csi_per_carrier = pmt::make_vector(1, pmt::make_c32vector(1, d_csi[0][0][0]));
+        // TX space dimension.
+        for (int i = 0; i < 1; ++i){
+          pmt::pmt_t csi_line_vector = pmt::make_c32vector(1, d_csi[0][0][0]);
+          // RX space dimension.
+          for (int j = 0; j < 1; ++j) {
+            pmt::c32vector_set(csi_line_vector, j, d_csi[k][d_best_path[k]][j]);
+          }
+          pmt::vector_set(csi_per_carrier, i, csi_line_vector);
+        }
+        pmt::vector_set(csi_pmt, k, csi_per_carrier);
       }
       return csi_pmt;
     }
@@ -157,34 +167,34 @@ namespace gr {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+      get_tags_in_window(d_tags, 0, 0, noutput_items, d_key);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
-      if(tags.size() == 0){ // Input buffer includes no tags at all.
+      if(d_tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
         symbol_length = noutput_items;
         process_symbol(input_items, out, 0, symbol_length);
         nprocessed += symbol_length;
       } else { // Input buffer includes tags.
-        if (tags[0].offset - nitems_read(0) > 0){
+        if (d_tags[0].offset - nitems_read(0) > 0){
           /* There are items in the input buffer, before the first tag arrives,
            * which belong to the previous symbol. */
-          symbol_length = tags[0].offset - nitems_read(0);
+          symbol_length = d_tags[0].offset - nitems_read(0);
           process_symbol(input_items, out, 0, symbol_length);
           nprocessed += symbol_length;
         }
         // Iterate over tags in buffer.
-        for (unsigned int i = 0; i < tags.size(); ++i) {
+        for (unsigned int i = 0; i < d_tags.size(); ++i) {
           // Calculate the number of items before the next tag.
-          if (i < tags.size() - 1) {
-            symbol_length = tags[i + 1].offset - tags[i].offset;
+          if (i < d_tags.size() - 1) {
+            symbol_length = d_tags[i + 1].offset - d_tags[i].offset;
           } else {
-            symbol_length = noutput_items - tags[i].offset + nitems_read(0);
+            symbol_length = noutput_items - d_tags[i].offset + nitems_read(0);
           }
           // Get CSI from tag.
-          for (unsigned int k = 0; k < pmt::length(tags[i].value); ++k) {
-            pmt::pmt_t carrier_csi = pmt::vector_ref(tags[i].value, k);
+          for (unsigned int k = 0; k < pmt::length(d_tags[i].value); ++k) {
+            pmt::pmt_t carrier_csi = pmt::vector_ref(d_tags[i].value, k);
             for (unsigned int j = 0; j < pmt::length(carrier_csi); ++j) {
               d_csi[k][j] = pmt::c32vector_elements(pmt::vector_ref(carrier_csi, j));
             }
@@ -198,7 +208,14 @@ namespace gr {
           nprocessed += symbol_length;
         }
       }
-
+      // Propagate all other tags (except the CSI tags which were changed) manually.
+      std::vector <gr::tag_t> tags;
+      get_tags_in_window(tags, 0, 0, noutput_items);
+      for (int l = 0; l < tags.size(); ++l) {
+        if (tags[l].key != d_key) {
+          add_item_tag(0, tags[l].offset, tags[l].key, tags[l].value);
+        }
+      }
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }

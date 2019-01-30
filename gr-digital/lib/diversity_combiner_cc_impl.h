@@ -58,7 +58,7 @@ namespace gr {
       uint16_t d_vlen; /*!< Vector length of the input and output items. */
       std::string d_combining_technique;
       /*!< Combining technique selection combining ('SC') or maximum-ratio combining ('MRC'). */
-      std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
+      std::vector <gr::tag_t> d_tags; /*!< Vector that stores the tags in input buffer. */
       static const std::string s; /*!< String that matches the key of the CSI tags. */
       static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       std::vector<std::vector<std::vector<gr_complex> > > d_csi; /*!< Current channel matrix. */
