@@ -185,17 +185,17 @@ class ofdm_tx(gr.hier_block2):
 
         # Change SISO/MIMO specific default parameters.
         if occupied_carriers is None:
-            if self.m == 1:
+            if self.mimo_technique == 'SISO':
                 self.occupied_carriers = _def_occupied_carriers
             else:
                 self.occupied_carriers = _def_occupied_carriers_mimo
         if pilot_carriers is None:
-            if self.m == 1:
+            if self.mimo_technique == 'SISO':
                 self.pilot_carriers = _def_pilot_carriers
             else:
                 self.pilot_carriers = _def_pilot_carriers_mimo
         if pilot_symbols is None:
-            if self.m == 1:
+            if self.mimo_technique == 'SISO':
                 self.pilot_symbols = _def_pilot_symbols
             else:
                 # Generate Hadamard matrix as orthogonal pilot sequences.
@@ -279,7 +279,7 @@ class ofdm_tx(gr.hier_block2):
         '''
         Create OFDM frame
         '''
-        if self.m == 1:  # SISO case.
+        if self.mimo_technique == 'SISO':  # SISO case.
             allocator = digital.ofdm_carrier_allocator_cvc(
                 self.fft_len,
                 occupied_carriers=self.occupied_carriers,
