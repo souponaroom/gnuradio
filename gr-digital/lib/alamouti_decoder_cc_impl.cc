@@ -63,7 +63,7 @@ namespace gr {
       // Init CSI array.
       d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(1, std::vector<gr_complex> (2, 1.0)));
       // Set tag propagation policy to 'All to All'.
-      set_tag_propagation_policy(TPP_ALL_TO_ALL);
+      set_tag_propagation_policy(TPP_DONT);
     }
 
     /*
@@ -78,12 +78,14 @@ namespace gr {
                                             gr_complex* out,
                                             uint32_t length){
       // Iterate over received sequences (= 2 complex symbols).
-      for (unsigned int i = 0; i < length*d_vlen; i+=2) {
-        // Calculate the sum of the energy of both branches.
-        float total_branch_energy = std::norm(d_csi[i%d_vlen][0][0]) + std::norm(d_csi[i%d_vlen][0][1]);
-        // Calculate an estimation for the transmission sequence.
-        out[i] = (std::conj(d_csi[i%d_vlen][0][0])*in[i] + d_csi[i%d_vlen][0][1]*std::conj(in[i+1]))/total_branch_energy;
-        out[i+1] = (std::conj(d_csi[i%d_vlen][0][1])*in[i] - d_csi[i%d_vlen][0][0]*std::conj(in[i+1]))/total_branch_energy;
+      for (unsigned int i = 0; i < length; i+=2) {
+        for (int k = 0; k < d_vlen; ++k) {
+          // Calculate the sum of the energy of both branches.
+          float total_branch_energy = std::norm(d_csi[k][0][0]) + std::norm(d_csi[k][0][1]);
+          // Calculate an estimation for the transmission sequence.
+          out[i*d_vlen+k] = (std::conj(d_csi[k][0][0])*in[i*d_vlen+k]+d_csi[k][0][1]*std::conj(in[(i+1)*d_vlen+k]))/total_branch_energy;
+          out[(i+1)*d_vlen+k] = (std::conj(d_csi[k][0][1])*in[i*d_vlen+k]-d_csi[k][0][0]*std::conj(in[(i+1)*d_vlen+k]))/total_branch_energy;
+        }
       }
     }
 
@@ -95,10 +97,10 @@ namespace gr {
       const gr_complex *in = (const gr_complex *) input_items[0];
       gr_complex *out = (gr_complex *) output_items[0];
 
-      uint16_t nprocessed = 0; // Number of read and written items.
+      uint32_t nprocessed = 0; // Number of read and written items.
 
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+      get_tags_in_window(tags, 0, 0, noutput_items/d_vlen, d_key);
 
       uint32_t symbol_length; // Number of items in the current symbol.
 
@@ -115,11 +117,11 @@ namespace gr {
           // Check if the next tag is on an uneven position.
           if(tags[0].offset%2 != 0){
             // This should be prevented by the system developer in most cases.
-            GR_LOG_WARN(d_logger, format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d).\n "
-                                         "The Alamouti scheme works on sequences of 2 samples. "
-                                         "If you are not really sure what you are doing, "
-                                         "you should only set 'csi' tags on even sample positions.")
-                                  %0 %tags[0].offset);
+//            GR_LOG_WARN(d_logger, format("Ddetected \'csi\' tag on uneven position (tag[%d].offset = %d).\n "
+//                                         "The Alamouti scheme works on sequences of 2 samples. "
+//                                         "If you are not really sure what you are doing, "
+//                                         "you should only set 'csi' tags on even sample positions.")
+//                                  %0 %tags[0].offset);
             // The CSI is updated with the start of the next sequence (=next even sample).
             ++symbol_length;
           }
@@ -132,20 +134,22 @@ namespace gr {
           if (i < tags.size() - 1) {
             // This is not the last tag in the buffer.
             symbol_length = tags[i + 1].offset - nitems_read(0) - nprocessed/d_vlen;
+            //GR_LOG_DEBUG(d_logger, format("symbol len %d")%symbol_length);
             // Check if the next tag is on an uneven position (which it should usually not).
             if(symbol_length%2 != 0){
               // This should be prevented by the system developer in most cases.
-              GR_LOG_WARN(d_logger, format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d). \n"
-                                                   "The Alamouti scheme works on sequences of 2 samples. "
-                                                   "If you are not really sure what you are doing, "
-                                                   "you should only set 'csi' tags on even sample positions.")
-                                    %i %tags[i].offset);
+//              GR_LOG_WARN(d_logger, format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d). \n"
+//                                                   "The Alamouti scheme works on sequences of 2 samples. "
+//                                                   "If you are not really sure what you are doing, "
+//                                                   "you should only set 'csi' tags on even sample positions.")
+//                                    %i %tags[i].offset);
               // The CSI is updated with the start of the next sequence (=next even sample).
               ++symbol_length;
             }
           } else {
             // This is the last tag in the buffer.
             symbol_length = (noutput_items - nprocessed)/d_vlen;
+            //GR_LOG_DEBUG(d_logger, format("last symbol len %d, noutputitems %d, nprocessed %d")%symbol_length %noutput_items %nprocessed);
           }
           // Get CSI from 'csi' tag.
           for (unsigned int k = 0; k < pmt::length(tags[i].value); ++k) {
@@ -154,13 +158,19 @@ namespace gr {
               d_csi[k][j] = pmt::c32vector_elements(pmt::vector_ref(carrier_csi, j));
             }
           }
-          //GR_LOG_DEBUG(d_logger, format("csi: %d %d")%(d_csi[0][0][0]) %(d_csi[0][0][1]));
           // Process the symbol with the calculated weighting vector.
           decode_symbol(&in[nprocessed], &out[nprocessed], symbol_length);
           nprocessed += symbol_length*d_vlen;
         }
       }
-
+      // Propagate all other tags (except the CSI tags which were changed) manually.
+      std::vector <gr::tag_t> tags;
+      get_tags_in_window(tags, 0, 0, noutput_items);
+      for (int l = 0; l < tags.size(); ++l) {
+        if (tags[l].key != d_key) {
+          add_item_tag(0, tags[l].offset*d_vlen, tags[l].key, tags[l].value);
+        }
+      }
       // Tell runtime system how many output items we produced.
       return noutput_items;
     }

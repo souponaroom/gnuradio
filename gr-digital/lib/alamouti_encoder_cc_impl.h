@@ -47,9 +47,9 @@ namespace gr {
     class alamouti_encoder_cc_impl : public alamouti_encoder_cc
     {
      private:
-
+      uint32_t d_vlen;
      public:
-      alamouti_encoder_cc_impl();
+      alamouti_encoder_cc_impl(uint32_t vlen);
       ~alamouti_encoder_cc_impl();
 
       // Where all the action really happens

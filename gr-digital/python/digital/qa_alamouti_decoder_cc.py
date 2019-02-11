@@ -39,9 +39,9 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
     def dice_csi_tags(self, input, num_tags, tag_pos, vlen=1):
         tags = []
         # Calculate initial behaviour before first tag.
-        output = np.empty(shape=[len(input)], dtype=complex)
-        output[::2] = (input[::2] + np.conj(input[1::2]))/2.0
-        output[1::2] = (input[::2] - np.conj(input[1::2]))/2.0
+        output = np.empty(shape=np.shape(input), dtype=complex)
+        output[:,::2] = (input[:,::2] + np.conj(input[:,1::2]))/2.0
+        output[:,1::2] = (input[:,::2] - np.conj(input[:,1::2]))/2.0
 
         # Iterate over tags and update the calculated output according to the diced CSI.
         for i in range(0, num_tags):
@@ -62,54 +62,34 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
                                                     pmt.string_to_symbol("csi"),
                                                     csi_pmt,
                                                     pmt.from_long(0))))
-            # Calculate the expected result.
-            if vlen == 1:
-                total_branch_energy = np.sum(np.square(np.abs(csi[0][0])))
-                if tag_pos[i]%2 == 0:
-                    output[tag_pos[i]  ::2] = (np.conj(csi[0][0][0])*input[tag_pos[i]::2] +
-                                               csi[0][0][1]*np.conj(input[tag_pos[i]+1::2]))/total_branch_energy
-                    output[tag_pos[i]+1::2] = (np.conj(csi[0][0][1])*input[tag_pos[i]::2] -
-                                               csi[0][0][0]*np.conj(input[tag_pos[i]+1::2]))/total_branch_energy
-                else:
-                    output[tag_pos[i]+1::2] = (np.conj(csi[0][0][0])*input[tag_pos[i]+1::2] +
-                                               csi[0][0][1]*np.conj(input[tag_pos[i]+2::2]))/total_branch_energy
-                    output[tag_pos[i]+2::2] = (np.conj(csi[0][0][1])*input[tag_pos[i]+1::2] -
-                                               csi[0][0][0]*np.conj(input[tag_pos[i]+2::2]))/total_branch_energy
-            else:
-                if tag_pos[i]%2 == 0:
-                    for j in range(tag_pos[i]*vlen, len(input), 2):
-                        total_branch_energy = np.sum(np.square(np.abs(csi[j % vlen][0])))
-                        output[j] = (np.conj(csi[j%vlen][0][0])*input[j] +
-                                                   csi[j%vlen][0][1]*np.conj(input[j+1]))/total_branch_energy
-                        output[j+1] = (np.conj(csi[j%vlen][0][1])*input[j] -
-                                                   csi[j%vlen][0][0]*np.conj(input[j+1]))/total_branch_energy
-                else:
-                    for j in range((tag_pos[i]+1)*vlen, len(input), 2):
-                        total_branch_energy = np.sum(np.square(np.abs(csi[j % vlen][0])))
-                        output[j] = (np.conj(csi[j%vlen][0][0])*input[j] +
-                                                   csi[j%vlen][0][1]*np.conj(input[j+1]))/total_branch_energy
-                        output[j+1] = (np.conj(csi[j%vlen][0][1])*input[j] -
-                                                   csi[j%vlen][0][0]*np.conj(input[j+1]))/total_branch_energy
-        return tags, output
 
-    ''' 
+            total_branch_energy = np.reshape(np.sum(np.square(np.abs(csi[:,0])),axis=1),(vlen,1))
+            if tag_pos[i]%2 == 0:
+                output[:,tag_pos[i]  ::2] = (np.conj(np.reshape(csi[:,0,0],(vlen,1)))*input[:,tag_pos[i]::2] +
+                                             np.reshape(csi[:, 0, 1], (vlen, 1))*np.conj(input[:,tag_pos[i]+1::2]))/(1.0*total_branch_energy)
+                output[:,tag_pos[i]+1::2] = (np.conj(np.reshape(csi[:,0,1],(vlen,1)))*input[:,tag_pos[i]::2] -
+                                             np.reshape(csi[:, 0, 0], (vlen, 1))*np.conj(input[:,tag_pos[i]+1::2]))/(1.0*total_branch_energy)
+
+
+        return tags, output.T.ravel()
+
+    '''
     5 tests validating the correct output of the decoder with random input data and vector length 1.
     '''
     def test_001_t (self):
         # Define test params.
         data_length = 20
-        repetitions = 5
+        repetitions = 2
         num_tags = 4
-        vlen = 1
 
         for i in range(repetitions):
             # Generate random input data.
-            data = np.random.randn(vlen * data_length) + 1j * np.random.randn(vlen *data_length)
+            data = np.random.randn(data_length) + 1j * np.random.randn(data_length)
             # Generate random tag positions.
             tag_pos = np.random.randint(low=0, high=data_length/2, size=num_tags)*2
             tag_pos = np.sort(tag_pos)
             # Calculate expected result.
-            tags, expected_result = self.dice_csi_tags(data,
+            tags, expected_result = self.dice_csi_tags(np.array([data]),
                                                        num_tags,
                                                        tag_pos)
 
@@ -122,7 +102,6 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
             self.tb.connect(src, alamouti, sink)
             # Run flowgraph.
             self.tb.run()
-
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
 
@@ -132,7 +111,7 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
     def test_002_t (self):
         # Define test params.
         data_length = 20
-        repetitions = 5
+        repetitions = 4
         num_tags = 2
 
         for i in range(repetitions):
@@ -143,7 +122,7 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
             tag_pos = np.random.randint(low=0, high=data_length/2, size=num_tags)*2
             tag_pos = np.sort(tag_pos)
             # Calculate expected result.
-            tags, expected_result = self.dice_csi_tags(np.reshape(data.T, vlen*data_length),
+            tags, expected_result = self.dice_csi_tags(data,
                                                        num_tags,
                                                        tag_pos,
                                                        vlen)
@@ -159,7 +138,6 @@ class qa_alamouti_decoder_cc (gr_unittest.TestCase):
             self.tb.connect(src, alamouti, sink)
             # Run flowgraph.
             self.tb.run()
-
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
 

@@ -26,29 +26,31 @@
 
 #include <gnuradio/io_signature.h>
 #include "alamouti_encoder_cc_impl.h"
-
+#include <boost/format.hpp>
+using namespace boost;
 namespace gr {
   namespace digital {
 
     alamouti_encoder_cc::sptr
-    alamouti_encoder_cc::make()
+    alamouti_encoder_cc::make(uint32_t vlen)
     {
       return gnuradio::get_initial_sptr
-        (new alamouti_encoder_cc_impl());
+        (new alamouti_encoder_cc_impl(vlen));
     }
 
     /*
      * The private constructor
      */
-    alamouti_encoder_cc_impl::alamouti_encoder_cc_impl()
+    alamouti_encoder_cc_impl::alamouti_encoder_cc_impl(uint32_t vlen)
       : gr::sync_block("alamouti_encoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
-              gr::io_signature::make(2, 2, sizeof(gr_complex)))
+              gr::io_signature::make(2, 2, sizeof(gr_complex))),
+        d_vlen(vlen)
     {
       /* Set the number of input and output items to a multiple of 2,
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
        */
-      set_output_multiple(2);
+      set_output_multiple(2*vlen);
     }
 
     /*
@@ -68,14 +70,18 @@ namespace gr {
       gr_complex *out2 = (gr_complex *) output_items[1];
 
       // Copy data to first period of each transmission sequence.
-      for (int i = 0; i < noutput_items; i+=2) {
-        out1[i] = in[i];
-        out2[i] = in[i+1];
+      for (int i = 0; i < noutput_items/d_vlen; i+=2) {
+        for (int k = 0; k < d_vlen; ++k) {
+          out1[i*d_vlen+k] = in[i*d_vlen+k];
+          out2[i*d_vlen+k] = in[(i+1)*d_vlen+k];
+        }
       }
       // Write conjugated (and for branch 2 negated) data to 2. period of each transmission sequence.
-      for (int i = 1; i < noutput_items; i+=2) {
-        out1[i] = -std::conj(in[i]);
-        out2[i] = std::conj(in[i-1]);
+      for (int i = 1; i < noutput_items/d_vlen; i+=2) {
+        for (int k = 0; k < d_vlen; ++k) {
+          out1[i*d_vlen+k] = -std::conj(in[i*d_vlen+k]);
+          out2[i*d_vlen+k] = std::conj(in[(i-1)*d_vlen+k]);
+        }
       }
 
       // Tell runtime system how many output items we produced.

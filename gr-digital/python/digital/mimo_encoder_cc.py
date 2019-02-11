@@ -32,14 +32,14 @@ class mimo_encoder_cc(gr.hier_block2):
     -M output ports
     """
 
-    def __init__(self, M=2, mimo_technique='none'):
+    def __init__(self, M=2, mimo_technique='none', vlen=1):
         gr.hier_block2.__init__(self,
             "mimo_encoder_cc",
             gr.io_signature(1, 1, gr.sizeof_gr_complex),  # Input signature
             gr.io_signature(M, M, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into encoder blocks.
-        mimo_algorithm = {'alamouti' : digital.alamouti_encoder_cc_make(),
+        mimo_algorithm = {'alamouti' : digital.alamouti_encoder_cc_make(vlen),
                           'diff_stbc' : digital.diff_stbc_encoder_cc_make(),
                           'vblast' : digital.vblast_encoder_cc_make(M),
                           'diversity_combining_SC' : digital.vblast_encoder_cc_make(M)}

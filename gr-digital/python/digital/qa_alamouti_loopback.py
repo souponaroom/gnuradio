@@ -43,7 +43,7 @@ class qa_alamouti_loopback (gr_unittest.TestCase):
         # Define test params.
         data_length = 20
         repetitions = 3
-        num_tags = 3
+        num_tags = 1
         vlen = 1
         result = np.empty(shape=[data_length*vlen], dtype=complex)
 
@@ -107,7 +107,7 @@ class qa_alamouti_loopback (gr_unittest.TestCase):
         # Define test params.
         data_length = 20
         repetitions = 3
-        num_tags = 3
+        num_tags = 4
 
         for n in range(repetitions):
             # Random (even) vector length.
@@ -147,7 +147,7 @@ class qa_alamouti_loopback (gr_unittest.TestCase):
                 src = blocks.vector_source_c(data=subdata,
                                              repeat=False,
                                              tags=tags)
-                alamouti_encoder = digital.alamouti_encoder_cc()
+                alamouti_encoder = digital.alamouti_encoder_cc(vlen)
                 # Simulate channel with matrix multiplication.
                 channel = blocks.multiply_matrix_cc_make(csi[0])
                 alamouti_decoder = digital.alamouti_decoder_cc(vlen=vlen)

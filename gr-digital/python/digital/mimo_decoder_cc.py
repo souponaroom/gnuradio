@@ -44,7 +44,7 @@ class mimo_decoder_cc(gr.hier_block2):
                           'diversity_combining_MRC': digital.diversity_combiner_cc_make(num_inputs=N,
                                                                                     vlen=vlen,
                                                                                     combining_technique='MRC'),
-                          'alamouti': digital.alamouti_decoder_cc_make(),
+                          'alamouti': digital.alamouti_decoder_cc_make(vlen),
                           'diff_stbc': digital.diff_stbc_decoder_cc_make(),
                           'vblast': digital.vblast_decoder_cc_make(num_inputs=N,
                                                                     equalizer_type='ZF',
@@ -57,7 +57,7 @@ class mimo_decoder_cc(gr.hier_block2):
         if mimo_technique not in mimo_algorithm:
             raise ValueError('MIMO algorithm %s unknown.' % (mimo_technique))
         # Check if N = 2 for Alamouti-like schemes.
-        if N != 2 and mimo_technique == ('alamouti' or 'diff_stbc'):
+        if N != 1 and mimo_technique == ('alamouti' or 'diff_stbc'):
             raise ValueError('For Alamouti-like schemes like %s, N must be 2.' % mimo_technique)
 
         # Connect everything.

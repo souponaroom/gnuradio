@@ -308,7 +308,8 @@ class ofdm_tx(gr.hier_block2):
         else:  # MIMO case.
             mimo_encoder = mimo_encoder_cc(
                 M=self.m,
-                mimo_technique=self.mimo_technique
+                mimo_technique=self.mimo_technique,
+                vlen=len(self.occupied_carriers[0])
             )
             self.connect(header_payload_mux, mimo_encoder)
             self.connect(header_payload_mux, blocks.file_sink(gr.sizeof_gr_complex, "tx_symbols.dat"))
