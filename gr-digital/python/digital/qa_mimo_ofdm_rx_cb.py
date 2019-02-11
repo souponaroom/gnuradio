@@ -96,13 +96,13 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         return sink.data()
 
 
-    def test_001_basic_t (self):
+    def test_001_vblast_t (self):
         """
-        Basic test.
+        VBLAST test
         """
         # Define test parameters.
-        f_off_rel = 0.0
-        packet_len = 8
+        f_off_rel = [0.0, 0.5, 4.0, 5.3]
+        packet_len = 16
         fft_len = 64
         cp_len = fft_len/4
         n = 2
@@ -110,78 +110,35 @@ class qa_mimo_ofdm_rx_cb (gr_unittest.TestCase):
         mimo_technique = "vblast"
         packet_len_tag_key = "packet_length"
 
-        data = np.random.randint(0, 256, packet_len*6)
-        result = self.simulate_loopback(data, m, n, mimo_technique,
-                                        packet_len, packet_len_tag_key,
-                                        fft_len, cp_len,
-                                        f_off_rel)
+        for freq_off in f_off_rel:
+            data = np.random.randint(0, 256, packet_len*6)
+            result = self.simulate_loopback(data, m, n, mimo_technique,
+                                            packet_len, packet_len_tag_key,
+                                            fft_len, cp_len,
+                                            freq_off)
+            self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
 
-        self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
-
-    def test_002_fract_carr_freq_off_t (self):
+    def test_002_diversity_combining_t (self):
         """
-        Test with fractional carrier frequency offset.
+        Diversity Combining test
         """
         # Define test parameters.
-        f_off_rel = 0.5
+        f_off_rel = [0.0, 0.5, 4.0, 5.3]
         packet_len = 8
         fft_len = 64
         cp_len = fft_len/4
         n = 2
-        m = 2
-        mimo_technique = "vblast"
+        m = 1
+        mimo_technique = "diversity_combining_SC"
         packet_len_tag_key = "packet_length"
 
-        data = range(packet_len)
-        result = self.simulate_loopback(data, m, n, mimo_technique,
-                                        packet_len, packet_len_tag_key,
-                                        fft_len, cp_len,
-                                        f_off_rel)
-
-        self.assertComplexTuplesAlmostEqual(data, result, 2)
-
-
-    def test_003_int_carr_freq_off_t (self):
-        """
-        Test with integer carrier frequency offset.
-        """
-        # Define test parameters.
-        f_off_rel = 4.0
-        packet_len = 8
-        fft_len = 64
-        cp_len = fft_len/4
-        n = 2
-        m = 2
-        mimo_technique = "vblast"
-        packet_len_tag_key = "packet_length"
-
-        data = range(packet_len)
-        result = self.simulate_loopback(data, m, n, mimo_technique,
-                                        packet_len, packet_len_tag_key,
-                                        fft_len, cp_len,
-                                        f_off_rel)
-        self.assertComplexTuplesAlmostEqual(data, result, 2)
-
-    def test_004_arbitrary_freq_off_t (self):
-        """
-        Test with arbitrary frequency offset (int + fractional offset).
-        """
-        # Define test parameters.
-        f_off_rel = 5.3
-        packet_len = 8
-        fft_len = 64
-        cp_len = fft_len/4
-        n = 2
-        m = 2
-        mimo_technique = "vblast"
-        packet_len_tag_key = "packet_length"
-
-        data = range(packet_len)
-        result = self.simulate_loopback(data, m, n, mimo_technique,
-                                        packet_len, packet_len_tag_key,
-                                        fft_len, cp_len,
-                                        f_off_rel)
-        self.assertComplexTuplesAlmostEqual(data, result, 2)
+        for freq_off in f_off_rel:
+            data = np.random.randint(0, 256, packet_len*6)
+            result = self.simulate_loopback(data, m, n, mimo_technique,
+                                            packet_len, packet_len_tag_key,
+                                            fft_len, cp_len,
+                                            freq_off)
+            self.assertComplexTuplesAlmostEqual(data[:packet_len], result, 2)
 
 
 if __name__ == '__main__':

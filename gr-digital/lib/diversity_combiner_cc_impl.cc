@@ -204,7 +204,7 @@ namespace gr {
           // Process the symbol with the calculated weighting vector.
           process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
           // Generate new CSI tags for equalization and add them to stream.
-          add_item_tag(0, nitems_written(0) + nprocessed*d_vlen, d_key, generate_csi_pmt());
+          add_item_tag(0, d_tags[i].offset, d_key, generate_csi_pmt());
           nprocessed += symbol_length;
         }
       }
