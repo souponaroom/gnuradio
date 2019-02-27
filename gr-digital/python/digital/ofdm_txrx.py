@@ -34,6 +34,7 @@ import digital_swig as digital
 from mimo_encoder_cc import mimo_encoder_cc
 from mimo_ofdm_rx_cb import mimo_ofdm_rx_cb
 from scipy.linalg import hadamard
+from mimo import mimo_technique
 
 try:
     # This will work when feature #505 is added.
@@ -67,7 +68,7 @@ _seq_seed = 42
 
 # Default parameters for MIMO-OFDM.
 _def_m = 1
-_def_mimo_technique = 'none'
+_def_mimo_technique = mimo_technique.VBLAST
 # OFDM carrier allocation.
 _def_pilot_carriers_mimo=[range(-26, 0, 3)+range(2, 27, 3), ]
 _def_occupied_carriers_mimo = [[x for x in range(-24, 25, 1) if x not in _def_pilot_carriers_mimo[0] + [0]], ]
@@ -185,17 +186,17 @@ class ofdm_tx(gr.hier_block2):
 
         # Change SISO/MIMO specific default parameters.
         if occupied_carriers is None:
-            if self.mimo_technique == 'SISO':
+            if self.mimo_technique is mimo_technique.SISO:
                 self.occupied_carriers = _def_occupied_carriers
             else:
                 self.occupied_carriers = _def_occupied_carriers_mimo
         if pilot_carriers is None:
-            if self.mimo_technique == 'SISO':
+            if self.mimo_technique is  mimo_technique.SISO:
                 self.pilot_carriers = _def_pilot_carriers
             else:
                 self.pilot_carriers = _def_pilot_carriers_mimo
         if pilot_symbols is None:
-            if self.mimo_technique == 'SISO':
+            if self.mimo_technique is  mimo_technique.SISO:
                 self.pilot_symbols = _def_pilot_symbols
             else:
                 # Generate Hadamard matrix as orthogonal pilot sequences.
@@ -279,7 +280,7 @@ class ofdm_tx(gr.hier_block2):
         '''
         Create OFDM frame
         '''
-        if self.mimo_technique == 'SISO':  # SISO case.
+        if self.mimo_technique is  mimo_technique.SISO:  # SISO case.
             allocator = digital.ofdm_carrier_allocator_cvc(
                 self.fft_len,
                 occupied_carriers=self.occupied_carriers,

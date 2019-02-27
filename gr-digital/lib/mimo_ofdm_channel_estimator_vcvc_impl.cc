@@ -213,7 +213,6 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-      add_item_tag(0, nitems_written(0), pmt::string_to_symbol("est_buffer"), pmt::from_long(noutput_items));
       /* Copy occupied OFDM sub-carriers to output buffer.
        * (Neither the zero-carriers nor the pilot carriers) */
       extract_payload_carriers(input_items, output_items, noutput_items);

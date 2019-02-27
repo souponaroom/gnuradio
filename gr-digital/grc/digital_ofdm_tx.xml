@@ -170,29 +170,23 @@
   <param>
     <name>MIMO</name>
     <key>mimo_technique</key>
-    <value>"siso"</value>
+    <value>digital.mimo.VBLAST</value>
     <type>enum</type>
     <option>
-      <name>SISO</name>
-      <key>"siso"</key>
-      <opt>set_m:1</opt>
-      <opt>hide_m:all</opt>
-    </option>
-    <option>
       <name>Alamouti</name>
-      <key>"alamouti"</key>
+      <key>digital.mimo.ALAMOUTI</key>
       <opt>set_m:2</opt>
       <opt>hide_m:none</opt>
     </option>
     <option>
       <name>Differential Alamouti</name>
-      <key>"diff_stbc"</key>
+      <key>digital.mimo.DIFF_ALAMOUTI</key>
       <opt>set_m:2</opt>
       <opt>hide_m:none</opt>
     </option>
     <option>
       <name>V-BLAST</name>
-      <key>"vblast"</key>
+      <key>digital.mimo.VBLAST</key>
       <opt>set_m:2</opt>
       <opt>hide_m:none</opt>
     </option>

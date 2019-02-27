@@ -50,6 +50,7 @@ GR_PYTHON_INSTALL(
     qam_constellations.py
     qpsk.py
     soft_dec_lut_gen.py
+    mimo.py
     mimo_encoder_cc.py
     mimo_decoder_cc.py
     mimo_ofdm_rx_cb.py DESTINATION ${GR_PYTHON_DIR}/gnuradio/digital

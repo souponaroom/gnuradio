@@ -23,6 +23,7 @@
 
 from gnuradio import gr
 import digital_swig as digital
+from mimo import mimo_technique as mimo
 
 class mimo_decoder_cc(gr.hier_block2):
     """
@@ -31,22 +32,22 @@ class mimo_decoder_cc(gr.hier_block2):
     -decoder block with selected MIMO algorithm (default 'none' is no block at all)
     -1 output port
     """
-    def __init__(self, N=2, mimo_technique='none', vlen=1, csi_key="csi"):
+    def __init__(self, mimo_technique, N=2, vlen=1, csi_key="csi"):
         gr.hier_block2.__init__(self,
             "mimo_decoder_cc",
             gr.io_signature(N, N, gr.sizeof_gr_complex*vlen),  # Input signature
             gr.io_signature(1, 1, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into decoder blocks.
-        mimo_algorithm = {'diversity_combining_SC': digital.diversity_combiner_cc_make(num_inputs=N,
+        mimo_algorithm = {mimo.RX_DIVERSITY_SC: digital.diversity_combiner_cc_make(num_inputs=N,
                                                                                   vlen=vlen,
                                                                                   combining_technique='SC'),
-                          'diversity_combining_MRC': digital.diversity_combiner_cc_make(num_inputs=N,
+                          mimo.RX_DIVERSITY_MRC: digital.diversity_combiner_cc_make(num_inputs=N,
                                                                                     vlen=vlen,
                                                                                     combining_technique='MRC'),
-                          'alamouti': digital.alamouti_decoder_cc_make(vlen),
-                          'diff_stbc': digital.diff_stbc_decoder_cc_make(),
-                          'vblast': digital.vblast_decoder_cc_make(num_inputs=N,
+                          mimo.ALAMOUTI: digital.alamouti_decoder_cc_make(vlen=vlen),
+                          mimo.DIFF_ALAMOUTI: digital.diff_stbc_decoder_cc_make(vlen=vlen),
+                          mimo.VBLAST: digital.vblast_decoder_cc_make(num_inputs=N,
                                                                     equalizer_type='ZF',
                                                                     vlen=vlen)}
 
@@ -55,10 +56,10 @@ class mimo_decoder_cc(gr.hier_block2):
             raise ValueError('MIMO block must have N >= 1 (N=%d) selected).' % N)
         # Check for valid MIMO algorithm.
         if mimo_technique not in mimo_algorithm:
-            raise ValueError('MIMO algorithm %s unknown.' % (mimo_technique))
+            raise ValueError('MIMO algorithm %s unknown.' % str(mimo_technique))
         # Check if N = 2 for Alamouti-like schemes.
-        if N != 1 and mimo_technique == ('alamouti' or 'diff_stbc'):
-            raise ValueError('For Alamouti-like schemes like %s, N must be 2.' % mimo_technique)
+        if N != 1 and mimo_technique is (mimo.ALAMOUTI or mimo.DIFF_ALAMOUTI):
+            raise ValueError('For Alamouti-like schemes like %s, N must be 2.' % str(mimo_technique))
 
         # Connect everything.
         mimo_decoder = mimo_algorithm[mimo_technique]

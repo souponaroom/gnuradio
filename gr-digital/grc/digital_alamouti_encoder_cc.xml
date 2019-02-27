@@ -3,7 +3,13 @@
   <key>digital_alamouti_encoder_cc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.alamouti_encoder_cc()</make>
+  <make>digital.alamouti_encoder_cc($vlen)</make>
+  <param>
+    <name>Vector len</name>
+    <key>vlen</key>
+    <value>1</value>
+    <type>int</type> 
+  </param>
   <sink>
     <name>in</name>
     <type>complex</type>

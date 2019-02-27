@@ -38,14 +38,15 @@ except ImportError:
 
 import numpy as np
 from scipy.linalg import hadamard
+from mimo import mimo_technique
 
 ''' 
 Default values for Receiver.
 '''
 # Number of receiving antennas.
-_def_m = 1
+_def_m = 2
 _def_n = 2
-_def_mimo_technique = 'diversity_combining_SC'
+_def_mimo_technique = mimo_technique.VBLAST
 _def_fft_len = 64
 _def_cp_len = 16
 _seq_seed = 42

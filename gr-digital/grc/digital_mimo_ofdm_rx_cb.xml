@@ -172,10 +172,22 @@
     </option>
   </param>
   <param>
-    <name>MIMO technique</name>
+    <name>MIMO</name>
     <key>mimo_technique</key>
-    <value>"vblast"</value>
-    <type>raw</type>
+    <value>digital.mimo.VBLAST</value>
+    <type>enum</type>
+    <option>
+      <name>Alamouti</name>
+      <key>digital.mimo.ALAMOUTI</key>
+    </option>
+    <option>
+      <name>Differential Alamouti</name>
+      <key>digital.mimo.DIFF_ALAMOUTI</key>
+    </option>
+    <option>
+      <name>V-BLAST</name>
+      <key>digital.mimo.VBLAST</key>
+    </option>
   </param>
   <check>$fft_len &gt; 0</check>
   <check>$cp_len &gt; 0</check>
