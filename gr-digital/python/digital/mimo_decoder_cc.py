@@ -65,11 +65,6 @@ class mimo_decoder_cc(gr.hier_block2):
         mimo_decoder = mimo_algorithm[mimo_technique]
         for i in range(0, N):
             self.connect((self, i), (mimo_decoder, i))
-        if mimo_technique is mimo.RX_DIVERSITY_SC:
-            equalizer = digital.vblast_decoder_cc_make(num_inputs=1, equalizer_type='ZF', vlen=vlen)
-            self.connect(mimo_decoder, equalizer, self)
-        elif mimo_technique is mimo.RX_DIVERSITY_MRC:
-            self.connect(mimo_decoder, blocks.vector_to_stream(gr.sizeof_gr_complex, vlen), self)
-        else:
-            self.connect(mimo_decoder, self)
+
+        self.connect(mimo_decoder, self)
 

@@ -1279,7 +1279,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.RX_DIVERSITY_MRC</value>
+      <value>digital.mimo.RX_DIVERSITY_SC</value>
     </param>
     <param>
       <key>maxoutbuf</key>

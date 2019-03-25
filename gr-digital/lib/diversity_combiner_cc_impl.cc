@@ -56,9 +56,9 @@ namespace gr {
     diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs,
                                                            uint16_t vlen,
                                                            std::string combining_technique)
-      : gr::sync_block("diversity_combiner_cc",
+      : gr::sync_interpolator("diversity_combiner_cc",
               gr::io_signature::make(num_inputs, num_inputs, vlen*sizeof(gr_complex)),
-              gr::io_signature::make(1, 1, vlen*sizeof(gr_complex))),
+              gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
         d_num_inputs(num_inputs),
         d_vlen(vlen),
         d_combining_technique(combining_technique)
@@ -120,7 +120,7 @@ namespace gr {
         for (int k = 0; k < d_vlen; ++k) {
           const gr_complex *in = &((const gr_complex *) input[d_best_path[k]])[offset];
           for (int i = 0; i < length; ++i) {
-            out[d_vlen*i+k] = in[d_vlen*i+k];
+            out[d_vlen*i+k] = in[d_vlen*i+k]/d_csi[k][0][d_best_path[k]];
           }
         }
       }
@@ -167,13 +167,13 @@ namespace gr {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(d_tags, 0, 0, noutput_items, d_key);
+      get_tags_in_window(d_tags, 0, 0, noutput_items/d_vlen, d_key);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
       if(d_tags.size() == 0){ // Input buffer includes no tags at all.
         // Handle all samples in buffer as they belong to the current symbol.
-        symbol_length = noutput_items;
+        symbol_length = noutput_items/d_vlen;
         process_symbol(input_items, out, 0, symbol_length);
         nprocessed += symbol_length;
       } else { // Input buffer includes tags.
@@ -190,7 +190,7 @@ namespace gr {
           if (i < d_tags.size() - 1) {
             symbol_length = d_tags[i + 1].offset - d_tags[i].offset;
           } else {
-            symbol_length = noutput_items - d_tags[i].offset + nitems_read(0);
+            symbol_length = noutput_items/d_vlen - d_tags[i].offset + nitems_read(0);
           }
           // Get CSI from tag.
           for (unsigned int k = 0; k < pmt::length(d_tags[i].value); ++k) {
@@ -203,17 +203,15 @@ namespace gr {
           combine_inputs(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
           // Process the symbol with the calculated weighting vector.
           process_symbol(input_items, &out[nprocessed*d_vlen], nprocessed*d_vlen, symbol_length);
-          // Generate new CSI tags for equalization and add them to stream.
-          add_item_tag(0, d_tags[i].offset, d_key, generate_csi_pmt());
           nprocessed += symbol_length;
         }
       }
       // Propagate all other tags (except the CSI tags which were changed) manually.
       std::vector <gr::tag_t> tags;
-      get_tags_in_window(tags, 0, 0, noutput_items);
+      get_tags_in_window(tags, 0, 0, noutput_items/d_vlen);
       for (int l = 0; l < tags.size(); ++l) {
         if (tags[l].key != d_key) {
-          add_item_tag(0, tags[l].offset, tags[l].key, tags[l].value);
+          add_item_tag(0, tags[l].offset*d_vlen, tags[l].key, tags[l].value);
         }
       }
       // Tell runtime system how many output items we produced.
