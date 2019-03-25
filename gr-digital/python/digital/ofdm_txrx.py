@@ -313,6 +313,7 @@ class ofdm_tx(gr.hier_block2):
                 vlen=len(self.occupied_carriers[0])
             )
             self.connect(header_payload_mux, mimo_encoder)
+            #self.connect(mimo_encoder, blocks.tag_debug(gr.sizeof_gr_complex, 'encoder'))
             self.connect(header_payload_mux, blocks.file_sink(gr.sizeof_gr_complex, "tx_symbols.dat"))
             allocator = []
             ffter = []

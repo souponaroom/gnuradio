@@ -57,6 +57,9 @@ namespace gr {
        * vector size, but with stream input/output item sizes.
        */
       uint32_t d_block_len;
+      bool d_start_new_packet;
+      std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
+      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       /*!< Complex vector of size 2. The 2 complex elements of this vectors
        * can each be interpreted as a basis vector in the complex plane.
        * These 2 2-dimensional vectors (= 2 complex numbers) are a new basis
@@ -109,7 +112,9 @@ namespace gr {
       ~diff_stbc_encoder_cc_impl();
 
       // Where all the action really happens
-      int work(int noutput_items,
+      void forecast (int noutput_items, gr_vector_int &ninput_items_required);
+      int general_work(int noutput_items,
+         gr_vector_int &ninput_items,
          gr_vector_const_void_star &input_items,
          gr_vector_void_star &output_items);
     };

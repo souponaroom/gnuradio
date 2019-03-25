@@ -3,7 +3,13 @@
   <key>digital_diff_stbc_encoder_cc</key>
   <category>[MIMO]</category>
   <import>from gnuradio import digital</import>
-  <make>digital.diff_stbc_encoder_cc($phase_offset)</make>
+  <make>digital.diff_stbc_encoder_cc($phase_offset, $block_len)</make>
+  <param>
+    <name>Block Length</name>
+    <key>block_len</key>
+    <value>1</value>
+    <type>int</type>
+  </param>
   <param>
     <name>Phase Offset</name>
     <key>phase_offset</key>

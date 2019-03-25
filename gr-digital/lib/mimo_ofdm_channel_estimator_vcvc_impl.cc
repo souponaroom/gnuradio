@@ -85,7 +85,7 @@ namespace gr {
         throw std::invalid_argument((boost::format("FFT length %d must be even.") %fft_len).str());
       }
       // Set tag propagation policy.
-      set_tag_propagation_policy(TPP_ONE_TO_ONE);
+      set_tag_propagation_policy(TPP_DONT);
     }
 
     /*
@@ -257,6 +257,13 @@ namespace gr {
       // Update last_tag_offset.
       if (start_tags.size() > 0){
         d_last_tag_offset = start_tags[start_tags.size()-1].offset;
+      }
+
+      // Propagate all other tags (except the CSI tags which were changed) manually.
+      std::vector <gr::tag_t> propagate_tags;
+      get_tags_in_window(propagate_tags, 0, 0, noutput_items);
+      for (int l = 0; l < propagate_tags.size(); ++l) {
+          add_item_tag(0, propagate_tags[l].offset, propagate_tags[l].key, propagate_tags[l].value);
       }
 
       // Tell runtime system how many input items we consumed on

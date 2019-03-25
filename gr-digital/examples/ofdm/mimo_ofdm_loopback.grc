@@ -1196,7 +1196,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(440, 716)</value>
+      <value>(432, 700)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -1279,7 +1279,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.ALAMOUTI</value>
+      <value>digital.mimo.DIFF_ALAMOUTI</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -1382,7 +1382,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.ALAMOUTI</value>
+      <value>digital.mimo.DIFF_ALAMOUTI</value>
     </param>
     <param>
       <key>maxoutbuf</key>

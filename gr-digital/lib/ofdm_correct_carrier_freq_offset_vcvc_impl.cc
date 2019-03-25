@@ -60,7 +60,7 @@ namespace gr {
         d_carrier_offset(0)
     {
       // Set tag propagation policy.
-      set_tag_propagation_policy(TPP_ONE_TO_ONE);
+      set_tag_propagation_policy(TPP_DONT);
     }
 
     /*
@@ -143,6 +143,15 @@ namespace gr {
           // Correct int freq offset.
           correct_offset(input_items, output_items, nprocessed*d_fft_len, length);
           nprocessed += length;
+        }
+      }
+
+      // Propagate all other tags (except the CSI tags which were changed) manually.
+      std::vector <gr::tag_t> propagate_tags;
+      get_tags_in_window(propagate_tags, 0, 0, noutput_items);
+      for (int l = 0; l < propagate_tags.size(); ++l) {
+        if (propagate_tags[l].key != d_key) {
+          add_item_tag(0, propagate_tags[l].offset, propagate_tags[l].key, propagate_tags[l].value);
         }
       }
 

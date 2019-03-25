@@ -61,6 +61,7 @@ namespace gr {
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
        */
       set_output_multiple(2*vlen);
+      set_tag_propagation_policy(TPP_DONT);
     }
 
     /*
@@ -122,38 +123,34 @@ namespace gr {
         }
       }
       if (tags.size() > 0) {
-        // Process samples before the first tag.
-        input_block_length = (tags[0].offset-((tags[0].offset)%2)) - nitems_read(0);
-        // Decode remaining sequences of the current block before the first tag.
-        decode_sequences(d_predecessor, in, out, input_block_length);
-        nconsumed = input_block_length;
-        nproduced = input_block_length*d_vlen;
+        if(tags[0].offset == nitems_read(0)){
+          // Tag on 1st item.
+          // Iterate over data blocks between taqs.
+          for (unsigned int i = 0; i+1 < tags.size(); ++i) {
+            // This is not the last tag in the buffer.
+            /* Calculate input block length. The output block length is
+             * one sequence shorter than the input block length
+             * due to differential coding. */
+            input_block_length = (tags[i+1].offset-(tags[i+1].offset%2)) - (tags[i].offset-(tags[i].offset%2));
+            // Decode sequences of this block.
+            if (input_block_length > 2) {
+              decode_sequences(&in[nconsumed*d_vlen], &in[(nconsumed + 2)*d_vlen], &out[nproduced], input_block_length - 2);
+              add_item_tag(0, nitems_written(0) + nproduced, d_key, pmt::from_long(0));
+              //GR_LOG_DEBUG(d_logger, format("%d")%(nitems_written(0) + nproduced));
+              nproduced += (input_block_length - 2)*d_vlen;
+            }
+            nconsumed += input_block_length;
 
-        // Iterate over data blocks between taqs.
-        for (unsigned int i = 0; i+1 < tags.size(); ++i) {
-          // This is not the last tag in the buffer.
-          /* Calculate input block length. The output block length is
-           * one sequence shorter than the input block length
-           * due to differential coding. */
-          input_block_length = (tags[i+1].offset-(tags[i+1].offset%2)) - (tags[i].offset-(tags[i].offset%2));
-          // Decode sequences of this block.
-          if (input_block_length > 2) {
-            decode_sequences(&in[nconsumed*d_vlen], &in[(nconsumed + 2)*d_vlen], &out[nproduced], input_block_length - 2);
-            nproduced += (input_block_length - 2)*d_vlen;
           }
-          nconsumed += input_block_length;
-
+        } else{
+          // There are items before the first tag.
+          // Process samples before the first tag.
+          input_block_length = (tags[0].offset-((tags[0].offset)%2)) - nitems_read(0);
+          // Decode remaining sequences of the current block before the first tag.
+          decode_sequences(d_predecessor, in, out, input_block_length);
+          nconsumed = input_block_length;
+          nproduced = input_block_length*d_vlen;
         }
-        // Process samples after last tag in the buffer.
-        input_block_length = noutput_items/d_vlen - nconsumed;
-        // Decode remaining sequences of this buffer.
-        if (input_block_length > 2) {
-          // There is more than one sequence left.
-          decode_sequences(&in[nconsumed*d_vlen], &in[(nconsumed + 2)*d_vlen], &out[nproduced], input_block_length - 2);
-          nproduced += (input_block_length - 2)*d_vlen;
-        }
-        nconsumed += input_block_length;
-
       } else{
         // Process all samples, because there is no tag in this buffer.
         decode_sequences(d_predecessor, in, out, noutput_items);

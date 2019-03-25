@@ -25,7 +25,7 @@
 #define INCLUDED_DIGITAL_DIFF_STBC_ENCODER_CC_H
 
 #include <gnuradio/digital/api.h>
-#include <gnuradio/sync_block.h>
+#include <gnuradio/block.h>
 
 namespace gr {
   namespace digital {
@@ -53,7 +53,7 @@ namespace gr {
  * WCNC. 1999 IEEE Wireless Communications and Networking Conference (Cat. No.99TH8466),
  * New Orleans, LA, 1999, pp. 1043-1047 vol.3. doi: 10.1109/WCNC.1999.796832
  */
-    class DIGITAL_API diff_stbc_encoder_cc : virtual public gr::sync_block
+    class DIGITAL_API diff_stbc_encoder_cc : virtual public gr::block
     {
      public:
       typedef boost::shared_ptr<diff_stbc_encoder_cc> sptr;
