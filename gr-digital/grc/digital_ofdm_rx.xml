@@ -4,6 +4,7 @@
   <key>digital_ofdm_rx</key>
   <import>from gnuradio import digital</import>
   <make>digital.ofdm_rx(
+          m=$m, n=$n, mimo_technique=$mimo,
 	  fft_len=$fft_len, cp_len=$cp_len,
 	  frame_length_tag_key='frame_'+$packet_len_key,
 	  packet_length_tag_key=$packet_len_key,
@@ -161,6 +162,46 @@
     </option>
   </param>
   <param>
+    <name>MIMO</name>
+    <key>mimo_technique</key>                                                   
+    <value>digital.mimo.SISO</value>                                          
+    <type>enum</type>                                                           
+    <option>                                                                    
+      <name>SISO</name>                                                     
+      <key>digital.mimo.SISO</key>                                                        
+      <opt>hide_mn:part</opt>                                                    
+    </option>                                                                   
+    <option>                                                                    
+      <name>Alamouti</name>                                                     
+      <key>digital.mimo.ALAMOUTI</key>                                          
+      <opt>hide_mn:none</opt>                                                  
+    </option>                                                                   
+    <option>                                                                    
+      <name>Differential Alamouti</name>                                        
+      <key>digital.mimo.DIFF_ALAMOUTI</key>                                     
+      <opt>hide_mn:none</opt>                                                    
+    </option>                                                                   
+    <option>                                                                    
+      <name>V-BLAST</name>                                                      
+      <key>digital.mimo.VBLAST</key>                                            
+      <opt>hide_mn:none</opt>                                                    
+    </option>                                                                   
+  </param>
+  <param>                                                                       
+    <name>M</name>                                                              
+    <key>m</key>                                                                
+    <value>1</value>                                                 
+    <type>int</type>                                                            
+    <hide>$mimo_technique.hide_mn</hide>                                         
+  </param>
+  <param>                                                                       
+    <name>N</name>                                                              
+    <key>n</key>                                                                
+    <value>1</value>                                               
+    <type>int</type>                                                            
+    <hide>$mimo_technique.hide_mn</hide>                                         
+  </param>
+  <param>
     <name>Log Debug Info</name>
     <key>log</key>
     <value>False</value>
@@ -181,6 +222,7 @@
   <sink>
     <name>in</name>
     <type>complex</type>
+    <nports>$n</nports>
   </sink>
   <source>
     <name>out</name>

@@ -383,7 +383,7 @@ class ofdm_rx(gr.hier_block2):
     |           channel estimation.
     """
     def __init__(self,
-                 n=1,
+                 m=1, n=1,
                  fft_len=_def_fft_len,
                  cp_len=_def_cp_len,
                  frame_length_tag_key=_def_frame_length_tag_key,
@@ -403,8 +403,7 @@ class ofdm_rx(gr.hier_block2):
         gr.hier_block2.__init__(self, "ofdm_rx",
                     gr.io_signature(n, n, gr.sizeof_gr_complex),
                     gr.io_signature(1, 1, gr.sizeof_char))
-        if n == 1:
-            # SISO
+        if self.mimo_technique is mimo_technique.SISO:  # SISO case.
             ### Param init / sanity check ########################################
             self.fft_len           = fft_len
             self.cp_len            = cp_len
@@ -559,7 +558,7 @@ class ofdm_rx(gr.hier_block2):
         else:
             # MIMO
             self.mimo_ofdm_rx = mimo_ofdm_rx_cb(
-                n=n,
+                m=m, n=n,
                 mimo_technique=mimo_technique,
                 fft_len=fft_len,
                 cp_len=cp_len,

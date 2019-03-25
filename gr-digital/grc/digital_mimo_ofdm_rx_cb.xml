@@ -177,6 +177,14 @@
     <value>digital.mimo.VBLAST</value>
     <type>enum</type>
     <option>
+      <name>Diversity Combining (SC)</name>
+      <key>digital.mimo.RX_DIVERSITY_SC</key>
+    </option>
+    <option>
+      <name>Diversity Combining (MRC)</name>
+      <key>digital.mimo.RX_DIVERSITY_MRC</key>
+    </option>
+    <option>
       <name>Alamouti</name>
       <key>digital.mimo.ALAMOUTI</key>
     </option>

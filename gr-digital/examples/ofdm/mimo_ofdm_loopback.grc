@@ -284,7 +284,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>2</value>
+      <value>1</value>
     </param>
   </block>
   <block>
@@ -311,7 +311,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>1</value>
+      <value>2</value>
     </param>
   </block>
   <block>
@@ -670,7 +670,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -925,7 +925,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -1082,7 +1082,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -1259,7 +1259,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(608, 680)</value>
+      <value>(616, 664)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -1279,7 +1279,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.DIFF_ALAMOUTI</value>
+      <value>digital.mimo.RX_DIVERSITY_MRC</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -1354,7 +1354,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(448, 244)</value>
+      <value>(448, 252)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -1382,7 +1382,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.DIFF_ALAMOUTI</value>
+      <value>digital.mimo.VBLAST</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -1476,7 +1476,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -2926,7 +2926,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -2980,7 +2980,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -3036,6 +3036,12 @@
     <sink_key>0</sink_key>
   </connection>
   <connection>
+    <source_block_id>blocks_add_xx_1</source_block_id>
+    <sink_block_id>digital_mimo_ofdm_rx_cb_0</sink_block_id>
+    <source_key>0</source_key>
+    <sink_key>1</sink_key>
+  </connection>
+  <connection>
     <source_block_id>blocks_complex_to_imag_0</source_block_id>
     <sink_block_id>qtgui_time_sink_x_0</sink_block_id>
     <source_key>0</source_key>
@@ -3051,6 +3057,12 @@
     <source_block_id>blocks_multiply_matrix_xx_0</source_block_id>
     <sink_block_id>blocks_multiply_xx_1</sink_block_id>
     <source_key>0</source_key>
+    <sink_key>1</sink_key>
+  </connection>
+  <connection>
+    <source_block_id>blocks_multiply_matrix_xx_0</source_block_id>
+    <sink_block_id>blocks_multiply_xx_0</sink_block_id>
+    <source_key>1</source_key>
     <sink_key>1</sink_key>
   </connection>
   <connection>
@@ -3112,12 +3124,6 @@
     <sink_block_id>blocks_multiply_matrix_xx_0</sink_block_id>
     <source_key>0</source_key>
     <sink_key>0</sink_key>
-  </connection>
-  <connection>
-    <source_block_id>digital_ofdm_tx_0</source_block_id>
-    <sink_block_id>blocks_multiply_matrix_xx_0</sink_block_id>
-    <source_key>1</source_key>
-    <sink_key>1</sink_key>
   </connection>
   <connection>
     <source_block_id>noise_source</source_block_id>
