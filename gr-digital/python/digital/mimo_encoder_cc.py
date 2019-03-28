@@ -42,8 +42,10 @@ class mimo_encoder_cc(gr.hier_block2):
         # Dictionary translating mimo algorithm keys into encoder blocks.
         mimo_algorithm = {mimo.ALAMOUTI : digital.alamouti_encoder_cc_make(vlen=vlen),
                           mimo.DIFF_ALAMOUTI : digital.diff_stbc_encoder_cc_make(block_len=vlen),
-                          mimo.VBLAST : digital.vblast_encoder_cc_make(M),
-                          mimo.RX_DIVERSITY_SC : digital.vblast_encoder_cc_make(M)}
+                          mimo.VBLAST_ZF : digital.vblast_encoder_cc_make(M),
+                          mimo.VBLAST_MMSE: digital.vblast_encoder_cc_make(M),
+                          mimo.RX_DIVERSITY_SC : digital.vblast_encoder_cc_make(M),
+                          mimo.RX_DIVERSITY_MRC: digital.vblast_encoder_cc_make(M)}
 
         # Check for valid M.
         if M < 1:

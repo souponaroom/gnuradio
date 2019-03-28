@@ -145,6 +145,7 @@ list(APPEND digital_sources
     mimo_ofdm_header_reader_cc_impl.cc
     ofdm_correct_carrier_freq_offset_vcvc_impl.cc
     cp_dumper_impl.cc
+    ofdm_snr_est_vcvc_impl.cc
 )
 
 #Add Windows DLL resource file if using MSVC

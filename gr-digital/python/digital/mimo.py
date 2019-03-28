@@ -35,6 +35,7 @@ class mimo_technique(AutoNumber):
     SISO = ()
     RX_DIVERSITY_SC = ()
     RX_DIVERSITY_MRC = ()
-    VBLAST = ()
+    VBLAST_ZF = ()
+    VBLAST_MMSE = ()
     ALAMOUTI = ()
     DIFF_ALAMOUTI = ()

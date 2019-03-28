@@ -84,6 +84,7 @@
 #include "gnuradio/digital/mimo_ofdm_header_reader_cc.h"
 #include "gnuradio/digital/ofdm_correct_carrier_freq_offset_vcvc.h"
 #include "gnuradio/digital/cp_dumper.h"
+#include "gnuradio/digital/ofdm_snr_est_vcvc.h"
 %}
 
 %include "gnuradio/digital/binary_slicer_fb.h"
@@ -133,6 +134,7 @@
 %include "gnuradio/digital/mimo_ofdm_header_reader_cc.h"
 %include "gnuradio/digital/ofdm_correct_carrier_freq_offset_vcvc.h"
 %include "gnuradio/digital/cp_dumper.h"
+%include "gnuradio/digital/ofdm_snr_est_vcvc.h"
 
 GR_SWIG_BLOCK_MAGIC2(digital, binary_slicer_fb);
 GR_SWIG_BLOCK_MAGIC2(digital, cma_equalizer_cc);
@@ -176,6 +178,7 @@ GR_SWIG_BLOCK_MAGIC2(digital, mimo_ofdm_synchronizer_fbcvc);
 GR_SWIG_BLOCK_MAGIC2(digital, mimo_ofdm_header_reader_cc);
 GR_SWIG_BLOCK_MAGIC2(digital, ofdm_correct_carrier_freq_offset_vcvc);
 GR_SWIG_BLOCK_MAGIC2(digital, cp_dumper);
+GR_SWIG_BLOCK_MAGIC2(digital, ofdm_snr_est_vcvc);
 
 GR_SWIG_BLOCK_MAGIC_FACTORY(digital, cpmmod_bc, gmskmod_bc);
 

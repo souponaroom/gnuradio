@@ -47,9 +47,13 @@ class mimo_decoder_cc(gr.hier_block2):
                                                                                     combining_technique='MRC'),
                           mimo.ALAMOUTI: digital.alamouti_decoder_cc_make(vlen=vlen),
                           mimo.DIFF_ALAMOUTI: digital.diff_stbc_decoder_cc_make(vlen=vlen),
-                          mimo.VBLAST: digital.vblast_decoder_cc_make(num_inputs=N,
+                          mimo.VBLAST_ZF: digital.vblast_decoder_cc_make(num_inputs=N,
                                                                     equalizer_type='ZF',
-                                                                    vlen=vlen)}
+                                                                    vlen=vlen),
+                          mimo.VBLAST_MMSE: digital.vblast_decoder_cc_make(num_inputs=N,
+                                                                         equalizer_type='MMSE',
+                                                                         vlen=vlen)
+                          }
 
         # Check for valid N.
         if N < 1:

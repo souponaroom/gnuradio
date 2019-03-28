@@ -69,12 +69,13 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
     def test_001_t(self):
         # Define test params.
         data_length = 10
-        repetitions = 5
+        repetitions = 1
 
         for i in range(repetitions):
-            block_len = np.random.randint(1,9)
-            modulation_order = np.random.randint(1, 4)
-            phase_shift = 2.0 * np.pi * np.random.randn()
+            block_len = 1#np.random.randint(1,9)
+            #modulation_order = np.random.randint(1, 4)
+            modulation_order = 1
+            phase_shift = 0.0#2.0 * np.pi * np.random.randn()
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.random.randint(0, 2**modulation_order, size=data_length*block_len)/(2.0**modulation_order) + phase_shift))
             basis = np.array([M_SQRT_2*np.exp(1j * phase_shift), M_SQRT_2*np.exp(1j * phase_shift)])
@@ -88,10 +89,11 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
             self.tb.connect((encoder, 1), sink2)
             # Run flowgraph.
             self.tb.run()
-
             # Calculate expected result.
             expected_result = self.encode(basis, data, data_length, block_len, phase_shift)
-
+            print 'test'
+            print expected_result[0]
+            print sink1.data()
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[0], data_length*block_len), sink1.data(), 4)
             self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[1], data_length*block_len), sink2.data(), 4)

@@ -46,7 +46,7 @@ Default values for Receiver.
 # Number of receiving antennas.
 _def_m = 2
 _def_n = 2
-_def_mimo_technique = mimo_technique.VBLAST
+_def_mimo_technique = mimo_technique.VBLAST_ZF
 _def_fft_len = 64
 _def_cp_len = 16
 _seq_seed = 42
@@ -63,6 +63,7 @@ _def_packet_num_tag_key = "packet_num"
 # OFDM carrier allocation.
 _def_pilot_carriers_mimo=[range(-26, 0, 3)+range(2, 27, 3), ]
 _def_occupied_carriers_mimo = [[x for x in range(-24, 25, 1) if x not in _def_pilot_carriers_mimo[0] + [0]], ]
+_def_zero_carriers_mimo=[[x for x in range(-32, 32, 1) if x not in _def_pilot_carriers_mimo[0] + _def_occupied_carriers_mimo[0]], ]
 
 def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
     """ Returns a list of all carriers that at some point carry data or pilots. """
@@ -188,7 +189,6 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.bps_header = bps_header
         self.bps_payload = bps_payload
 
-
         # Change SISO/MIMO specific default parameters, if not defined.
         if self.m < 1:
             raise ValueError("Number of TX antennas must be a natural number.")
@@ -274,8 +274,21 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             occupied_carriers=self.occupied_carriers[0],
             csi_key=self.csi_key,
             start_key=self.start_key)
-        for i in range(0, self.n):
-            self.connect((carrier_freq_corrector, i), (channel_est, i))
+
+        if (self.mimo_technique is mimo_technique.VBLAST_MMSE):
+            # Enable SNR estimation for MMSE equalizer.
+            snr_estimator = digital.ofdm_snr_est_vcvc(num_inputs=self.n,
+                                                      fft_len=self.fft_len,
+                                                      occupied_carriers=self.occupied_carriers[0],
+                                                      zero_carriers=_def_zero_carriers_mimo[0],
+                                                      snr_key="snr",
+                                                      update_time=16,
+                                                      averaging_length=8)
+            for i in range(0, self.n):
+                self.connect((carrier_freq_corrector, i), (snr_estimator, i), (channel_est, i))
+        else:
+            for i in range(0, self.n):
+                self.connect((carrier_freq_corrector, i), (channel_est, i))
 
         """
         MIMO decoder

@@ -201,7 +201,7 @@ namespace gr {
       uint32_t nprocessed = 0; // Number of read and written items.
 
       // Collect all tags of the input buffer in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items/(d_vlen*d_num_inputs), pmt::string_to_symbol("csi"));
+      get_tags_in_window(tags, 0, 0, noutput_items/(d_vlen*d_num_inputs));
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
@@ -242,6 +242,7 @@ namespace gr {
           } else if (pmt::symbol_to_string(tags[i].key).compare("snr") == 0 && d_equalizer_type.compare("MMSE") == 0) {
             // 'snr' tag: Recalculate the weighting vector for the next symbol with the updated snr.
             d_snr = pmt::f32vector_elements(tags[i].value);
+            GR_LOG_INFO(d_logger, format("snr update %d") %d_snr[0]);
             update_mimo_equalizer();
           }
           // Process the symbol with the calculated weighting vector.

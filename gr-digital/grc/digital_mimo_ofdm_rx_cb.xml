@@ -193,8 +193,12 @@
       <key>digital.mimo.DIFF_ALAMOUTI</key>
     </option>
     <option>
-      <name>V-BLAST</name>
-      <key>digital.mimo.VBLAST</key>
+      <name>V-BLAST (ZF)</name>
+      <key>digital.mimo.VBLAST_ZF</key>
+    </option>
+    <option>
+      <name>V-BLAST (MMSE)</name>
+      <key>digital.mimo.VBLAST_MMSE</key>
     </option>
   </param>
   <check>$fft_len &gt; 0</check>

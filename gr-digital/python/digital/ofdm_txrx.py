@@ -68,7 +68,7 @@ _seq_seed = 42
 
 # Default parameters for MIMO-OFDM.
 _def_m = 1
-_def_mimo_technique = mimo_technique.VBLAST
+_def_mimo_technique = mimo_technique.VBLAST_ZF
 # OFDM carrier allocation.
 _def_pilot_carriers_mimo=[range(-26, 0, 3)+range(2, 27, 3), ]
 _def_occupied_carriers_mimo = [[x for x in range(-24, 25, 1) if x not in _def_pilot_carriers_mimo[0] + [0]], ]

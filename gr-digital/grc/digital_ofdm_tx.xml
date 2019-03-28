@@ -188,8 +188,13 @@
       <opt>hide_m:none</opt>
     </option>
     <option>
-      <name>V-BLAST</name>
-      <key>digital.mimo.VBLAST</key>
+      <name>V-BLAST (ZF)</name>
+      <key>digital.mimo.VBLAST_ZF</key>
+      <opt>hide_m:none</opt>
+    </option>
+    <option>
+      <name>V-BLAST (MMSE)</name>
+      <key>digital.mimo.VBLAST_MMSE</key>
       <opt>hide_m:none</opt>
     </option>
   </param>

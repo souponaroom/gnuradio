@@ -48,8 +48,8 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
 
         for n in range(repetitions):
             vlen = np.random.randint(1, 9)
-            modulation_order = np.random.randint(1, 4)
-            phase_shift = 2.0 * np.pi * np.random.randn()
+            modulation_order = 1#np.random.randint(1, 4)
+            phase_shift = 0.0#2.0 * np.pi * np.random.randn()
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.pi*np.random.randint(0, 2**modulation_order, size=[data_length*vlen])/(2.0**modulation_order) + phase_shift))
 
@@ -69,6 +69,8 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
             # Build up the test flowgraph.
             src = blocks.vector_source_c(data=data, tags=tags)
             diff_stbc_encoder = digital.diff_stbc_encoder_cc(phase_shift, vlen)
+            dst = blocks.vector_sink_c()
+            self.tb.connect(diff_stbc_encoder, dst)
             # Simulate channel with matrix multiplication.
             channel = blocks.multiply_matrix_cc_make([channel_matrix])
             v2s = blocks.stream_to_vector(gr.sizeof_gr_complex, vlen)
