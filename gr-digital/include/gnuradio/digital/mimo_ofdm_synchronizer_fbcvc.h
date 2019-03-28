@@ -30,10 +30,20 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
+    /*! \brief MIMO-OFDM synchronization for frame, timing, fractional and integer frequency carrier offset.
+     * Input ports:
+     * - Trigger channel indicates the start of a frame.
+     * - Frequency channel indicates fractional frequency carrier offset.
+     * - Reference channel for integer frequency carrier offset estimation.
+     *   (for example the sum of the MIMO RX channels)
      *
+     * The following steps are applied:
+     * - Wait for a trigger indicating the start of an OFDM frame.
+     * - Read Schmidl & Cox synchronization symbols and estimate frequency carrier offset.
+     *   (Estimated offset is tagged to stream)
+     * - Copy (fractional carrier frequency corrected) data OFDM symbols to output.
+     *   (Start of frame is tagged)
+     * - Repeat with the next incoming start trigger.
      */
     class DIGITAL_API mimo_ofdm_synchronizer_fbcvc : virtual public gr::block
     {
@@ -51,7 +61,8 @@ namespace gr {
       static sptr make(uint16_t n, uint32_t fft_len, uint32_t cp_len, 
                        const std::vector<gr_complex> &sync_symbol1, 
                        const std::vector<gr_complex> &sync_symbol2,
-                       const std::string &start_key);
+                       const std::string &start_key="start",
+                       const std::string &carrier_freq_off_key="carrier_freq_offset");
     };
 
   } // namespace digital

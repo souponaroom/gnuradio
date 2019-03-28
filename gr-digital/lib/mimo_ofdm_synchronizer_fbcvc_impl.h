@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -29,13 +29,19 @@
 namespace gr {
   namespace digital {
     /*! \brief MIMO-OFDM synchronization for frame, timing, fractional and integer frequency carrier offset.
-     * The following steps are applied:
+     * Input ports:
      * - Trigger channel indicates the start of a frame.
      * - Frequency channel indicates fractional frequency carrier offset.
+     * - Reference channel for integer frequency carrier offset estimation.
+     *   (for example the sum of the MIMO RX channels)
+     *
+     * The following steps are applied:
+     * - Wait for a trigger indicating the start of an OFDM frame.
      * - Read Schmidl & Cox synchronization symbols and estimate frequency carrier offset.
      *   (Estimated offset is tagged to stream)
      * - Copy (fractional carrier frequency corrected) data OFDM symbols to output.
      *   (Start of frame is tagged)
+     * - Repeat with the next incoming start trigger.
      */
 
     class mimo_ofdm_synchronizer_fbcvc_impl : public mimo_ofdm_synchronizer_fbcvc
@@ -54,6 +60,7 @@ namespace gr {
       /*! Indicates first data symbol of frame (after sync symbols).
        * This is where we set a 'start' tag. */
       bool d_first_data_symbol;
+      uint32_t d_frame_count; /*!< Counts number of detected frames. (value of the start tags) */
       float d_phase; /*!< Phase which rotates to correct fine frequency offset. */
       int d_carrier_freq_offset; /*!< Estimated carrier frequency offset. */
       /*! The index of the first carrier with data.
@@ -70,8 +77,16 @@ namespace gr {
       std::vector<gr_complex> d_rec_sync_symbol1;
       std::vector<gr_complex> d_rec_sync_symbol2;
       std::vector<gr_complex> d_corr_v;
-      pmt::pmt_t d_start_key;
+      pmt::pmt_t d_start_key; /*!< Key of the start tags. */
+      pmt::pmt_t d_carrier_freq_off_key; /*!< Key of the integer carrier offset tags. */
 
+      /*! \brief Finds the last trigger position within an interval.
+       *
+       * @param trigger Pointer to buffer.
+       * @param start Relative start position.
+       * @param end Relative end position.
+       * @return
+       */
       uint32_t find_trigger(const unsigned char *trigger, uint32_t start, uint32_t end);
 
       /*! \brief Rotates the phase of a complex pointer with specified params.
@@ -113,7 +128,8 @@ namespace gr {
                                         uint32_t cp_len,
                                         const std::vector<gr_complex> &sync_symbol1,
                                         const std::vector<gr_complex> &sync_symbol2,
-                                        const std::string &start_key);
+                                        const std::string &start_key,
+                                        const std::string &carrier_freq_off_key);
       ~mimo_ofdm_synchronizer_fbcvc_impl();
 
       // Where all the action really happens

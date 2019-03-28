@@ -1279,7 +1279,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.VBLAST_MMSE</value>
+      <value>digital.mimo.VBLAST_ZF</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -1382,7 +1382,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.VBLAST_MMSE</value>
+      <value>digital.mimo.VBLAST_ZF</value>
     </param>
     <param>
       <key>maxoutbuf</key>
