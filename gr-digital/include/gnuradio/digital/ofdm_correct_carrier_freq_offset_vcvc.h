@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -30,10 +30,16 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
+    /*! \brief Integer carrier frequency corrector for OFDM.
+     * This block corrects an integer frequency offset, indicated by stream tags,
+     * on demodulated OFDM symbols (freqency domain).
      *
+     * This block supports parallel branch processing (for example for MIMO systems).
+     *
+     * Input:  FFT vectors after OFDM demodulation (frequency domain) which are already
+     *         time-synchronized and with corrected fractional frequency offset.
+     *         Tags indicate the integer carrier offset.
+     * Output: FFT vectors with corrected integer carrier frequency offset.
      */
     class DIGITAL_API ofdm_correct_carrier_freq_offset_vcvc : virtual public gr::sync_block
     {
@@ -48,7 +54,7 @@ namespace gr {
        * class. digital::ofdm_correct_carrier_freq_offset_vcvc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t n, uint32_t fft_len, uint32_t cp_len, std::string carrier_freq_offset_key);
+      static sptr make(uint16_t n, uint32_t fft_len, uint32_t cp_len, std::string carrier_freq_offset_key="carrier_freq_offset");
     };
 
   } // namespace digital
