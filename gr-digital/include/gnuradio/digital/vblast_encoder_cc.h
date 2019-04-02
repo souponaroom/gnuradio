@@ -48,7 +48,8 @@ namespace gr {
        * class. digital::vblast_encoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t num_outputs);
+      static sptr make(uint16_t num_outputs, 
+                       const std::string &packet_len_tag_key="packet_length");
     };
 
   } // namespace digital

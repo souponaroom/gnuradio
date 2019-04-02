@@ -35,13 +35,13 @@ namespace gr {
     class vblast_encoder_cc_impl : public vblast_encoder_cc
     {
      private:
-      /*!< Number of output ports on which the data is divided.
+      /*! Number of output ports on which the data is divided.
        * This equals the number of your transmit antennas.*/
-      uint16_t d_num_outputs;
-      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
+      uint16_t d_num_outputs; /*!< Number of transmit ports. */
+      const pmt::pmt_t d_packet_len_key; /*!< PMT stores the key of the CSI tag. */
 
      public:
-      vblast_encoder_cc_impl(uint16_t num_outputs);
+      vblast_encoder_cc_impl(uint16_t num_outputs, const std::string &packet_len_tag_key);
       ~vblast_encoder_cc_impl();
 
       // Where all the action really happens

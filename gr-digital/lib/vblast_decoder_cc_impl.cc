@@ -38,14 +38,16 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const std::string vblast_decoder_cc_impl::s = "csi";
-    const pmt::pmt_t vblast_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
-
     vblast_decoder_cc::sptr
-    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type, uint32_t vlen)
+    vblast_decoder_cc::make(uint16_t num_inputs, std::string equalizer_type,
+                            uint32_t vlen,
+                            const std::string &csi_tag_key,
+                            const std::string &snr_tag_key,
+                            const std::string &frame_tag_key)
     {
       return gnuradio::get_initial_sptr
-        (new vblast_decoder_cc_impl(num_inputs, equalizer_type, vlen));
+        (new vblast_decoder_cc_impl(num_inputs, equalizer_type, vlen,
+                                    csi_tag_key, snr_tag_key, frame_tag_key));
     }
 
     /*
@@ -53,13 +55,19 @@ namespace gr {
      */
     vblast_decoder_cc_impl::vblast_decoder_cc_impl(uint16_t num_inputs,
                                                    std::string equalizer_type,
-                                                   uint32_t vlen)
+                                                   uint32_t vlen,
+                                                   const std::string &csi_tag_key,
+                                                   const std::string &snr_tag_key,
+                                                   const std::string &frame_tag_key)
       : gr::sync_interpolator("vblast_decoder_cc",
               gr::io_signature::make(num_inputs, num_inputs, sizeof(gr_complex)*vlen),
               gr::io_signature::make(1, 1, sizeof(gr_complex)), num_inputs*vlen),
         d_num_inputs(num_inputs),
         d_equalizer_type(equalizer_type),
-        d_vlen(vlen)
+        d_vlen(vlen),
+        d_csi_key(pmt::string_to_symbol(csi_tag_key)),
+        d_snr_key(pmt::string_to_symbol(snr_tag_key)),
+        d_start_key(pmt::string_to_symbol(frame_tag_key))
     {
       // Init CSI array and mimo_equalizer.
       d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (num_inputs, 1.0)));
@@ -239,10 +247,9 @@ namespace gr {
             }
             // Calculate the weighting vector for the next symbol with the received CSI.
             update_mimo_equalizer();
-          } else if (pmt::symbol_to_string(tags[i].key).compare("snr") == 0 && d_equalizer_type.compare("MMSE") == 0) {
+          } else if (tags[i].key == d_snr_key && d_equalizer_type.compare("MMSE") == 0) {
             // 'snr' tag: Recalculate the weighting vector for the next symbol with the updated snr.
             d_snr = pmt::f32vector_elements(tags[i].value);
-            GR_LOG_INFO(d_logger, format("snr update %d") %d_snr[0]);
             update_mimo_equalizer();
           }
           // Process the symbol with the calculated weighting vector.
@@ -251,9 +258,9 @@ namespace gr {
         }
       }
 
-      // Read old 'start' tags and write new tags (with new position and value).
+      // Read old <start of frame> tags and write new tags (with new position and value).
       std::vector <gr::tag_t> length_tags;
-      get_tags_in_window(length_tags, 0, 0, noutput_items/(d_num_inputs*d_vlen), pmt::string_to_symbol("start"));
+      get_tags_in_window(length_tags, 0, 0, noutput_items/(d_num_inputs*d_vlen), d_start_key);
 
       for (unsigned int i = 0; i < length_tags.size(); ++i) {
         add_item_tag(0,

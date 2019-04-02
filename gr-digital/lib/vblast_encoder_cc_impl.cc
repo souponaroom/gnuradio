@@ -31,23 +31,23 @@
 namespace gr {
   namespace digital {
 
-    const pmt::pmt_t vblast_encoder_cc_impl::d_key = pmt::string_to_symbol("packet_length");
-
     vblast_encoder_cc::sptr
-    vblast_encoder_cc::make(uint16_t num_outputs)
+    vblast_encoder_cc::make(uint16_t num_outputs, const std::string &packet_len_tag_key)
     {
       return gnuradio::get_initial_sptr
-        (new vblast_encoder_cc_impl(num_outputs));
+        (new vblast_encoder_cc_impl(num_outputs, packet_len_tag_key));
     }
 
     /*
      * The private constructor
      */
-    vblast_encoder_cc_impl::vblast_encoder_cc_impl(uint16_t num_outputs)
+    vblast_encoder_cc_impl::vblast_encoder_cc_impl(uint16_t num_outputs,
+                                                   const std::string &packet_len_tag_key)
       : gr::sync_decimator("vblast_encoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(num_outputs, num_outputs, sizeof(gr_complex)), num_outputs),
-        d_num_outputs(num_outputs)
+        d_num_outputs(num_outputs),
+        d_packet_len_key(pmt::string_to_symbol(packet_len_tag_key))
     {
       // Don't propagate theses tags because the lengths are not proper anymore.
       set_tag_propagation_policy(TPP_DONT);
@@ -78,10 +78,9 @@ namespace gr {
 
       // Read old tags and write new tags (with new position and value).
       std::vector <gr::tag_t> tags;
-      get_tags_in_window(tags, 0, 0, noutput_items*d_num_outputs, d_key);
+      get_tags_in_window(tags, 0, 0, noutput_items*d_num_outputs, d_packet_len_key);
       for (int i = 0; i < tags.size(); ++i) {
         for (int j = 0; j < d_num_outputs; ++j) {
-          //GR_LOG_DEBUG(d_logger, boost::format("Add input tag %d from offset %d to antenna %d") %i %tags[i].offset %j);
           add_item_tag(j,
                        tags[i].offset / d_num_outputs,
                        tags[i].key,
