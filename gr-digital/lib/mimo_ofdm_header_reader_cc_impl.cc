@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018,2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -36,10 +36,12 @@ namespace gr {
     mimo_ofdm_header_reader_cc::sptr
     mimo_ofdm_header_reader_cc::make(constellation_sptr constellation,
                                      const gr::digital::packet_header_default::sptr &header_formatter,
-                                     const std::string &start_key)
+                                     const std::string &start_key, const std::string &len_tag_key,
+                                     const std::string &frame_len_tag_key, const std::string &num_tag_key)
     {
       return gnuradio::get_initial_sptr
-        (new mimo_ofdm_header_reader_cc_impl(constellation, header_formatter, start_key));
+        (new mimo_ofdm_header_reader_cc_impl(constellation, header_formatter, start_key,
+                                             len_tag_key, frame_len_tag_key, num_tag_key));
     }
 
     /*
@@ -48,7 +50,8 @@ namespace gr {
     mimo_ofdm_header_reader_cc_impl::mimo_ofdm_header_reader_cc_impl(
             constellation_sptr constellation,
             const gr::digital::packet_header_default::sptr &header_formatter,
-            const std::string &start_key)
+            const std::string &start_key, const std::string &len_tag_key,
+            const std::string &frame_len_tag_key, const std::string &num_tag_key)
       : gr::block("mimo_ofdm_header_reader_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(gr_complex))),
@@ -62,9 +65,9 @@ namespace gr {
         d_packet_num(0),
         d_on_packet(false),
         d_remaining_packet_len(0),
-        d_len_tag_key(pmt::string_to_symbol("packet_length")),
-        d_frame_len_tag_key(pmt::string_to_symbol("frame_length")),
-        d_num_tag_key(pmt::string_to_symbol("packet_num"))
+        d_len_tag_key(pmt::string_to_symbol(len_tag_key)),
+        d_frame_len_tag_key(pmt::string_to_symbol(frame_len_tag_key)),
+        d_num_tag_key(pmt::string_to_symbol(num_tag_key))
     {
       // Allocate space for demodulated header data.
       d_header_data = new unsigned char[header_formatter->header_len()/d_dim];
@@ -165,6 +168,7 @@ namespace gr {
       uint32_t nconsumed = 0;
       uint32_t nwritten = 0;
 
+      // State machine.
       if (d_on_packet){
         // We are still on the packet.
         // Check if this is the beginning of the packet.
@@ -211,15 +215,10 @@ namespace gr {
             // Parse header.
             if (parse_header()) {
               // This header is valid.
-              // This header is invalid.
-//              GR_LOG_INFO(d_logger, format("Valid header at %d.") %
-//                                    (nitems_read(0) + nconsumed - d_header_length));
               d_on_packet = true;
               d_remaining_packet_len = d_packet_length;
             } else {
               // This header is invalid.
-//              GR_LOG_INFO(d_logger, format("------Invalid header at %d.") %
-//                                    (nitems_read(0) + nconsumed - d_header_length));
               // Dump the segment.
               d_on_packet = false;
             }

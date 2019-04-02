@@ -95,7 +95,8 @@ namespace gr {
      public:
       mimo_ofdm_header_reader_cc_impl(constellation_sptr constellation,
                                       const gr::digital::packet_header_default::sptr &header_formatter,
-                                      const std::string &start_key);
+                                      const std::string &start_key, const std::string &len_tag_key,
+                                      const std::string &frame_len_tag_key, const std::string &num_tag_key);
       ~mimo_ofdm_header_reader_cc_impl();
 
       // Where all the action really happens

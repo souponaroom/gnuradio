@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -32,10 +32,12 @@
 namespace gr {
   namespace digital {
 
-    /*!
-     * \brief <+description of block+>
-     * \ingroup digital
+    /*! \brief Parses header and adds header tags to extracted payload stream.
      *
+     * -Input: Synchronized and equalized sample stream with 'start' tags on the beginning of each frame.
+     * -Read and demodulate header. Parse and validate header info.
+     * -Add header info with stream tags to the beginning of each packet.
+     * -Output: Payload stream (not yet demodulated) with header tags at the beginning of each packet.
      */
     class DIGITAL_API mimo_ofdm_header_reader_cc : virtual public gr::block
     {
@@ -50,7 +52,9 @@ namespace gr {
        * class. digital::mimo_ofdm_header_reader_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(constellation_sptr constellation, const gr::digital::packet_header_default::sptr &header_formatter, const std::string &start_key);
+      static sptr make(constellation_sptr constellation, const gr::digital::packet_header_default::sptr &header_formatter, 
+                       const std::string &start_key="start", const std::string &len_tag_key="packet_length", 
+                       const std::string &frame_len_tag_key="frame_length", const std::string &num_tag_key="packet_num");
     };
 
   } // namespace digital
