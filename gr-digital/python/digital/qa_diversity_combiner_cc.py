@@ -58,7 +58,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
                                       tags=tags)
         comb = digital.diversity_combiner_cc(num_inputs, vlen, mode)
         sink = blocks.vector_sink_c(vlen)
-        self.tb.connect(src1, comb, sink)
+        self.tb.connect(src1, comb, blocks.stream_to_vector(gr.sizeof_gr_complex, vlen), sink)
         # Connect all other sources.
         for i in range(1, num_inputs):
             self.tb.connect(blocks.vector_source_c(data=data[i], vlen=vlen), (comb, i))
@@ -97,7 +97,7 @@ class qa_diversity_combiner_cc (gr_unittest.TestCase):
             # Calculate the expected result.
             if combining_technique == 'SC':
                 # Select the path with the greatest magnitude.
-                expected_result[vlen*tag_pos[i]:] = data[np.argmax(np.abs(csi))][vlen*tag_pos[i]:]
+                expected_result[vlen*tag_pos[i]:] = (1.0*data[np.argmax(np.abs(csi))][vlen*tag_pos[i]:])/(1.0*csi[np.argmax(np.abs(csi))])
             elif combining_technique == 'MRC':
                 # Calculate the normalized weighting vector.
                 weighting_vector = np.sqrt(np.divide(np.square(np.abs(csi)),

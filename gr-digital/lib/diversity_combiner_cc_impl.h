@@ -59,8 +59,7 @@ namespace gr {
       std::string d_combining_technique;
       /*!< Combining technique selection combining ('SC') or maximum-ratio combining ('MRC'). */
       std::vector <gr::tag_t> d_tags; /*!< Vector that stores the tags in input buffer. */
-      static const std::string s; /*!< String that matches the key of the CSI tags. */
-      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
+      const pmt::pmt_t d_csi_key; /*!< PMT stores the key of the CSI tag. */
       std::vector<std::vector<std::vector<gr_complex> > > d_csi; /*!< Current channel matrix. */
       std::vector<std::vector<float> > d_csi_squared;
       /*!< The current squared channel state information (CSI). The matrix is being updated which each
@@ -91,14 +90,10 @@ namespace gr {
        * @param length Number of items of the current symbol in the current buffer.
        */
 
-      /*! \brief Converts channel state vector to a PMT.
-       *
-       * @return PMT object (3-dim vector) with channel state information (CSI).
-       */
-      pmt::pmt_t generate_csi_pmt();
-
     public:
-      diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
+      diversity_combiner_cc_impl(uint16_t num_inputs, uint16_t vlen,
+                                 std::string combining_technique,
+                                 const std::string &csi_tag_key);
       ~diversity_combiner_cc_impl();
 
       void set_combining_technique(std::string combining_technique) {

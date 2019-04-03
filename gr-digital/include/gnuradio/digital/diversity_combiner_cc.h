@@ -63,7 +63,9 @@ namespace gr {
        * class. digital::diversity_combiner_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint16_t num_inputs, uint16_t vlen, std::string combining_technique);
+      static sptr make(uint16_t num_inputs, uint16_t vlen, 
+                       std::string combining_technique,
+                       const std::string &csi_tag_key="csi");
       
       virtual void set_combining_technique(std::string combining_technique) = 0;
     };

@@ -40,14 +40,13 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const std::string diversity_combiner_cc_impl::s = "csi";
-    const pmt::pmt_t diversity_combiner_cc_impl::d_key = pmt::string_to_symbol(s);
-
     diversity_combiner_cc::sptr
-    diversity_combiner_cc::make(uint16_t num_inputs, uint16_t vlen, std::string combining_technique)
+    diversity_combiner_cc::make(uint16_t num_inputs, uint16_t vlen,
+                                std::string combining_technique,
+                                const std::string &csi_tag_key)
     {
       return gnuradio::get_initial_sptr
-        (new diversity_combiner_cc_impl(num_inputs, vlen, combining_technique));
+        (new diversity_combiner_cc_impl(num_inputs, vlen, combining_technique, csi_tag_key));
     }
 
     /*
@@ -55,13 +54,15 @@ namespace gr {
      */
     diversity_combiner_cc_impl::diversity_combiner_cc_impl(uint16_t num_inputs,
                                                            uint16_t vlen,
-                                                           std::string combining_technique)
+                                                           std::string combining_technique,
+                                                           const std::string &csi_tag_key)
       : gr::sync_interpolator("diversity_combiner_cc",
               gr::io_signature::make(num_inputs, num_inputs, vlen*sizeof(gr_complex)),
               gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
         d_num_inputs(num_inputs),
         d_vlen(vlen),
-        d_combining_technique(combining_technique)
+        d_combining_technique(combining_technique),
+        d_csi_key(pmt::string_to_symbol(csi_tag_key))
     {
       d_csi = std::vector<std::vector<std::vector<gr_complex> > >(vlen, std::vector<std::vector<gr_complex> >(num_inputs, std::vector<gr_complex> (1, 1.0)));
       d_csi_squared = std::vector<std::vector<float> >(vlen, std::vector<float>(num_inputs, 1.0));
@@ -120,7 +121,7 @@ namespace gr {
         for (int k = 0; k < d_vlen; ++k) {
           const gr_complex *in = &((const gr_complex *) input[d_best_path[k]])[offset];
           for (int i = 0; i < length; ++i) {
-            out[d_vlen*i+k] = in[d_vlen*i+k]/d_csi[k][0][d_best_path[k]];
+            out[d_vlen*i+k] = in[d_vlen*i+k]/d_csi[k][d_best_path[k]][0];
           }
         }
       }
@@ -138,27 +139,6 @@ namespace gr {
       }
     }
 
-    pmt::pmt_t
-    diversity_combiner_cc_impl::generate_csi_pmt() { //TODO MRC CSI generation
-      // Assign the channel state vector to a PMT vector. Only take the occupied carriers into account.
-      pmt::pmt_t csi_pmt = pmt::make_vector(d_vlen, pmt::make_vector(1, pmt::make_c32vector(1, d_csi[0][0][0])));
-      // Frequency dimension.
-      for (unsigned int k = 0; k < d_vlen; ++k) {
-        pmt::pmt_t csi_per_carrier = pmt::make_vector(1, pmt::make_c32vector(1, d_csi[0][0][0]));
-        // TX space dimension.
-        for (int i = 0; i < 1; ++i){
-          pmt::pmt_t csi_line_vector = pmt::make_c32vector(1, d_csi[0][0][0]);
-          // RX space dimension.
-          for (int j = 0; j < 1; ++j) {
-            pmt::c32vector_set(csi_line_vector, j, d_csi[k][d_best_path[k]][j]);
-          }
-          pmt::vector_set(csi_per_carrier, i, csi_line_vector);
-        }
-        pmt::vector_set(csi_pmt, k, csi_per_carrier);
-      }
-      return csi_pmt;
-    }
-
     int
     diversity_combiner_cc_impl::work(int noutput_items,
                                      gr_vector_const_void_star &input_items,
@@ -167,7 +147,7 @@ namespace gr {
       gr_complex *out = (gr_complex *) output_items[0];
       uint16_t nprocessed = 0; // Number of read and written items (vectors, if d_vlen > 1).
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(d_tags, 0, 0, noutput_items/d_vlen, d_key);
+      get_tags_in_window(d_tags, 0, 0, noutput_items/d_vlen, d_csi_key);
 
       uint16_t symbol_length; // Number of items in the current symbol.
 
@@ -210,7 +190,7 @@ namespace gr {
       std::vector <gr::tag_t> tags;
       get_tags_in_window(tags, 0, 0, noutput_items/d_vlen);
       for (int l = 0; l < tags.size(); ++l) {
-        if (tags[l].key != d_key) {
+        if (tags[l].key != d_csi_key) {
           add_item_tag(0, tags[l].offset*d_vlen, tags[l].key, tags[l].value);
         }
       }
