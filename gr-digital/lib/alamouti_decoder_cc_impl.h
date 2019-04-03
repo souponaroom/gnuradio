@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -36,7 +36,9 @@ namespace gr {
  * if the input data stream is terminated, the absolute number of input items
  * must be an even number.
  * The Alamouti decoder is a sync block which produces the same amount of
- * output items as there are input items. The code rate is R=1.
+ * output samples as there are input samples (however, because the input items
+ * are vectors and the output is in stream mode, the block is actually an
+ * interpolator block). The code rate is R=1.
  *
  * The CSI is transported via stream tags with key='csi'.
  * The CSI must be a 3-dimensional vector with the dimensions vlen, N(=1 for Alamouti), M(=2 for Alamouti).
@@ -48,7 +50,7 @@ namespace gr {
  * with each incoming CSI. Because the Alamouti algorithm works with sequences
  * of length 2, the tags should be set only on samples with even positions.
  * CSI tags on uneven sample positions are not processed until the beginning of
- * the next sequence (in this case one sample delay) begins.
+ * the next sequence (in this case one sample delay).
  *
  * There exist different versions of the exact algorithm (changed
  * position of negations). This implementation follows [1] and is therefore
@@ -62,8 +64,7 @@ namespace gr {
      private:
       uint32_t d_vlen; /*!< Vector length of the incoming items. */
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
-      static const std::string s; /*!< String that matches the key of the CSI tags. */
-      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
+      const pmt::pmt_t d_csi_key; /*!< PMT stores the key of the CSI tag. */
       std::vector<std::vector<std::vector<gr_complex> > > d_csi; /*!< Current channel matrix. */
 
       /*!
@@ -78,7 +79,7 @@ namespace gr {
       void decode_symbol(const gr_complex* in, gr_complex* out, uint32_t length);
 
      public:
-      alamouti_decoder_cc_impl(uint32_t vlen);
+      alamouti_decoder_cc_impl(uint32_t vlen, const std::string &csi_tag_key);
       ~alamouti_decoder_cc_impl();
 
       // Where all the action really happens

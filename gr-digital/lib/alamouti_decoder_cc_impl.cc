@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -33,24 +33,23 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const std::string alamouti_decoder_cc_impl::s = "csi";
-    const pmt::pmt_t alamouti_decoder_cc_impl::d_key = pmt::string_to_symbol(s);
-
     alamouti_decoder_cc::sptr
-    alamouti_decoder_cc::make(uint32_t vlen)
+    alamouti_decoder_cc::make(uint32_t vlen, const std::string &csi_tag_key)
     {
       return gnuradio::get_initial_sptr
-        (new alamouti_decoder_cc_impl(vlen));
+        (new alamouti_decoder_cc_impl(vlen, csi_tag_key));
     }
 
     /*
      * The private constructor
      */
-    alamouti_decoder_cc_impl::alamouti_decoder_cc_impl(uint32_t vlen)
+    alamouti_decoder_cc_impl::alamouti_decoder_cc_impl(uint32_t vlen,
+                                                       const std::string &csi_tag_key)
       : gr::sync_interpolator("alamouti_decoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)*vlen),
               gr::io_signature::make(1, 1, sizeof(gr_complex)), vlen),
-        d_vlen(vlen)
+        d_vlen(vlen),
+        d_csi_key(pmt::string_to_symbol(csi_tag_key))
     {
       /* Set the number of input and output items to a multiple of 2,
        * because the Alamouti algorithm processes sequences of 2 complex symbols.
@@ -100,7 +99,7 @@ namespace gr {
       uint32_t nprocessed = 0; // Number of read and written items.
 
       // Collect all tags of the input buffer with key "csi" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items/d_vlen, d_key);
+      get_tags_in_window(tags, 0, 0, noutput_items/d_vlen, d_csi_key);
 
       uint32_t symbol_length; // Number of items in the current symbol.
 
@@ -116,12 +115,6 @@ namespace gr {
           symbol_length = tags[0].offset - nitems_read(0);
           // Check if the next tag is on an uneven position.
           if(tags[0].offset%2 != 0){
-            // This should be prevented by the system developer in most cases.
-//            GR_LOG_WARN(d_logger, format("Ddetected \'csi\' tag on uneven position (tag[%d].offset = %d).\n "
-//                                         "The Alamouti scheme works on sequences of 2 samples. "
-//                                         "If you are not really sure what you are doing, "
-//                                         "you should only set 'csi' tags on even sample positions.")
-//                                  %0 %tags[0].offset);
             // The CSI is updated with the start of the next sequence (=next even sample).
             ++symbol_length;
           }
@@ -133,23 +126,19 @@ namespace gr {
           // Calculate the number of items before the next tag.
           if (i < tags.size() - 1) {
             // This is not the last tag in the buffer.
+            // Check if there are 2 tags on the same item.
+            if(tags[i+1].offset <= tags[i].offset){
+              continue;
+            }
             symbol_length = tags[i + 1].offset - nitems_read(0) - nprocessed/d_vlen;
-            //GR_LOG_DEBUG(d_logger, format("symbol len %d")%symbol_length);
-            // Check if the next tag is on an uneven position (which it should usually not).
+            // Check if the next tag is on an uneven position.
             if(symbol_length%2 != 0){
-              // This should be prevented by the system developer in most cases.
-//              GR_LOG_WARN(d_logger, format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d). \n"
-//                                                   "The Alamouti scheme works on sequences of 2 samples. "
-//                                                   "If you are not really sure what you are doing, "
-//                                                   "you should only set 'csi' tags on even sample positions.")
-//                                    %i %tags[i].offset);
               // The CSI is updated with the start of the next sequence (=next even sample).
               ++symbol_length;
             }
           } else {
             // This is the last tag in the buffer.
             symbol_length = (noutput_items - nprocessed)/d_vlen;
-            //GR_LOG_DEBUG(d_logger, format("last symbol len %d, noutputitems %d, nprocessed %d")%symbol_length %noutput_items %nprocessed);
           }
           // Get CSI from 'csi' tag.
           for (unsigned int k = 0; k < pmt::length(tags[i].value); ++k) {
@@ -167,7 +156,7 @@ namespace gr {
       std::vector <gr::tag_t> tags;
       get_tags_in_window(tags, 0, 0, noutput_items);
       for (int l = 0; l < tags.size(); ++l) {
-        if (tags[l].key != d_key) {
+        if (tags[l].key != d_csi_key) {
           add_item_tag(0, tags[l].offset*d_vlen, tags[l].key, tags[l].value);
         }
       }

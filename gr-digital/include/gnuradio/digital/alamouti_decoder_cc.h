@@ -68,7 +68,7 @@ namespace gr {
        * class. digital::alamouti_decoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(uint32_t vlen=1);
+      static sptr make(uint32_t vlen=1, const std::string &csi_tag_key="csi");
     };
 
   } // namespace digital
