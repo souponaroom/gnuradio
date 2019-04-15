@@ -33,23 +33,25 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const pmt::pmt_t diff_stbc_decoder_cc_impl::d_key = pmt::string_to_symbol("start");
-
     diff_stbc_decoder_cc::sptr
-    diff_stbc_decoder_cc::make(float phase_offset, uint32_t vlen)
+    diff_stbc_decoder_cc::make(float phase_offset, uint32_t vlen,
+                               const std::string &start_key)
     {
       return gnuradio::get_initial_sptr
-        (new diff_stbc_decoder_cc_impl(phase_offset, vlen));
+        (new diff_stbc_decoder_cc_impl(phase_offset, vlen, start_key));
     }
 
     /*
      * The private constructor
      */
-    diff_stbc_decoder_cc_impl::diff_stbc_decoder_cc_impl(float phase_offset, uint32_t vlen)
+    diff_stbc_decoder_cc_impl::diff_stbc_decoder_cc_impl(float phase_offset,
+                                                         uint32_t vlen,
+                                                         const std::string &start_key)
       : gr::block("diff_stbc_decoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)*vlen),
               gr::io_signature::make(1, 1, sizeof(gr_complex))),
         d_vlen(vlen),
+        d_key(pmt::string_to_symbol(start_key)),
         d_basis_vecs(std::vector<gr_complex>(2, std::polar((float)M_SQRT1_2, phase_offset)))
     {
       // Init predecessor with dummy sequence.
@@ -115,7 +117,7 @@ namespace gr {
         if (tags[j].offset%2 != 0){
           // This should be prevented by the system developer in most cases.
           GR_LOG_DEBUG(d_logger, format("Detected start tag on uneven position (tag[%d].offset = %d).\n "
-                                        "This differenatial STBC scheme works on sequences of 2 samples. "
+                                        "This differential STBC scheme works on sequences of 2 samples. "
                                         "If you are not really sure what you are doing, "
                                         "you should only set 'start' tags on even sample positions.")
                                  %0 %tags[0].offset);

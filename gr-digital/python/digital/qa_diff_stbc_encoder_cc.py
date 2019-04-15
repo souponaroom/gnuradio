@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # 
-# Copyright 2018 Free Software Foundation, Inc.
+# Copyright 2018, 2019 Free Software Foundation, Inc.
 # 
 # This file is part of GNU Radio
 # 
@@ -45,7 +45,6 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
             mapping_coeffs[0][k] = input[k::2*block_len] *  np.conj(basis[0]) + input[1*block_len+k::2*block_len] * np.conj(basis[1])
             mapping_coeffs[1][k] = input[k::2*block_len] * -basis[1] + input[1*block_len+k::2*block_len] * basis[0]
 
-
         # Calculate the expected result.
         # The first vector is calculated with help of the fixed predecessor.
         pre = M_SQRT_2 * np.exp(1j * phase_shift)
@@ -58,7 +57,9 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
         for i in range(1, data_len/2):
             for k in range(0, block_len):
                 output[0][i*2][k] = mapping_coeffs[0][k][i]*output[0][(i-1)*2][k] - mapping_coeffs[1][k][i]*np.conj(output[1][(i-1)*2][k])
+                output[0][i*2][k] *= M_SQRT_2/(1.0*np.abs(output[0][i*2][k]))
                 output[1][i*2][k] = mapping_coeffs[0][k][i]*output[1][(i-1)*2][k] + mapping_coeffs[1][k][i]*np.conj(output[0][(i-1)*2][k])
+                output[1][i*2][k] *= M_SQRT_2/(1.0*np.abs(output[1][i*2][k]))
                 # Calculate the second element of the output sequence after the rules of Alamouti.
                 output[0][i*2+1][k] = -np.conj(output[1][i*2][k])
                 output[1][i*2+1][k] =  np.conj(output[0][i*2][k])
@@ -68,14 +69,13 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
         random modulation order and random phase shift. '''
     def test_001_t(self):
         # Define test params.
-        data_length = 10
-        repetitions = 1
+        data_length = 20
+        repetitions = 5
 
         for i in range(repetitions):
-            block_len = 1#np.random.randint(1,9)
-            #modulation_order = np.random.randint(1, 4)
-            modulation_order = 1
-            phase_shift = 0.0#2.0 * np.pi * np.random.randn()
+            block_len = np.random.randint(1,9)
+            modulation_order = np.random.randint(1, 4)
+            phase_shift = 2.0 * np.pi * np.random.randn()
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.random.randint(0, 2**modulation_order, size=data_length*block_len)/(2.0**modulation_order) + phase_shift))
             basis = np.array([M_SQRT_2*np.exp(1j * phase_shift), M_SQRT_2*np.exp(1j * phase_shift)])
@@ -91,9 +91,6 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
             self.tb.run()
             # Calculate expected result.
             expected_result = self.encode(basis, data, data_length, block_len, phase_shift)
-            print 'test'
-            print expected_result[0]
-            print sink1.data()
             # Check if the expected result equals the actual result.
             self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[0], data_length*block_len), sink1.data(), 4)
             self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[1], data_length*block_len), sink2.data(), 4)

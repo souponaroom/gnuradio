@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -36,24 +36,26 @@ using namespace boost;
 namespace gr {
   namespace digital {
 
-    const pmt::pmt_t diff_stbc_encoder_cc_impl::d_key = pmt::string_to_symbol("packet_length");
-
     diff_stbc_encoder_cc::sptr
-    diff_stbc_encoder_cc::make(float phase_offset, uint32_t block_len)
+    diff_stbc_encoder_cc::make(float phase_offset, uint32_t block_len,
+                               const std::string &len_tag_key)
     {
       return gnuradio::get_initial_sptr
-        (new diff_stbc_encoder_cc_impl(phase_offset, block_len));
+        (new diff_stbc_encoder_cc_impl(phase_offset, block_len, len_tag_key));
     }
 
     /*
      * The private constructor
      */
-    diff_stbc_encoder_cc_impl::diff_stbc_encoder_cc_impl(float phase_offset, uint32_t block_len)
+    diff_stbc_encoder_cc_impl::diff_stbc_encoder_cc_impl(float phase_offset,
+                                                         uint32_t block_len,
+                                                         const std::string &len_tag_key)
       : gr::block("diff_stbc_encoder_cc",
               gr::io_signature::make(1, 1, sizeof(gr_complex)),
               gr::io_signature::make(2, 2, sizeof(gr_complex))),
         d_block_len(block_len),
         d_start_new_packet(false),
+        d_len_tag_key(pmt::string_to_symbol(len_tag_key)),
         d_basis_vecs(std::vector<gr_complex>(2, std::polar((float)M_SQRT1_2, phase_offset)))
     {
       d_mapping_coeffs = std::vector<std::vector<gr_complex> > (2, std::vector<gr_complex>(block_len, 0.0));
@@ -114,7 +116,6 @@ namespace gr {
                                            gr_complex *out2,
                                            uint32_t length) {
       uint32_t count = 0;
-
       while (count < length) {
         // Transform input vector to new basis and calculate new coefficients.
         map_symbols(&in[count]);
@@ -145,7 +146,7 @@ namespace gr {
       uint32_t nproduced = 0;
 
       // Collect all tags of the input buffer with key "start" in the vector 'tags'.
-      get_tags_in_window(tags, 0, 0, noutput_items, d_key);
+      get_tags_in_window(tags, 0, 0, noutput_items, d_len_tag_key);
 
       if (tags.size() == 0) {
         // No tags in buffer.
@@ -156,38 +157,38 @@ namespace gr {
         nconsumed = noutput_items;
         nproduced = noutput_items;
       } else {
-        // Tags in buffer. Insert a ref symbol at each tag.
+        // Tags in buffer.
         if (d_start_new_packet) {
+          // Reference symbol was already inserted.
+          // Differetially encode data with reference to this first symbol.
           encode_data(in, &d_predecessor[0], &d_predecessor[d_block_len], out1, out2);
           nconsumed = 2*d_block_len;
           nproduced = nconsumed;
           d_start_new_packet = false;
         }else if(tags[0].offset > nitems_read(0)){
-          //GR_LOG_INFO(d_logger, format("finish packet (length %d)")%((tags[0].offset - nitems_read(0)) - 2 * d_block_len));
+          // Encode actual data.
           encode_data(in, &d_predecessor[0], &d_predecessor[d_block_len], out1, out2);
           encode_data(&in[2 * d_block_len], out1, out2, (tags[0].offset - nitems_read(0)) - 2 * d_block_len); //TODO check if length is even
           nconsumed = tags[0].offset - nitems_read(0);
           nproduced = nconsumed;
-
         } else{
           // Tag on first item.
-          // Insert ref symbol.
+          // Insert a reference symbol at each new tag (for differential encoding).
           for (unsigned int k = 0; k < d_block_len; ++k) { // Iterate over elements of one block.
-              // Calculate the output of antenna 1.
-              out1[k] = d_basis_vecs[0];
-              // Calculate the output of antenna 2.
-              out2[k] = d_basis_vecs[1]; // TODO are the basis vecs a good choice for init symbols???
-              // Calculate the second element of the output sequence after the rules of Alamouti.
-              out1[1*d_block_len+k] = -std::conj(out2[k]);
-              out2[1*d_block_len+k] = std::conj(out1[k]);
+            // Reference symbols can be chose freely.
+            // In this implementation they are equal to the basis vectors.
+            out1[k] = d_basis_vecs[0];
+            out2[k] = d_basis_vecs[1];
+            // Calculate the second element of the output sequence after the rules of Alamouti.
+            out1[1*d_block_len+k] = -std::conj(out2[k]);
+            out2[1*d_block_len+k] = std::conj(out1[k]);
             }
           nproduced = 2*d_block_len;
           d_start_new_packet = true;
-          add_item_tag(0, nitems_written(0), d_key, pmt::from_long(pmt::to_long(tags[0].value)+2*d_block_len));
-          add_item_tag(1, nitems_written(1), d_key, pmt::from_long(pmt::to_long(tags[0].value)+2*d_block_len));
+          add_item_tag(0, nitems_written(0), d_len_tag_key, pmt::from_long(pmt::to_long(tags[0].value)+2*d_block_len));
+          add_item_tag(1, nitems_written(1), d_len_tag_key, pmt::from_long(pmt::to_long(tags[0].value)+2*d_block_len));
         }
       }
-
       // Update predecessor for next call of work.
       if(nproduced >= 2*d_block_len) {
         for (unsigned int k = 0; k < d_block_len; ++k) {
@@ -195,7 +196,6 @@ namespace gr {
           d_predecessor[d_block_len+k] = out2[nproduced - 2*d_block_len + k];
         }
       }
-
       // Tell runtime system how many input items we consumed.
       consume_each (nconsumed);
       // Tell runtime system how many output items we produced.

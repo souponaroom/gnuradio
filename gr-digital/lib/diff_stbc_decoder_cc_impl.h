@@ -39,7 +39,7 @@ namespace gr {
  * block which produces the same amount of output items as there are input items.
  * The code rate is R=1.
  * If a finite block of sequences is transmitted, the decoder needs a reference sequence
- * to differentially decode the first sequence. When using stream tags 'start'
+ * to differentially decode the first sequence. When using stream tags with key
  * on the stream, the decoder therefore produces one sequence less than it consumes, because
  * the tagged sequence is skipped and taken as reference to differentially decode the first
  * sequence after the tag as first decoded output sequence. If there is no tag at the very
@@ -69,7 +69,7 @@ namespace gr {
      private:
       uint32_t d_vlen;
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
-      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
+      const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
       const std::vector <gr_complex> d_basis_vecs;
       /*!< Complex vector of size 2. The 2 complex elements of this vectors
        * can each be interpreted as a basis vector in the complex plane.
@@ -96,7 +96,7 @@ namespace gr {
                             uint32_t length);
 
      public:
-      diff_stbc_decoder_cc_impl(float phase_offset, uint32_t vlen);
+      diff_stbc_decoder_cc_impl(float phase_offset, uint32_t vlen, const std::string &start_key);
       ~diff_stbc_decoder_cc_impl();
 
       // Where all the action really happens

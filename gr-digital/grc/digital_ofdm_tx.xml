@@ -197,6 +197,11 @@
       <key>digital.mimo.VBLAST_MMSE</key>
       <opt>hide_m:none</opt>
     </option>
+    <option>
+      <name>RX Diveristy Combining</name>
+      <key>digital.mimo.RX_DIVERSITY_SC</key>
+      <opt>hide_m:none</opt>
+    </option>
   </param>
   <param>
     <name>M</name>

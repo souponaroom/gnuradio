@@ -80,7 +80,7 @@ namespace gr {
        * class. digital::diff_stbc_decoder_cc::make is the public interface for
        * creating new instances.
        */
-      static sptr make(float phase_offset=0.0, uint32_t vlen=1);
+      static sptr make(float phase_offset=0.0, uint32_t vlen=1, const std::string &start_key="start");
     };
 
   } // namespace digital

@@ -35,8 +35,13 @@ namespace gr {
  * The number of input items is automatically scheduled to a multiple of 2, however,
  * if the input data stream is terminated, the absolute number of input items
  * must be an even number.
- * The differential STBC encoder is a sync block which produces the same amount of
- * output items at each port as there are input items. The code rate is R=1.
+ * The differential STBC encoder is a sync block in theory which produces the same amount of
+ * output items at each port as there are input items (the code rate is R=1).
+ * However, due to the differential encoding, a reference symbol is required
+ * at the beginning of the encoding process. In this implementation, this
+ * reference symbol is chosen to be the same as the basis vector of [1].
+ * The reference symbol is inserted into the data stream automatically
+ * with each length_tag.
  *
  * The incoming samples are expected to be PSK modulated samples of any modulation order.
  * If the constellation is phase shifted, meaning that there is no constellation point
@@ -59,7 +64,7 @@ namespace gr {
       uint32_t d_block_len;
       bool d_start_new_packet;
       std::vector <gr::tag_t> tags; /*!< Vector that stores the tags in input buffer. */
-      static const pmt::pmt_t d_key; /*!< PMT stores the key of the CSI tag. */
+      const pmt::pmt_t d_len_tag_key; /*!< PMT stores the key of the CSI tag. */
       /*!< Complex vector of size 2. The 2 complex elements of this vectors
        * can each be interpreted as a basis vector in the complex plane.
        * These 2 2-dimensional vectors (= 2 complex numbers) are a new basis
@@ -108,7 +113,8 @@ namespace gr {
                        uint32_t length);
 
      public:
-      diff_stbc_encoder_cc_impl(float phase_offset, uint32_t block_len);
+      diff_stbc_encoder_cc_impl(float phase_offset, uint32_t block_len,
+                                const std::string &len_tag_key);
       ~diff_stbc_encoder_cc_impl();
 
       // Where all the action really happens

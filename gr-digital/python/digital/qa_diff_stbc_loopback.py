@@ -49,7 +49,7 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
         for n in range(repetitions):
             vlen = np.random.randint(1, 9)
             modulation_order = 1#np.random.randint(1, 4)
-            phase_shift = 0.0#2.0 * np.pi * np.random.randn()
+            phase_shift = 2.0 * np.pi * np.random.randn()
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.pi*np.random.randint(0, 2**modulation_order, size=[data_length*vlen])/(2.0**modulation_order) + phase_shift))
 
@@ -62,8 +62,8 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
             tag_pmt = pmt.from_bool(True)
             # Append stream tags with CSI to data stream.
             tags = [(gr.tag_utils.python_to_tag((0,
-                                                 pmt.string_to_symbol("start"),
-                                                 tag_pmt,
+                                                 pmt.string_to_symbol("packet_length"),
+                                                 pmt.from_long(data_length),
                                                  pmt.from_long(0))))]
 
             # Build up the test flowgraph.
@@ -85,11 +85,7 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
             # Run flowgraph.
             self.tb.run()
 
-            ''' 
-            Check if the expected result (=the data itself with only missing sequences at the tag
-            positions (differential scheme loses one sample at the beginning of each block) 
-            equals the actual result. '''
-            self.assertComplexTuplesAlmostEqual(data[2*vlen:data_length*vlen:], sink.data(), 4)
+            self.assertComplexTuplesAlmostEqual(data, sink.data()[2*vlen:], 4)
 
 if __name__ == '__main__':
     gr_unittest.run(qa_diff_stbc_loopback, "qa_diff_stbc_loopback.xml")

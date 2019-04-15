@@ -64,12 +64,14 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
 
         return tags, np.delete(output, delete_indices)
 
-    ''' 5 test with random input data, random tag positions, random basis and random vector length.'''
+    ''' 
+    5 test with random input data, random tag positions, random basis and 
+    random vector length. Steam mode (no tags).'''
     def test_001_t (self):
         # Define test params.
         data_length = 20
         repetitions = 5
-        num_tags = 4
+        num_tags = 0
 
         for i in range(repetitions):
             vlen = np.random.randint(1, 9)
