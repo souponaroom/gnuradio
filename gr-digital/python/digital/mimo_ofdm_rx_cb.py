@@ -43,27 +43,7 @@ from mimo import mimo_technique
 ''' 
 Default values for Receiver.
 '''
-# Number of receiving antennas.
-_def_m = 2
-_def_n = 2
-_def_mimo_technique = mimo_technique.VBLAST_ZF
-_def_fft_len = 64
-_def_cp_len = 16
 _seq_seed = 42
-# Modulation order of header and payload symbols
-_def_bps_header = 1
-_def_bps_payload = 1
-# Tag keys.
-_def_start_key = "start"
-_def_csi_key = "csi"
-_def_carrier_freq_off_key = "carrier_freq_offset"
-_def_frame_length_tag_key = "frame_length"
-_def_packet_length_tag_key = "packet_length"
-_def_packet_num_tag_key = "packet_num"
-# OFDM carrier allocation.
-_def_pilot_carriers_mimo=[range(-26, 0, 3)+range(2, 27, 3), ]
-_def_occupied_carriers_mimo = [[x for x in range(-24, 25, 1) if x not in _def_pilot_carriers_mimo[0] + [0]], ]
-_def_zero_carriers_mimo=[[x for x in range(-32, 32, 1) if x not in _def_pilot_carriers_mimo[0] + _def_occupied_carriers_mimo[0]], ]
 
 def _get_active_carriers(fft_len, occupied_carriers, pilot_carriers):
     """ Returns a list of all carriers that at some point carry data or pilots. """
@@ -127,7 +107,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     The detected packets are output as a stream of packed bits on the output.
 
     Args:
-    n: Number of receiving antennas.
+    m: Number of transmit antennas (m=1 for SISO/SIMO case) (integer).
+    n: Number of transmit antennas (n=1 for SISO/MISO case) (integer).
     mimo_technique: Key to one of the implemented MIMO techniques. Choose between:
     |               V-BLAST (key = 'vblast')
     |               Alamouti (key = 'alamouti')
@@ -149,20 +130,20 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     |           channel estimation.
     """
     def __init__(self,
-                 m = _def_m, n=_def_n,
-                 mimo_technique=_def_mimo_technique,
-                 fft_len=_def_fft_len, cp_len=_def_cp_len,
-                 start_key=_def_start_key,
-                 csi_key = _def_csi_key,
-                 carrier_freq_off_key = _def_carrier_freq_off_key,
-                 frame_length_tag_key=_def_frame_length_tag_key,
-                 packet_length_tag_key=_def_packet_length_tag_key,
-                 packet_num_tag_key=_def_packet_num_tag_key,
-                 occupied_carriers=_def_occupied_carriers_mimo,
-                 pilot_carriers=_def_pilot_carriers_mimo,
+                 m=2, n=2,
+                 mimo_technique=mimo_technique.VBLAST_ZF,
+                 fft_len=64, cp_len=16,
+                 start_key="start",
+                 csi_key ="csi",
+                 carrier_freq_off_key = "carrier_freq_offset",
+                 frame_length_tag_key="frame_length",
+                 packet_length_tag_key="packet_length",
+                 packet_num_tag_key="packet_num",
+                 occupied_carriers=None,
+                 pilot_carriers=None,
                  pilot_symbols=None,
-                 bps_header=_def_bps_header,
-                 bps_payload=_def_bps_payload,
+                 bps_header=1,
+                 bps_payload=1,
                  sync_word1=None,
                  sync_word2=None,
                  scramble_bits=False):
@@ -194,24 +175,28 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             raise ValueError("Number of TX antennas must be a natural number.")
         if self.n < 1:
             raise ValueError("Number of RX antennas must be a natural number.")
-        if occupied_carriers is None:
-            self.occupied_carriers = _def_occupied_carriers_mimo
+        max_carrier_offset = 6
         if pilot_carriers is None:
-            self.pilot_carriers = _def_pilot_carriers_mimo
+            self.pilot_carriers = [range(-fft_len / 2 + max_carrier_offset, 0, 3) +
+                                   range(2, fft_len / 2 - max_carrier_offset + 1, 3), ]
+        if occupied_carriers is None:
+            self.occupied_carriers = [[x for x in range(-fft_len / 2 + max_carrier_offset + 2,
+                                                        fft_len / 2 - max_carrier_offset - 1, 1)
+                                       if x not in self.pilot_carriers[0] + [0]], ]
+        self.zero_carriers = [[x for x in range(-32, 32, 1) if x not in self.pilot_carriers[0] + self.occupied_carriers[0]], ]
         if pilot_symbols is None:
             # Generate Hadamard matrix as orthogonal pilot sequences.
-            self.pilot_symbols = hadamard(_def_n)
-        else:
-            self.pilot_symbols = pilot_symbols
+            self.pilot_symbols = hadamard(self.m)
+        # Check/generate valid sync words.
         if sync_word1 is None:
-            self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
+            self.sync_word1 = _make_sync_word1(self.fft_len, self.occupied_carriers, self.pilot_carriers)
         else:
             if len(sync_word1) != self.fft_len:
                 raise ValueError("Length of sync sequence(s) must be FFT length.")
             self.sync_word1 = sync_word1
         self.sync_word2 = ()
         if sync_word2 is None:
-            self.sync_word2 = _make_sync_word2(fft_len, occupied_carriers, pilot_carriers)
+            self.sync_word2 = _make_sync_word2(self.fft_len, self.occupied_carriers, self.pilot_carriers)
         elif len(sync_word2):
             if len(sync_word2) != fft_len:
                 raise ValueError("Length of sync sequence(s) must be FFT length.")
@@ -270,7 +255,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             m=self.m, n=self.n,
             fft_len=fft_len,
             pilot_symbols=self.pilot_symbols,
-            pilot_carriers=pilot_carriers[0],
+            pilot_carriers=self.pilot_carriers[0],
             occupied_carriers=self.occupied_carriers[0],
             csi_key=self.csi_key,
             start_key=self.start_key)
@@ -280,7 +265,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             snr_estimator = digital.ofdm_snr_est_vcvc(num_inputs=self.n,
                                                       fft_len=self.fft_len,
                                                       occupied_carriers=self.occupied_carriers[0],
-                                                      zero_carriers=_def_zero_carriers_mimo[0],
+                                                      zero_carriers=self.zero_carriers[0],
                                                       snr_key="snr",
                                                       update_time=16,
                                                       averaging_length=8)
@@ -306,11 +291,11 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         """
         header_constellation = _get_constellation(bps_header)
         header_formatter = digital.packet_header_ofdm(
-            occupied_carriers, 1,
+            self.occupied_carriers, 1,
             packet_length_tag_key,
             frame_length_tag_key,
             packet_num_tag_key,
-            bps_header, bps_payload)
+            self.bps_header, self.bps_payload)
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter(),
                                                            self.start_key)
