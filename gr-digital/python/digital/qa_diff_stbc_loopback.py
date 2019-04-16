@@ -27,6 +27,8 @@ import digital_swig as digital
 import numpy as np
 import pmt
 
+from matplotlib.pyplot import *
+
 M_SQRT_2 = 1.0/np.sqrt(2)
 
 class qa_diff_stbc_loopback (gr_unittest.TestCase):
@@ -43,13 +45,13 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
     '''
     def test_001_t (self):
         # Define test params.
-        data_length = 20
-        repetitions = 5
+        data_length =20
+        repetitions = 1
 
         for n in range(repetitions):
-            vlen = np.random.randint(1, 9)
+            vlen = 1#np.random.randint(1, 9)
             modulation_order = 1#np.random.randint(1, 4)
-            phase_shift = 2.0 * np.pi * np.random.randn()
+            phase_shift = 0.0#2.0 * np.pi * np.random.randn()
             # Generate random input data.
             data = M_SQRT_2 * np.exp(1j* (2.0*np.pi*np.random.randint(0, 2**modulation_order, size=[data_length*vlen])/(2.0**modulation_order) + phase_shift))
 
@@ -84,6 +86,7 @@ class qa_diff_stbc_loopback (gr_unittest.TestCase):
             self.tb.connect((diff_stbc_encoder, 1), encoder_sink2)
             # Run flowgraph.
             self.tb.run()
+
 
             self.assertComplexTuplesAlmostEqual(data, sink.data()[2*vlen:], 4)
 

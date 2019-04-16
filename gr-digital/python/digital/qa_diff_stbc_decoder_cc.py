@@ -98,6 +98,40 @@ class qa_diff_stbc_decoder_cc (gr_unittest.TestCase):
 
             self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
 
+    ''' 
+    5 test with random input data, random tag positions, random basis and 
+    random vector length. Steam mode (no tags).'''
+    def test_002_t (self):
+        # Define test params.
+        data_length = 20
+        repetitions = 5
+        num_tags = 4
+
+        for i in range(repetitions):
+            vlen = np.random.randint(1, 9)
+            data = np.random.randint(-1, 2, size=data_length*vlen) + 1j*np.random.randint(-1, 2, size=data_length*vlen)
+            # Generate random tag positions.
+            tag_pos = np.random.randint(low=0, high=data_length / 2, size=num_tags) * 2
+            tag_pos = np.sort(tag_pos)
+
+            phase_shift = 2.0 * np.pi * np.random.randn()
+            basis = np.array([M_SQRT_2 * np.exp(1j * phase_shift), M_SQRT_2 * np.exp(1j * phase_shift)])
+
+            tags, expected_result = self.decode(basis, data, tag_pos, vlen)
+
+            # Build up the test flowgraph.
+            src = blocks.vector_source_c(data=data,
+                                         vlen=vlen,
+                                         repeat=False,
+                                         tags=tags)
+            stbc = digital.diff_stbc_decoder_cc(phase_shift, vlen)
+            sink = blocks.vector_sink_c()
+            self.tb.connect(src, stbc, sink)
+            # Run flowgraph.
+            self.tb.run()
+            #
+            # self.assertComplexTuplesAlmostEqual(expected_result, sink.data(), 4)
+
 
 if __name__ == '__main__':
     gr_unittest.run(qa_diff_stbc_decoder_cc, "qa_diff_stbc_decoder_cc.xml")

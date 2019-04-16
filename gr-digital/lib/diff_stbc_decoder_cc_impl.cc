@@ -1,6 +1,6 @@
 /* -*- c++ -*- */
 /* 
- * Copyright 2018 Free Software Foundation, Inc.
+ * Copyright 2018, 2019 Free Software Foundation, Inc.
  * 
  * This file is part of GNU Radio
  * 
@@ -127,23 +127,34 @@ namespace gr {
       if (tags.size() > 0) {
         if(tags[0].offset == nitems_read(0)){
           // Tag on 1st item.
-          // Iterate over data blocks between taqs.
-          for (unsigned int i = 0; i+1 < tags.size(); ++i) {
-            // This is not the last tag in the buffer.
-            /* Calculate input block length. The output block length is
-             * one sequence shorter than the input block length
-             * due to differential coding. */
-            input_block_length = (tags[i+1].offset-(tags[i+1].offset%2)) - (tags[i].offset-(tags[i].offset%2));
-            // Decode sequences of this block.
-            if (input_block_length > 2) {
-              decode_sequences(&in[nconsumed*d_vlen], &in[(nconsumed + 2)*d_vlen], &out[nproduced], input_block_length - 2);
-              add_item_tag(0, nitems_written(0) + nproduced, d_key, pmt::from_long(0));
-              //GR_LOG_DEBUG(d_logger, format("%d")%(nitems_written(0) + nproduced));
-              nproduced += (input_block_length - 2)*d_vlen;
+          if(tags.size() > 1) {
+            // Iterate over data blocks between taqs.
+            for (unsigned int i = 0; i + 1 < tags.size(); ++i) {
+              // This is not the last tag in the buffer.
+              /* Calculate input block length. The output block length is
+               * one sequence shorter than the input block length
+               * due to differential coding. */
+              input_block_length = (tags[i + 1].offset - (tags[i + 1].offset % 2)) -
+                                   (tags[i].offset - (tags[i].offset % 2));
+              // Decode sequences of this block.
+              if (input_block_length > 2) {
+                decode_sequences(&in[nconsumed * d_vlen], &in[(nconsumed + 2) * d_vlen],
+                                 &out[nproduced], input_block_length - 2);
+                add_item_tag(0, nitems_written(0) + nproduced, d_key, pmt::from_long(0));
+                nproduced += (input_block_length - 2) * d_vlen;
+              }
+              nconsumed += input_block_length;
             }
-            nconsumed += input_block_length;
-
           }
+          // Only one tag.
+          input_block_length = noutput_items/d_vlen-nconsumed;
+          add_item_tag(0, nitems_written(0), d_key, pmt::from_long(0));
+          if (input_block_length > 2) {
+            decode_sequences(&in[nconsumed * d_vlen], &in[(nconsumed + 2) * d_vlen],
+                             &out[nproduced], input_block_length - 2);
+            nproduced += (input_block_length - 2)*d_vlen;
+          }
+        nconsumed += input_block_length;
         } else{
           // There are items before the first tag.
           // Process samples before the first tag.
