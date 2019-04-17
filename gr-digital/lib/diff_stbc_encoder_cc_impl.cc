@@ -101,9 +101,9 @@ namespace gr {
       map_symbols(in);
       for (unsigned int k = 0; k < d_block_len; ++k) { // Iterate over elements of one block.
         // Calculate the output of antenna 1.
-        out1[k] = std::polar((float)M_SQRT1_2, std::arg(d_mapping_coeffs[0][k] * predecessor1[k] - d_mapping_coeffs[1][k] * std::conj(predecessor2[k])));
+        out1[k] = d_mapping_coeffs[0][k] * predecessor1[k] - d_mapping_coeffs[1][k] * std::conj(predecessor2[k]);
         // Calculate the output of antenna 2.
-        out2[k] = std::polar((float)M_SQRT1_2, std::arg(d_mapping_coeffs[0][k] * predecessor2[k] + d_mapping_coeffs[1][k] * std::conj(predecessor1[k])));
+        out2[k] = d_mapping_coeffs[0][k] * predecessor2[k] + d_mapping_coeffs[1][k] * std::conj(predecessor1[k]);
         // Calculate the second element of the output sequence after the rules of Alamouti.
         out1[1*d_block_len+k] = -std::conj(out2[k]);
         out2[1*d_block_len+k] = std::conj(out1[k]);
@@ -121,14 +121,13 @@ namespace gr {
         map_symbols(&in[count]);
         for (unsigned int k = 0; k < d_block_len; ++k) {
           // Calculate the output of antenna 1.
-          out1[count+2*d_block_len+k] = std::polar((float)M_SQRT1_2, std::arg(d_mapping_coeffs[0][k] * out1[count+k] - d_mapping_coeffs[1][k] * std::conj(out2[count+k])));
+          out1[count+2*d_block_len+k] = d_mapping_coeffs[0][k] * out1[count+k] - d_mapping_coeffs[1][k] * std::conj(out2[count+k]);
           // Calculate the output of antenna 2.
-          out2[count+2*d_block_len+k] = std::polar((float)M_SQRT1_2, std::arg(d_mapping_coeffs[0][k] * out2[count+k] + d_mapping_coeffs[1][k] * std::conj(out1[count+k])));
+          out2[count+2*d_block_len+k] = d_mapping_coeffs[0][k] * out2[count+k] + d_mapping_coeffs[1][k] * std::conj(out1[count+k]);
           // Calculate the second element of the output sequence after the rules of Alamouti.
           out1[count+3*d_block_len+k] = -std::conj(out2[count+2*d_block_len+k]);
           out2[count+3*d_block_len+k] = std::conj(out1[count+2*d_block_len+k]);
         }
-
         count += 2*d_block_len;
       }
     }
@@ -168,7 +167,9 @@ namespace gr {
         }else if(tags[0].offset > nitems_read(0)){
           // Encode actual data.
           encode_data(in, &d_predecessor[0], &d_predecessor[d_block_len], out1, out2);
-          encode_data(&in[2 * d_block_len], out1, out2, (tags[0].offset - nitems_read(0)) - 2 * d_block_len); //TODO check if length is even
+          if(tags[0].offset > nitems_read(0)+2*d_block_len) {
+            encode_data(&in[2 * d_block_len], out1, out2, (tags[0].offset - nitems_read(0)) - 2 * d_block_len);
+          }
           nconsumed = tags[0].offset - nitems_read(0);
           nproduced = nconsumed;
         } else{

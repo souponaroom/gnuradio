@@ -57,9 +57,7 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
         for i in range(1, data_len/2):
             for k in range(0, block_len):
                 output[0][i*2][k] = mapping_coeffs[0][k][i]*output[0][(i-1)*2][k] - mapping_coeffs[1][k][i]*np.conj(output[1][(i-1)*2][k])
-                output[0][i*2][k] *= M_SQRT_2/(1.0*np.abs(output[0][i*2][k]))
                 output[1][i*2][k] = mapping_coeffs[0][k][i]*output[1][(i-1)*2][k] + mapping_coeffs[1][k][i]*np.conj(output[0][(i-1)*2][k])
-                output[1][i*2][k] *= M_SQRT_2/(1.0*np.abs(output[1][i*2][k]))
                 # Calculate the second element of the output sequence after the rules of Alamouti.
                 output[0][i*2+1][k] = -np.conj(output[1][i*2][k])
                 output[1][i*2+1][k] =  np.conj(output[0][i*2][k])
@@ -75,9 +73,9 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
         for i in range(repetitions):
             block_len = np.random.randint(1,9)
             modulation_order = np.random.randint(1, 4)
-            phase_shift = 2.0 * np.pi * np.random.randn()
+            phase_shift = 0.0 * np.pi * np.random.randn()
             # Generate random input data.
-            data = M_SQRT_2 * np.exp(1j* (2.0*np.random.randint(0, 2**modulation_order, size=data_length*block_len)/(2.0**modulation_order) + phase_shift))
+            data = M_SQRT_2 * np.exp(1j* (2.0*np.pi*np.random.randint(0, 2**modulation_order, size=data_length*block_len)/(2.0**modulation_order) + phase_shift))
             basis = np.array([M_SQRT_2*np.exp(1j * phase_shift), M_SQRT_2*np.exp(1j * phase_shift)])
 
             # Build up the test flowgraph.
@@ -92,8 +90,8 @@ class qa_diff_stbc_encoder_cc (gr_unittest.TestCase):
             # Calculate expected result.
             expected_result = self.encode(basis, data, data_length, block_len, phase_shift)
             # Check if the expected result equals the actual result.
-            self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[0], data_length*block_len), sink1.data(), 4)
-            self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[1], data_length*block_len), sink2.data(), 4)
+            self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[0], data_length*block_len), sink1.data(), 3)
+            self.assertComplexTuplesAlmostEqual(np.reshape(expected_result[1], data_length*block_len), sink2.data(), 3)
 
         self.tb.run ()
         # check data

@@ -91,6 +91,8 @@ namespace gr {
           gr_complex r_2 = seq[0*d_vlen + i] * std::conj(prev_seq[1*d_vlen + i]) - std::conj(seq[1*d_vlen + i]) * prev_seq[0*d_vlen + i];
           // Calculate the decoded (but not normalized!) samples and write them to the output buffer.
           out[0*d_vlen + i] = d_basis_vecs[0] * r_1 - std::conj(d_basis_vecs[1]) * r_2;
+          //GR_LOG_DEBUG(d_logger, format("decoder output: %d, r1 %d, r2 %d")%(out[i]) %r_1 %r_2);
+          //GR_LOG_DEBUG(d_logger, format("details seq %d %d prev seq %d %d")%(seq[i]) %(seq[i+1]) %(prev_seq[i]) %(prev_seq[1+i]));
           out[1*d_vlen + i] = d_basis_vecs[1] * r_1 + std::conj(d_basis_vecs[0]) * r_2;
         }
         // Recursively decode the remaining sequences of this block.
@@ -106,7 +108,6 @@ namespace gr {
     {
       const gr_complex *in = (const gr_complex *) input_items[0];
       gr_complex *out = (gr_complex *) output_items[0];
-
       uint32_t nconsumed = 0;
       uint32_t nproduced = 0;
       uint32_t input_block_length;
@@ -146,9 +147,9 @@ namespace gr {
               nconsumed += input_block_length;
             }
           }
-          // Only one tag.
+          // Last tag.
           input_block_length = noutput_items/d_vlen-nconsumed;
-          add_item_tag(0, nitems_written(0), d_key, pmt::from_long(0));
+          add_item_tag(0, nitems_written(0)+nproduced, d_key, pmt::from_long(0));
           if (input_block_length > 2) {
             decode_sequences(&in[nconsumed * d_vlen], &in[(nconsumed + 2) * d_vlen],
                              &out[nproduced], input_block_length - 2);

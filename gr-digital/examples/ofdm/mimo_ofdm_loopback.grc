@@ -113,7 +113,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>(np.random.randn(n, m) + 1j * np.random.randn(n, m))</value>
+      <value>np.array([[0.5*np.exp(2j*np.pi*np.random.rand()), np.sqrt(1-np.square(np.abs(0.5)))*np.exp(2j*np.pi*np.random.rand())]])</value>
     </param>
   </block>
   <block>
@@ -365,7 +365,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>16</value>
+      <value>32</value>
     </param>
   </block>
   <block>
@@ -1382,7 +1382,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.ALAMOUTI</value>
+      <value>digital.mimo.DIFF_ALAMOUTI</value>
     </param>
     <param>
       <key>maxoutbuf</key>
