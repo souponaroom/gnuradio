@@ -131,7 +131,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
     """
     def __init__(self,
                  m=2, n=2,
-                 mimo_technique=mimo_technique.VBLAST_ZF,
+                 mimo=mimo_technique.VBLAST_ZF,
                  fft_len=64, cp_len=16,
                  start_key="start",
                  csi_key ="csi",
@@ -146,18 +146,19 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                  bps_payload=1,
                  sync_word1=None,
                  sync_word2=None,
-                 scramble_bits=False):
+                 scramble_bits=False,
+                 show_const=False):
         gr.hier_block2.__init__(self,
             "mimo_ofdm_rx_cb",
             gr.io_signature(n, n, gr.sizeof_gr_complex),  # Input signature
-            gr.io_signature2(2, 2, gr.sizeof_char, gr.sizeof_gr_complex))  # Output signature
+            gr.io_signature2(2, 2, gr.sizeof_char, gr.sizeof_gr_complex) if show_const else gr.io_signature(1, 1, gr.sizeof_char))
 
         """
         Parameter initalization
         """
         self.m = m
         self.n = n
-        self.mimo_technique = mimo_technique
+        self.mimo_technique = mimo
         self.fft_len = fft_len
         self.cp_len = cp_len
         self.start_key = start_key
@@ -285,6 +286,8 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             csi_key=self.csi_key)
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
+        if show_const:
+            self.connect(mimo_decoder, (self, 1))
 
         """
         Header reader/parser
@@ -295,18 +298,23 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
             packet_length_tag_key,
             frame_length_tag_key,
             packet_num_tag_key,
-            self.bps_header, self.bps_payload)
+            self.bps_header, self.bps_payload, scramble_header=scramble_bits
+            )
         header_reader = digital.mimo_ofdm_header_reader_cc(header_constellation.base(),
                                                            header_formatter.formatter(),
                                                            self.start_key)
         self.connect(mimo_decoder, header_reader)
 
         """
-        Payload demodulation + CRC
+        Payload demodulation + Scrambling(opt) + CRC
         """
         payload_constellation = _get_constellation(bps_payload)
         payload_demod = digital.constellation_decoder_cb(payload_constellation.base())
         payload_pack = blocks.repack_bits_bb(bps_payload, 8, self.packet_length_tag_key, True)
+        self.payload_descrambler = digital.additive_scrambler_bb(0x8a, self.scramble_seed, 7,
+                                                                 0,  # Don't reset after fixed length
+                                                                 bits_per_byte=8,  # This is after packing
+                                                                 reset_tag_key=self.packet_length_tag_key
+        )
         crc = digital.crc32_bb(True, self.packet_length_tag_key)
-        self.connect(header_reader, payload_demod, payload_pack, crc, self)
-        self.connect(mimo_decoder, (self, 1))
+        self.connect(header_reader, payload_demod, payload_pack, self.payload_descrambler, crc, (self, 0))

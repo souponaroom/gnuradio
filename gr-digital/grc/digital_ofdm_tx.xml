@@ -5,7 +5,7 @@
   <import>from gnuradio import digital</import>
   <make>digital.ofdm_tx(
 	  fft_len=$fft_len, cp_len=$cp_len,
-	  packet_length_tag_key=$packet_len_key,
+	  packet_len_tag_key=$packet_len_key,
 	  #if $occupied_carriers()
 	  occupied_carriers=$occupied_carriers,
 	  #end if

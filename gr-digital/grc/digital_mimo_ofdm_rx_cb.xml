@@ -4,7 +4,7 @@
   <key>digital_mimo_ofdm_rx_cb</key>
   <import>from gnuradio import digital</import>
   <make>digital.mimo_ofdm_rx_cb(
-	  m=$m, n=$n, mimo_technique=$mimo_technique,fft_len=$fft_len, cp_len=$cp_len,
+	  m=$m, n=$n, mimo=$mimo_technique,fft_len=$fft_len, cp_len=$cp_len,
 	  frame_length_tag_key='frame_'+$packet_len_key,
 	  packet_length_tag_key=$packet_len_key,
 	  #if $occupied_carriers()
@@ -24,8 +24,39 @@
 	  #end if
 	  bps_header=$header_mod.bps,
 	  bps_payload=$payload_mod.bps,
-	  scramble_bits=$scramble_bits
+	  scramble_bits=$scramble_bits,
+          show_const=$show_const
 	 )</make>
+  <param>
+    <name>MIMO</name>
+    <key>mimo_technique</key>
+    <value>digital.mimo.VBLAST</value>
+    <type>enum</type>
+    <option>
+      <name>Diversity Combining (SC)</name>
+      <key>digital.mimo.RX_DIVERSITY_SC</key>
+    </option>
+    <option>
+      <name>Diversity Combining (MRC)</name>
+      <key>digital.mimo.RX_DIVERSITY_MRC</key>
+    </option>
+    <option>
+      <name>Alamouti</name>
+      <key>digital.mimo.ALAMOUTI</key>
+    </option>
+    <option>
+      <name>Differential Alamouti</name>
+      <key>digital.mimo.DIFF_ALAMOUTI</key>
+    </option>
+    <option>
+      <name>V-BLAST (ZF)</name>
+      <key>digital.mimo.VBLAST_ZF</key>
+    </option>
+    <option>
+      <name>V-BLAST (MMSE)</name>
+      <key>digital.mimo.VBLAST_MMSE</key>
+    </option>
+  </param>
   <param>
     <name>M</name>
     <key>m</key>
@@ -172,33 +203,18 @@
     </option>
   </param>
   <param>
-    <name>MIMO</name>
-    <key>mimo_technique</key>
-    <value>digital.mimo.VBLAST</value>
+    <name>Show Constellation</name>
+    <key>show_const</key>
+    <value>False</value>
     <type>enum</type>
+    <hide>part</hide>
     <option>
-      <name>Diversity Combining (SC)</name>
-      <key>digital.mimo.RX_DIVERSITY_SC</key>
+      <name>Yes</name>
+      <key>True</key>
     </option>
     <option>
-      <name>Diversity Combining (MRC)</name>
-      <key>digital.mimo.RX_DIVERSITY_MRC</key>
-    </option>
-    <option>
-      <name>Alamouti</name>
-      <key>digital.mimo.ALAMOUTI</key>
-    </option>
-    <option>
-      <name>Differential Alamouti</name>
-      <key>digital.mimo.DIFF_ALAMOUTI</key>
-    </option>
-    <option>
-      <name>V-BLAST (ZF)</name>
-      <key>digital.mimo.VBLAST_ZF</key>
-    </option>
-    <option>
-      <name>V-BLAST (MMSE)</name>
-      <key>digital.mimo.VBLAST_MMSE</key>
+      <name>No</name>
+      <key>False</key>
     </option>
   </param>
   <check>$fft_len &gt; 0</check>
@@ -214,8 +230,9 @@
     <type>byte</type>
   </source>
   <source>
-    <name>out_debug</name>
+    <name>constellation</name>
     <type>complex</type>
+    <optional>1</optional>
   </source>
 </block>
 

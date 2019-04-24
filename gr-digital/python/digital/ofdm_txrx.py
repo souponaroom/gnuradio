@@ -47,7 +47,9 @@ except ImportError:
     import blocks_swig as blocks
     import analog_swig as analog
 
-# Default parameters.
+# Default parameters for SISO.
+_def_occupied_carriers = (range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22, 27),)
+_def_pilot_carriers=((-21, -7, 7, 21,),)
 _pilot_sym_scramble_seq = (
         1,1,1,1, -1,-1,-1,1, -1,-1,-1,-1, 1,1,-1,1, -1,-1,1,1, -1,1,1,-1, 1,1,1,1, 1,1,-1,1,
         1,1,-1,1, 1,-1,-1,1, 1,1,-1,1, -1,-1,-1,1, -1,1,-1,-1, 1,-1,-1,1, 1,1,1,1, -1,-1,1,1,
@@ -142,7 +144,6 @@ class ofdm_tx(gr.hier_block2):
                  m=1,
                  fft_len=64,
                  cp_len=16,
-                 packet_length_tag_key="packet_length",
                  occupied_carriers=None,
                  pilot_carriers=None,
                  pilot_symbols=None,
@@ -150,6 +151,9 @@ class ofdm_tx(gr.hier_block2):
                  bps_payload=1,
                  sync_word1=None,
                  sync_word2=None,
+                 frame_len_tag_key="frame_length",
+                 packet_len_tag_key="packet_length",
+                 packet_num_tag_key="packet_num",
                  rolloff=0,
                  debug_log=False,
                  scramble_bits=False,
@@ -162,7 +166,6 @@ class ofdm_tx(gr.hier_block2):
         '''
         self.fft_len           = fft_len
         self.cp_len            = cp_len
-        self.packet_length_tag_key = packet_length_tag_key
         self.bps_header        = bps_header
         self.bps_payload       = bps_payload
         self.sync_word1 = sync_word1
@@ -170,17 +173,22 @@ class ofdm_tx(gr.hier_block2):
         self.mimo_technique = mimo_technique
 
         # Change SISO/MIMO specific default parameters.
-        max_carrier_offset = 6
-        if pilot_carriers is None:
-            self.pilot_carriers = [range(-fft_len/2+max_carrier_offset, 0, 3)+range(2, fft_len/2-max_carrier_offset+1, 3), ]
-        if occupied_carriers is None:
-            self.occupied_carriers = [[x for x in range(-fft_len/2+max_carrier_offset+2,
-                                                        fft_len/2-max_carrier_offset-1, 1)
-                                       if x not in self.pilot_carriers[0] + [0]], ]
-        if pilot_symbols is None:
-            if self.mimo_technique is  mimo_technique.SISO:
+        if self.mimo_technique is mimo_technique.SISO:
+            if pilot_carriers is None:
+                self.pilot_carriers = _def_pilot_carriers
+            if pilot_symbols is None:
                 self.pilot_symbols = _def_pilot_symbols
-            else:
+            if occupied_carriers is None:
+                self.occupied_carriers = _def_occupied_carriers
+        else:
+            max_carrier_offset = 6
+            if pilot_carriers is None:
+                self.pilot_carriers = [range(-fft_len/2+max_carrier_offset, 0, 3)+range(2, fft_len/2-max_carrier_offset+1, 3), ]
+            if occupied_carriers is None:
+                self.occupied_carriers = [[x for x in range(-fft_len/2+max_carrier_offset+2,
+                                                            fft_len/2-max_carrier_offset-1, 1)
+                                           if x not in self.pilot_carriers[0] + [0]], ]
+            if pilot_symbols is None:
                 # Generate Hadamard matrix as orthogonal pilot sequences.
                 self.pilot_symbols = hadamard(self.m)
 
@@ -212,19 +220,22 @@ class ofdm_tx(gr.hier_block2):
         '''
         Header modulation
         '''
-        crc = digital.crc32_bb(False, self.packet_length_tag_key)
+        crc = digital.crc32_bb(False, packet_len_tag_key)
         header_constellation  = _get_constellation(bps_header)
         header_mod = digital.chunks_to_symbols_bc(header_constellation.points())
         formatter_object = digital.packet_header_ofdm(
             occupied_carriers=self.occupied_carriers, n_syms=1,
+            len_tag_key=packet_len_tag_key,
+            frame_len_tag_key=frame_len_tag_key,
+            num_tag_key=packet_num_tag_key,
             bits_per_header_sym=self.bps_header,
             bits_per_payload_sym=self.bps_payload,
             scramble_header=scramble_bits
         )
-        header_gen = digital.packet_headergenerator_bb(formatter_object.base(), self.packet_length_tag_key)
+        header_gen = digital.packet_headergenerator_bb(formatter_object.base(), packet_len_tag_key)
         header_payload_mux = blocks.tagged_stream_mux(
             itemsize=gr.sizeof_gr_complex*1,
-            lengthtagname=self.packet_length_tag_key,
+            lengthtagname=packet_len_tag_key,
             tag_preserve_head_pos=1 # Head tags on the payload stream stay on the head
         )
         self.connect(
@@ -248,12 +259,12 @@ class ofdm_tx(gr.hier_block2):
             7,
             0, # Don't reset after fixed length (let the reset tag do that)
             bits_per_byte=8, # This is before unpacking
-            reset_tag_key=self.packet_length_tag_key
+            reset_tag_key=packet_len_tag_key
         )
         payload_unpack = blocks.repack_bits_bb(
             8, # Unpack 8 bits per byte
             self.bps_payload,
-            self.packet_length_tag_key
+            packet_len_tag_key
         )
         self.connect(
             crc,
@@ -272,7 +283,7 @@ class ofdm_tx(gr.hier_block2):
                 pilot_carriers=self.pilot_carriers,
                 pilot_symbols=self.pilot_symbols,
                 sync_words=self.sync_words,
-                len_tag_key=self.packet_length_tag_key
+                len_tag_key=packet_len_tag_key
             )
             ffter = fft.fft_vcc(
                 self.fft_len,
@@ -284,7 +295,7 @@ class ofdm_tx(gr.hier_block2):
                 self.fft_len,
                 self.fft_len+self.cp_len,
                 rolloff,
-                self.packet_length_tag_key
+                packet_len_tag_key
             )
             self.normalize = blocks.multiply_const_cc(1.0/numpy.sqrt(fft_len))
             self.connect(header_payload_mux, allocator, ffter, cyclic_prefixer, self.normalize, self)
@@ -315,7 +326,7 @@ class ofdm_tx(gr.hier_block2):
                         pilot_carriers=self.pilot_carriers,
                         pilot_symbols=mimo_pilot_symbols,
                         sync_words=self.sync_words,
-                        len_tag_key=self.packet_length_tag_key
+                        len_tag_key=packet_len_tag_key
                     )
                 )
                 ffter.append(
@@ -331,7 +342,7 @@ class ofdm_tx(gr.hier_block2):
                         self.fft_len,
                         self.fft_len + self.cp_len,
                         rolloff,
-                        self.packet_length_tag_key
+                        packet_len_tag_key
                     )
                 )
                 normalize.append(blocks.multiply_const_cc(1.0 / numpy.sqrt(fft_len)))
@@ -381,13 +392,14 @@ class ofdm_rx(gr.hier_block2):
                  sync_word1=None,
                  sync_word2=None,
                  scramble_bits=False,
-                 mimo_technique=mimo_technique.SISO,
+                 debug_log=False,
+                 mimo=mimo_technique.SISO,
                  start_key="start",
                  csi_key="csi"):
         gr.hier_block2.__init__(self, "ofdm_rx",
                     gr.io_signature(n, n, gr.sizeof_gr_complex),
                     gr.io_signature(1, 1, gr.sizeof_char))
-        if self.mimo_technique is mimo_technique.SISO:  # SISO case.
+        if mimo is mimo_technique.SISO:  # SISO case.
             ### Param init / sanity check ########################################
             self.fft_len           = fft_len
             self.cp_len            = cp_len
@@ -397,15 +409,21 @@ class ofdm_rx(gr.hier_block2):
             self.bps_header        = bps_header
             self.bps_payload       = bps_payload
             n_sync_words = 1
+            if pilot_carriers is None:
+                self.pilot_carriers = _def_pilot_carriers
+            if pilot_symbols is None:
+                self.pilot_symbols = _def_pilot_symbols
+            if occupied_carriers is None:
+                self.occupied_carriers = _def_occupied_carriers
             if sync_word1 is None:
-                self.sync_word1 = _make_sync_word1(fft_len, occupied_carriers, pilot_carriers)
+                self.sync_word1 = _make_sync_word1(self.fft_len, self.occupied_carriers, self.pilot_carriers)
             else:
                 if len(sync_word1) != self.fft_len:
                     raise ValueError("Length of sync sequence(s) must be FFT length.")
                 self.sync_word1 = sync_word1
             self.sync_word2 = ()
             if sync_word2 is None:
-                self.sync_word2 = _make_sync_word2(fft_len, occupied_carriers, pilot_carriers)
+                self.sync_word2 = _make_sync_word2(self.fft_len, self.occupied_carriers, self.pilot_carriers)
                 n_sync_words = 2
             elif len(sync_word2):
                 if len(sync_word2) != fft_len:
@@ -443,9 +461,9 @@ class ofdm_rx(gr.hier_block2):
             header_equalizer     = digital.ofdm_equalizer_simpledfe(
                 fft_len,
                 header_constellation.base(),
-                occupied_carriers,
-                pilot_carriers,
-                pilot_symbols,
+                self.occupied_carriers,
+                self.pilot_carriers,
+                self.pilot_symbols,
                 symbols_skipped=0,
             )
             header_eq = digital.ofdm_frame_equalizer_vcvc(
@@ -456,12 +474,12 @@ class ofdm_rx(gr.hier_block2):
                     1 # Header is 1 symbol long
             )
             header_serializer = digital.ofdm_serializer_vcc(
-                    fft_len, occupied_carriers,
+                    fft_len, self.occupied_carriers,
                     self.frame_length_tag_key
             )
             header_demod     = digital.constellation_decoder_cb(header_constellation.base())
             header_formatter = digital.packet_header_ofdm(
-                    occupied_carriers, 1,
+                    self.occupied_carriers, 1,
                     packet_length_tag_key,
                     frame_length_tag_key,
                     packet_num_tag_key,
@@ -493,9 +511,9 @@ class ofdm_rx(gr.hier_block2):
             payload_equalizer = digital.ofdm_equalizer_simpledfe(
                     fft_len,
                     payload_constellation.base(),
-                    occupied_carriers,
-                    pilot_carriers,
-                    pilot_symbols,
+                    self.occupied_carriers,
+                    self.pilot_carriers,
+                    self.pilot_symbols,
                     symbols_skipped=1, # (that was already in the header)
                     alpha=0.1
             )
@@ -505,7 +523,7 @@ class ofdm_rx(gr.hier_block2):
                     self.frame_length_tag_key
             )
             payload_serializer = digital.ofdm_serializer_vcc(
-                    fft_len, occupied_carriers,
+                    fft_len, self.occupied_carriers,
                     self.frame_length_tag_key,
                     self.packet_length_tag_key,
                     1 # Skip 1 symbol (that was already in the header)
@@ -544,7 +562,7 @@ class ofdm_rx(gr.hier_block2):
             # MIMO
             self.mimo_ofdm_rx = mimo_ofdm_rx_cb(
                 m=m, n=n,
-                mimo_technique=mimo_technique,
+                mimo=mimo,
                 fft_len=fft_len,
                 cp_len=cp_len,
                 start_key=start_key,
