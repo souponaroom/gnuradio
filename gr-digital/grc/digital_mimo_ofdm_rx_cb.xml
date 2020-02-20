@@ -205,9 +205,9 @@
   <param>
     <name>Show Constellation</name>
     <key>show_const</key>
-    <value>False</value>
+    <value>True</value>
     <type>enum</type>
-    <hide>part</hide>
+<!--    <hide>part</hide>  -->
     <option>
       <name>Yes</name>
       <key>True</key>

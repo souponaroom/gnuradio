@@ -113,7 +113,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>np.array([[0.5*np.exp(2j*np.pi*np.random.rand()), np.sqrt(1-np.square(np.abs(0.5)))*np.exp(2j*np.pi*np.random.rand())]])</value>
+      <value>np.array([[0.5*np.exp(2j*np.pi*np.random.rand()), np.sqrt(1-np.square(np.abs(0.5)))*np.exp(2j*np.pi*np.random.rand())],[0.5*np.exp(2j*np.pi*np.random.rand()), np.sqrt(1-np.square(np.abs(0.5)))*np.exp(2j*np.pi*np.random.rand())]])</value>
     </param>
   </block>
   <block>
@@ -311,7 +311,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>1</value>
+      <value>2</value>
     </param>
   </block>
   <block>
@@ -670,7 +670,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -878,7 +878,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(704, 280)</value>
+      <value>(704, 296)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -925,7 +925,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -1082,7 +1082,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -1279,7 +1279,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.ALAMOUTI</value>
+      <value>digital.mimo.VBLAST_ZF</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -1316,6 +1316,10 @@
     <param>
       <key>scramble_bits</key>
       <value>False</value>
+    </param>
+    <param>
+      <key>show_const</key>
+      <value>True</value>
     </param>
     <param>
       <key>sync_word1</key>
@@ -1382,7 +1386,7 @@
     </param>
     <param>
       <key>mimo_technique</key>
-      <value>digital.mimo.DIFF_ALAMOUTI</value>
+      <value>digital.mimo.VBLAST_ZF</value>
     </param>
     <param>
       <key>maxoutbuf</key>
@@ -1476,7 +1480,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -2926,7 +2930,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -2980,7 +2984,7 @@
     </param>
     <param>
       <key>_enabled</key>
-      <value>0</value>
+      <value>1</value>
     </param>
     <param>
       <key>_coordinate</key>
@@ -3036,6 +3040,12 @@
     <sink_key>0</sink_key>
   </connection>
   <connection>
+    <source_block_id>blocks_add_xx_1</source_block_id>
+    <sink_block_id>digital_mimo_ofdm_rx_cb_0</sink_block_id>
+    <source_key>0</source_key>
+    <sink_key>1</sink_key>
+  </connection>
+  <connection>
     <source_block_id>blocks_complex_to_imag_0</source_block_id>
     <sink_block_id>qtgui_time_sink_x_0</sink_block_id>
     <source_key>0</source_key>
@@ -3051,6 +3061,12 @@
     <source_block_id>blocks_multiply_matrix_xx_0</source_block_id>
     <sink_block_id>blocks_multiply_xx_1</sink_block_id>
     <source_key>0</source_key>
+    <sink_key>1</sink_key>
+  </connection>
+  <connection>
+    <source_block_id>blocks_multiply_matrix_xx_0</source_block_id>
+    <sink_block_id>blocks_multiply_xx_0</sink_block_id>
+    <source_key>1</source_key>
     <sink_key>1</sink_key>
   </connection>
   <connection>
@@ -3091,12 +3107,6 @@
   </connection>
   <connection>
     <source_block_id>digital_mimo_ofdm_rx_cb_0</source_block_id>
-    <sink_block_id>blocks_file_sink_0</sink_block_id>
-    <source_key>0</source_key>
-    <sink_key>0</sink_key>
-  </connection>
-  <connection>
-    <source_block_id>digital_mimo_ofdm_rx_cb_0</source_block_id>
     <sink_block_id>blocks_complex_to_imag_0</sink_block_id>
     <source_key>1</source_key>
     <sink_key>0</sink_key>
@@ -3105,6 +3115,12 @@
     <source_block_id>digital_mimo_ofdm_rx_cb_0</source_block_id>
     <sink_block_id>qtgui_const_sink_x_0</sink_block_id>
     <source_key>1</source_key>
+    <sink_key>0</sink_key>
+  </connection>
+  <connection>
+    <source_block_id>digital_mimo_ofdm_rx_cb_0</source_block_id>
+    <sink_block_id>blocks_file_sink_0</sink_block_id>
+    <source_key>0</source_key>
     <sink_key>0</sink_key>
   </connection>
   <connection>

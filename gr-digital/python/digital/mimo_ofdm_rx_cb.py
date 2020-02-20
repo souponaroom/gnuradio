@@ -147,7 +147,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
                  sync_word1=None,
                  sync_word2=None,
                  scramble_bits=False,
-                 show_const=False):
+                 show_const=True):
         gr.hier_block2.__init__(self,
             "mimo_ofdm_rx_cb",
             gr.io_signature(n, n, gr.sizeof_gr_complex),  # Input signature
@@ -287,6 +287,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         for i in range(0, self.n):
             self.connect((channel_est, i), (mimo_decoder, i))
         if show_const:
+            print("show_const = True")
             self.connect(mimo_decoder, (self, 1))
 
         """
