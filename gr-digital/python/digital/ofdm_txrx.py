@@ -34,7 +34,7 @@ import digital_swig as digital
 from mimo_encoder_cc import mimo_encoder_cc
 from mimo_ofdm_rx_cb import mimo_ofdm_rx_cb
 from scipy.linalg import hadamard
-from mimo import mimo_technique
+from mimo import mimo_technique as mimo
 
 try:
     # This will work when feature #505 is added.
@@ -157,7 +157,7 @@ class ofdm_tx(gr.hier_block2):
                  rolloff=0,
                  debug_log=False,
                  scramble_bits=False,
-                 mimo_technique=mimo_technique.SISO):
+                 mimo_technique=mimo.SISO):
         gr.hier_block2.__init__(self, "ofdm_tx",
                                 gr.io_signature(1, 1, gr.sizeof_char),
                                 gr.io_signature(m, m, gr.sizeof_gr_complex))
@@ -173,7 +173,7 @@ class ofdm_tx(gr.hier_block2):
         self.mimo_technique = mimo_technique
 
         # Change SISO/MIMO specific default parameters.
-        if self.mimo_technique is mimo_technique.SISO:
+        if self.mimo_technique is mimo.SISO:
             if pilot_carriers is None:
                 self.pilot_carriers = _def_pilot_carriers
             if pilot_symbols is None:
@@ -276,7 +276,7 @@ class ofdm_tx(gr.hier_block2):
         '''
         Create OFDM frame
         '''
-        if self.mimo_technique is  mimo_technique.SISO:  # SISO case.
+        if self.mimo_technique is  mimo.SISO:  # SISO case.
             allocator = digital.ofdm_carrier_allocator_cvc(
                 self.fft_len,
                 occupied_carriers=self.occupied_carriers,
@@ -393,13 +393,13 @@ class ofdm_rx(gr.hier_block2):
                  sync_word2=None,
                  scramble_bits=False,
                  debug_log=False,
-                 mimo=mimo_technique.SISO,
+                 mimo=mimo.SISO,
                  start_key="start",
                  csi_key="csi"):
         gr.hier_block2.__init__(self, "ofdm_rx",
                     gr.io_signature(n, n, gr.sizeof_gr_complex),
                     gr.io_signature(1, 1, gr.sizeof_char))
-        if mimo is mimo_technique.SISO:  # SISO case.
+        if mimo is mimo.SISO:  # SISO case.
             ### Param init / sanity check ########################################
             self.fft_len           = fft_len
             self.cp_len            = cp_len

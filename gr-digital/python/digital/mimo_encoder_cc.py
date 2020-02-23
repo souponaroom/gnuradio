@@ -40,12 +40,12 @@ class mimo_encoder_cc(gr.hier_block2):
             gr.io_signature(M, M, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into encoder blocks.
-        mimo_algorithm = {mimo.ALAMOUTI : digital.alamouti_encoder_cc_make(vlen=vlen),
-                          mimo.DIFF_ALAMOUTI : digital.diff_stbc_encoder_cc_make(block_len=vlen),
-                          mimo.VBLAST_ZF : digital.vblast_encoder_cc_make(M),
-                          mimo.VBLAST_MMSE: digital.vblast_encoder_cc_make(M),
-                          mimo.RX_DIVERSITY_SC : digital.vblast_encoder_cc_make(M),
-                          mimo.RX_DIVERSITY_MRC: digital.vblast_encoder_cc_make(M)}
+        mimo_algorithm = {mimo.ALAMOUTI.value : digital.alamouti_encoder_cc_make(vlen=vlen),
+                          mimo.DIFF_ALAMOUTI.value : digital.diff_stbc_encoder_cc_make(block_len=vlen),
+                          mimo.VBLAST_ZF.value : digital.vblast_encoder_cc_make(M),
+                          mimo.VBLAST_MMSE.value: digital.vblast_encoder_cc_make(M),
+                          mimo.RX_DIVERSITY_SC.value : digital.vblast_encoder_cc_make(M),
+                          mimo.RX_DIVERSITY_MRC.value: digital.vblast_encoder_cc_make(M)}
 
         # Check for valid M.
         if M < 1:
@@ -58,7 +58,7 @@ class mimo_encoder_cc(gr.hier_block2):
             raise ValueError('For Alamouti-like schemes like %s, M must be 2.' % mimo_technique)
 
         # Connect everything.
-        mimo_encoder = mimo_algorithm[mimo_technique]
+        mimo_encoder = mimo_algorithm[mimo_technique.value]
         self.connect(self, mimo_encoder)
         for m in range(0, M):
             self.connect((mimo_encoder, m), (self, m))

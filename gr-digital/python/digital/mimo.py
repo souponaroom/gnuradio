@@ -23,7 +23,6 @@
 
 from enum import Enum
 
-
 class AutoNumber(Enum):
     def __new__(cls):
         value = len(cls.__members__) + 1
@@ -39,3 +38,4 @@ class mimo_technique(AutoNumber):
     VBLAST_MMSE = ()
     ALAMOUTI = ()
     DIFF_ALAMOUTI = ()
+

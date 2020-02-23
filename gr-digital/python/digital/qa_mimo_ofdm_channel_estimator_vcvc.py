@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# 
-# Copyright 2018 Free Software Foundation, Inc.
+#
+# Copyright 2018,2019,2020 Moritz Luca Schmid, 
+# Communications Engineering Lab (CEL) / Karlsruhe Institute of Technology (KIT). 
 # 
 # This file is part of GNU Radio
 # 
@@ -26,6 +27,7 @@ from gnuradio import blocks
 from gnuradio import fft
 import digital_swig as digital
 from gnuradio.digital.ofdm_txrx import ofdm_tx
+from mimo import mimo_technique as mimo
 import numpy as np
 import pmt
 
@@ -37,17 +39,26 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
     def tearDown (self):
         self.tb = None
 
-    def test_001_t (self):
+    """
+    This unit test validates the correct channel estimation of a constant and flat channel
+    with random coefficients.
+    TODO enable N neq M
+    """
+    def test_static_channel_estimation_t (self):
+        # Channel dimesions to test.
+        dimensions = [1, 2, 4, 8]
+        for dim in dimensions:
+            self.estimate_NxN_channel(dim)
+
+    def estimate_NxN_channel (self, channel_dimension):
         # Define test params.
-        packet_len = 14
+        N = channel_dimension
+        packet_len = N # must be a multiple of N (so that min one whole pilot sequence fits in each packet) 
         len_tag_key = 'packet_length'
-        fft_len = 64
-        cp_len = fft_len/4
-        pilot_carriers = [-21, -7, 7, 21]
-        occupied_carriers = range(-26, -21) + range(-20, -7) + range(-6, 0) + range(1, 7) + range(8, 21) + range(22,27)
-        N=2
-        M=2
-        channel_matrix = np.array([[1,0],[0,1]])#(np.random.randn(N, M) + 1j * np.random.randn(N, M))
+        fft_len = 4
+        pilot_carriers = [-fft_len/2, fft_len/2-1] # use the outer carriers as pilots
+        occupied_carriers = range(-fft_len/2+1, fft_len/2-1) # all other carriers are occupied with payload
+        channel_matrix = (np.random.randn(N, N) + 1j * np.random.randn(N, N))
         self.walsh_sequences = np.array([
             [1, 1, 1, 1, 1, 1, 1, 1],
             [1, -1, 1, -1, 1, -1, 1, -1],
@@ -59,103 +70,65 @@ class qa_mimo_ofdm_channel_estimator_vcvc (gr_unittest.TestCase):
             [1, -1, -1, 1, -1, 1, 1, -1]
         ])
 
-        src = blocks.vector_source_b(range(packet_len*10), False, 1, ())
-        s2tagged_stream = blocks.stream_to_tagged_stream(gr.sizeof_char, 1,
-                                                         packet_len,
-                                                         len_tag_key)
-        tx = ofdm_tx(
-            fft_len=fft_len, cp_len=cp_len,
-            packet_length_tag_key=len_tag_key,
-            bps_header=1,
-            bps_payload=1,
-            rolloff=0,
-            debug_log=False,
-            scramble_bits=False,
-            m=M, mimo_technique="vblast"
-        )
+        # prepare data for antenna 1 & 2
+        data = np.repeat(self.walsh_sequences[:N,:N],fft_len, axis=1)
+
+        # Static channel.
         static_channel = blocks.multiply_matrix_cc(channel_matrix)
-        print 'channel matrix'
-        print channel_matrix
-        fft1 = fft.fft_vcc(fft_len, True, (), True)
-        fft2 = fft.fft_vcc(fft_len, True, (), True)
-        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
+
+        # Define TX blocks.
+        src = [] # data sources
+        ofdm_mod = [] # ifft for each TX branch
+        v2s = [] # vector to stream (to feed it to the channel matrix)
+        for i in range(N):
+            src.append( blocks.vector_source_c(data[i], False, fft_len, ()))
+            ofdm_mod.append( fft.fft_vcc(fft_len, False, (), True))
+            v2s.append( blocks.vector_to_stream(gr.sizeof_gr_complex, fft_len))
+        for i in range(N):
+            # Connect.
+            self.tb.connect(src[i], ofdm_mod[i], v2s[i], (static_channel, i))
+
+        # Channel estimator (the target of this test).
+        channel_est = digital.mimo_ofdm_channel_estimator_vcvc(m=N, n=N,
                                                                fft_len=fft_len,
                                                                pilot_symbols=self.walsh_sequences[:N, :N],
                                                                pilot_carriers=pilot_carriers,
-                                                               occupied_carriers=occupied_carriers)
-        dump_cp1 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len+cp_len, cp_len)
-        dump_cp2 = blocks.keep_m_in_n(gr.sizeof_gr_complex, fft_len, fft_len + cp_len, cp_len)
-        dump_sync1 = blocks.keep_m_in_n(gr.sizeof_gr_complex*fft_len, 2, 4, 2)
-        dump_sync2 = blocks.keep_m_in_n(gr.sizeof_gr_complex * fft_len, 2, 4, 2)
-        #head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 10)
-        sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-        sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-        debug_sink1 = blocks.vector_sink_c(vlen=fft_len)
-        debug_sink2 = blocks.vector_sink_c(vlen=fft_len)
+                                                               occupied_carriers=occupied_carriers,
+                                                               csi_key="csi", start_key="start")
 
-        self.tb.connect(src,
-                        s2tagged_stream,
-                        tx,
-                        (static_channel, 0),
-                        dump_cp1,
-                        blocks.multiply_const_cc(1.0 / np.sqrt(fft_len)),
-                        blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len),
-                        fft1,
-                        dump_sync1,
-                        (channel_est, 0),
-                        sink1)
-        #self.tb.connect((channel_est, 0), blocks.tag_debug(gr.sizeof_gr_complex*len(occupied_carriers), 'channel est pls'),)
-        self.tb.connect((tx, 1),
-                        (static_channel, 1),
-                        dump_cp2,
-                        blocks.multiply_const_cc(1.0 / np.sqrt(fft_len)),
-                        blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len),
-                        fft2,
-                        dump_sync2,
-                        (channel_est, 1),
-                        #head,
-                        sink2)
-        self.tb.connect(dump_sync1, debug_sink1)
-        self.tb.connect(dump_sync2, debug_sink2)
+        # Define RX blocks.
+        add_tag = [] # add packet tag for each RX branch
+        ofdm_demod = [] # FFT as OFDM demod for each RX branch
+        s2v = [] # stream to vector (to feed to estimator)
+        norm = [] # normalize each RX branch
+        sink = [] # data sink for each RX branch (after estimation)
+        for i in range(N):
+            add_tag.append( blocks.stream_to_tagged_stream(gr.sizeof_gr_complex, 
+                                                           fft_len,
+                                                           packet_len,
+                                                           len_tag_key))
+            ofdm_demod.append( fft.fft_vcc(fft_len, True, (), True))
+            s2v.append( blocks.stream_to_vector(gr.sizeof_gr_complex, fft_len))
+            norm.append( blocks.multiply_const_cc(1./fft_len, fft_len))
+            sink.append(blocks.vector_sink_c(vlen=fft_len-len(pilot_carriers)))
+            # Connect.
+            self.tb.connect((static_channel,i), s2v[i], ofdm_demod[i], norm[i], 
+                            add_tag[i], (channel_est, i), sink[i])
+            
+        
+        # Run test.
         self.tb.run ()
-        # check data
+
+        # Read channel estimation (out of tags) and compare with actual channel state.
         csi = np.empty(shape=[len(occupied_carriers), N, N], dtype=complex)
         for k in range(0, len(occupied_carriers)):
             for n in range(0, N):
-                for m in range(0, M):
-                    csi[k][n][m] = pmt.c32vector_ref(pmt.vector_ref(pmt.vector_ref(sink1.tags()[0].value, k), n), m)
-        print 'csi'
-        print csi
-
+                for m in range(0, N):
+                    csi[k][n][m] = pmt.c32vector_ref(pmt.vector_ref(pmt.vector_ref(sink[0].tags()[0].value, k), n), m)
 
         for c in range(0, len(occupied_carriers)):
             for n in range(0, N):
-                self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 1)
-
-
-    # def test_002_t(self):
-    #     N=2
-    #     fft_len = 4
-    #     length = 10
-    #     occupied_carriers = [-1]
-    #     data = np.random.randn(N, fft_len*10)
-    #     src1 = blocks.vector_source_c(data[0], vlen=fft_len)
-    #     src2 = blocks.vector_source_c(data[1], vlen=fft_len)
-    #     channel_est = digital.mimo_ofdm_channel_estimator_vcvc(n=N,
-    #                                                            fft_len=fft_len,
-    #                                                            pilot_symbols=[[1,1],[1,-1]],
-    #                                                            pilot_carriers=[0],
-    #                                                            occupied_carriers=occupied_carriers)
-    #     sink1 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-    #     sink2 = blocks.vector_sink_c(vlen=len(occupied_carriers))
-    #     head = blocks.head(gr.sizeof_gr_complex * len(occupied_carriers), 5)
-    #     self.tb.connect(src1, (channel_est, 0), head, sink1)
-    #     self.tb.connect(src2, (channel_est, 1), sink2)
-    #     self.tb.run()
-    #     self.assertComplexTuplesAlmostEqual(data[0][-1 + fft_len / 2:5 * fft_len:fft_len],
-    #         sink1.data()[0:len(occupied_carriers) * length / 2], 2)
-    #     self.assertComplexTuplesAlmostEqual(data[1][-1 + fft_len / 2:5 * fft_len:fft_len],
-    #         sink2.data()[0:len(occupied_carriers) * length / 2], 2)
+                self.assertComplexTuplesAlmostEqual(channel_matrix[n], csi[c][n], 3)
 
 if __name__ == '__main__':
     gr_unittest.run(qa_mimo_ofdm_channel_estimator_vcvc, "qa_mimo_ofdm_channel_estimator_vcvc.xml")

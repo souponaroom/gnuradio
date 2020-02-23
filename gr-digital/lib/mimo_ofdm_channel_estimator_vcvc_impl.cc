@@ -213,9 +213,11 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
+      std::cout<<"general work"<<std::endl;
       /* Copy occupied OFDM sub-carriers to output buffer.
        * (Neither the zero-carriers nor the pilot carriers) */
       extract_payload_carriers(input_items, output_items, noutput_items);
+      std::cout<<"extracted payload carriers"<<std::endl;
 
       // Read start tags to sync the pilot correlation.
       std::vector <gr::tag_t> start_tags;
@@ -229,7 +231,9 @@ namespace gr {
 
       // Iterate over OFDM symbols.
       for (int s = 0; s < noutput_items; ++s) {
+      std::cout<<"iterate over ofdm symbol "<< s << std::endl;
         if(start_tags.size() > 0 && nitems_read(0)+s == start_tags[tag_index].offset){
+      	  std::cout<<"update current start offset"<<std::endl;
           // Update current start offset.
           tag_offset_correction = d_m - (s%d_m);
           if(tag_index < start_tags.size()-1){
@@ -239,20 +243,28 @@ namespace gr {
         // Experimental feature
         if(start_tags.size() > 0 && start_tags[tag_index].offset-(d_m-1) <= nitems_read(0)+s && nitems_read(0)+s < start_tags[tag_index].offset){
           // This is the last symbol of the frame.
+      std::cout<<"last symbol of frame"<<std::endl;
           // Use old estimation.
         } else {
+      std::cout<<"not last symbol of frame"<<std::endl;
           // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
           estimate_channel_state(input_items, s, (s + tag_offset_correction) % d_m);
+      std::cout<<"estimated pilots"<<std::endl;
           /* We have estimated the CSI for the pilot carriers.
            * Now, lets interpolate over all remaining OFDM sub-carriers. */
           interpolate_channel_state();
+      std::cout<<"interpolated"<<std::endl;
         }
         /* Now we have individual CSI for each sub-carrier of each MIMO-branch.
          * Add tag with this CSI to the output vector.
          * All CSI for one time step is stored in one 3-dim vector which is tagged
          * to the output vector of the first MIMO branch. */
         add_item_tag(0, nitems_written(0) + s, d_csi_key, generate_csi_pmt());
+	//std::cout << "channel state [" << d_channel_state[-21+d_fft_shift][0][0] << d_channel_state[-21+d_fft_shift][0][1]<< d_channel_state[-21+d_fft_shift][1][0]<< d_channel_state[-21+d_fft_shift][1][1] << std::endl;
+
+      std::cout<<"added tag"<<std::endl;
       }
+      std::cout<<"finished iterating over ofdm symbols"<<std::endl;
 
       // Update last_tag_offset.
       if (start_tags.size() > 0){
