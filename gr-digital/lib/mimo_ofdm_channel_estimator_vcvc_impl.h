@@ -44,6 +44,8 @@ namespace gr {
       uint16_t d_n; /*!< Number of receiving antennas. */
       uint32_t d_fft_len; /*!< FFT length = Number of OFDM sub-carriers. */
       uint32_t d_fft_shift; /*!< FFT length/2. Used to convert centralized fft indices to vector indices. */
+      bool d_start_new_packet; /*!< State variable. If true, the correlation gets a reset. */
+      int d_time_delay;
       /*!
        * 2-dim vector of the dimensions NxN, containing the training pilot symbols
        * for each MIMO channel. */
@@ -55,7 +57,7 @@ namespace gr {
       std::vector<int> d_occupied_carriers;
       pmt::pmt_t d_csi_key; //!< Key for the CSI stream tags.
       pmt::pmt_t d_start_key; //!< Key for the CSI stream tags.
-      uint64_t d_last_tag_offset; //!< Indicates the absolute beginning of the last start tag.
+      uint32_t d_correlation_offset;
       /*! Length of the output vector.
        * (Number of occupied carriers = FFT length - the pilot carriers and the zero carriers)*/
       uint32_t d_output_vlen;
@@ -69,10 +71,12 @@ namespace gr {
        *
        * @param input_items Input buffers.
        * @param output_items Output buffers.
+       * @param offset Offset of first symbol to copy.
        * @param length Number of items to copy at each branch.
        */
       void extract_payload_carriers(gr_vector_const_void_star &input_items,
                                     gr_vector_void_star &output_items,
+                                    uint32_t offset,
                                     uint32_t length);
 
       /*! \brief Estimate channel coefficients for pilot carriers.
@@ -87,6 +91,15 @@ namespace gr {
       void estimate_channel_state(gr_vector_const_void_star &input_items,
                                   uint32_t reading_offset,
                                   uint16_t correlation_offset);
+
+      void estimate_time_delay(gr_vector_const_void_star &input_items,
+                                  uint32_t reading_offset);
+
+      void estimate_time_delay2(gr_vector_const_void_star &input_items,
+                                  uint32_t reading_offset);
+
+      void correct_time_delay(gr_vector_const_void_star &input_items,
+                                  uint32_t reading_offset);
 
       /*! \brief Converts channel state vector to a PMT.
        *
@@ -123,6 +136,7 @@ namespace gr {
                                             const std::string &start_key);
       ~mimo_ofdm_channel_estimator_vcvc_impl();
 
+      virtual int get_time_delay() { return d_time_delay; }
       // Where all the action really happens
       void forecast (int noutput_items, gr_vector_int &ninput_items_required);
 

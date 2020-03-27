@@ -104,6 +104,7 @@ namespace gr {
         crc = calculate_crc32(in, packet_length - d_crc_length);
         if (d_packed) {
           if (crc != *(unsigned int *) (in + packet_length - d_crc_length)) { // Drop package
+        std::cout << "crc check failed" << std::endl;
             return 0;
           }
         }
@@ -114,6 +115,7 @@ namespace gr {
             }
           }
         }
+        std::cout << "crc check succeeded" << std::endl;
         memcpy((void *) out, (const void *) in, packet_length - d_crc_length);
       } else {
         crc = calculate_crc32(in, packet_length);

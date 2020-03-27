@@ -51,7 +51,7 @@ class mimo_encoder_cc(gr.hier_block2):
         if M < 1:
             raise ValueError('MIMO block must have M >= 1 (M=%d) selected).' % M)
         # Check for valid MIMO algorithm.
-        if mimo_technique not in mimo_algorithm:
+        if mimo_technique.value not in mimo_algorithm:
             raise ValueError('MIMO algorithm %s unknown.' % (mimo_technique))
         # Check if M = 2 for Alamouti-like schemes.
         if M != 2 and mimo_technique == ('alamouti' or 'diff_stbc'):

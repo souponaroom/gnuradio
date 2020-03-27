@@ -167,7 +167,9 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         self.frame_length_tag_key = frame_length_tag_key
         self.packet_length_tag_key = packet_length_tag_key
         self.occupied_carriers = occupied_carriers
-        self.pilot_carriers = pilot_carriers,
+        self.pilot_carriers = pilot_carriers
+        self.pilot_symbols = pilot_symbols
+        self.occupied_carriers = occupied_carriers
         self.bps_header = bps_header
         self.bps_payload = bps_payload
 
@@ -177,15 +179,15 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         if self.n < 1:
             raise ValueError("Number of RX antennas must be a natural number.")
         max_carrier_offset = 6
-        if pilot_carriers is None:
+        if self.pilot_carriers is None:
             self.pilot_carriers = [range(-fft_len / 2 + max_carrier_offset, 0, 3) +
                                    range(2, fft_len / 2 - max_carrier_offset + 1, 3), ]
-        if occupied_carriers is None:
+        if self.occupied_carriers is None:
             self.occupied_carriers = [[x for x in range(-fft_len / 2 + max_carrier_offset + 2,
                                                         fft_len / 2 - max_carrier_offset - 1, 1)
                                        if x not in self.pilot_carriers[0] + [0]], ]
         self.zero_carriers = [[x for x in range(-32, 32, 1) if x not in self.pilot_carriers[0] + self.occupied_carriers[0]], ]
-        if pilot_symbols is None:
+        if self.pilot_symbols is None:
             # Generate Hadamard matrix as orthogonal pilot sequences.
             self.pilot_symbols = hadamard(self.m)
         # Check/generate valid sync words.
@@ -221,7 +223,7 @@ class mimo_ofdm_rx_cb(gr.hier_block2):
         # Factor for OFDM energy normalization.
         rx_normalize = 1.0 / np.sqrt(self.fft_len)
         symbol_len = fft_len + cp_len
-        manual_adjusting_factor = 3 + cp_len
+        manual_adjusting_factor = 3 + cp_len 
         for i in range(0, self.n):
             # Add up MIMO signals to do the sync on this reference signal.
             self.connect((self, i), blocks.multiply_const_cc(rx_normalize), (add, i))

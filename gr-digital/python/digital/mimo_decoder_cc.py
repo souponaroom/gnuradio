@@ -39,18 +39,18 @@ class mimo_decoder_cc(gr.hier_block2):
             gr.io_signature(1, 1, gr.sizeof_gr_complex))  # Output signature
 
         # Dictionary translating mimo algorithm keys into decoder blocks.
-        mimo_algorithm = {mimo.RX_DIVERSITY_SC: digital.diversity_combiner_cc_make(num_inputs=N,
+        mimo_algorithm = {mimo.RX_DIVERSITY_SC.value: digital.diversity_combiner_cc_make(num_inputs=N,
                                                                                   vlen=vlen,
                                                                                   combining_technique='SC'),
-                          mimo.RX_DIVERSITY_MRC: digital.diversity_combiner_cc_make(num_inputs=N,
+                          mimo.RX_DIVERSITY_MRC.value: digital.diversity_combiner_cc_make(num_inputs=N,
                                                                                     vlen=vlen,
                                                                                     combining_technique='MRC'),
-                          mimo.ALAMOUTI: digital.alamouti_decoder_cc_make(vlen=vlen),
-                          mimo.DIFF_ALAMOUTI: digital.diff_stbc_decoder_cc_make(vlen=vlen),
-                          mimo.VBLAST_ZF: digital.vblast_decoder_cc_make(num_inputs=N,
+                          mimo.ALAMOUTI.value: digital.alamouti_decoder_cc_make(vlen=vlen),
+                          mimo.DIFF_ALAMOUTI.value: digital.diff_stbc_decoder_cc_make(vlen=vlen),
+                          mimo.VBLAST_ZF.value: digital.vblast_decoder_cc_make(num_inputs=N,
                                                                     equalizer_type='ZF',
                                                                     vlen=vlen),
-                          mimo.VBLAST_MMSE: digital.vblast_decoder_cc_make(num_inputs=N,
+                          mimo.VBLAST_MMSE.value: digital.vblast_decoder_cc_make(num_inputs=N,
                                                                          equalizer_type='MMSE',
                                                                          vlen=vlen)
                           }
@@ -59,14 +59,14 @@ class mimo_decoder_cc(gr.hier_block2):
         if N < 1:
             raise ValueError('MIMO block must have N >= 1 (N=%d) selected).' % N)
         # Check for valid MIMO algorithm.
-        if mimo_technique not in mimo_algorithm:
+        if mimo_technique.value not in mimo_algorithm:
             raise ValueError('MIMO algorithm %s unknown.' % str(mimo_technique))
         # Check if N = 2 for Alamouti-like schemes.
-        if N != 1 and mimo_technique is (mimo.ALAMOUTI or mimo.DIFF_ALAMOUTI):
+        if N != 1 and mimo_technique.value is (mimo.ALAMOUTI.value or mimo.DIFF_ALAMOUTI.value):
             raise ValueError('For Alamouti-like schemes like %s, N must be 2.' % str(mimo_technique))
 
         # Connect everything.
-        mimo_decoder = mimo_algorithm[mimo_technique]
+        mimo_decoder = mimo_algorithm[mimo_technique.value]
         for i in range(0, N):
             self.connect((self, i), (mimo_decoder, i))
 

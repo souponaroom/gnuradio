@@ -29,6 +29,7 @@
 #include <pmt/pmt.h>
 
 using namespace boost;
+const float  PI_F=3.14159265358979f;
 
 namespace gr {
   namespace digital {
@@ -69,13 +70,15 @@ namespace gr {
         d_m(m), d_n(n),
         d_fft_len(fft_len),
         d_fft_shift(fft_len/2),
+        d_start_new_packet(true),
+        d_time_delay(0),
         d_pilot_symbols(pilot_symbols),
         d_pilot_carriers(pilot_carriers),
         d_occupied_carriers(occupied_carriers),
         d_output_vlen(occupied_carriers.size()),
         d_csi_key(pmt::string_to_symbol(csi_key)),
         d_start_key(pmt::string_to_symbol(start_key)),
-        d_last_tag_offset(0)
+        d_correlation_offset(0)
     {
       // Init CSI vector.
       d_channel_state = std::vector<std::vector<std::vector<gr_complex> > >
@@ -86,6 +89,9 @@ namespace gr {
       }
       // Set tag propagation policy.
       set_tag_propagation_policy(TPP_DONT);
+      
+      set_history(d_n);
+      set_output_multiple(d_n);
     }
 
     /*
@@ -98,15 +104,17 @@ namespace gr {
     void
     mimo_ofdm_channel_estimator_vcvc_impl::forecast (int noutput_items, gr_vector_int &ninput_items_required)
     {
-      for (int i = 0; i < d_m; ++i) {
-        ninput_items_required[i] = noutput_items+d_m-1;
-      }
+        for(int i=0; i<d_n; ++i)
+        {
+            ninput_items_required[i] = noutput_items;
+        }
     }
 
     void
     mimo_ofdm_channel_estimator_vcvc_impl::extract_payload_carriers(
             gr_vector_const_void_star &input_items,
             gr_vector_void_star &output_items,
+            uint32_t offset,
             uint32_t length) {
       // Iterate over RX branches.
       for (int i = 0; i < d_n; ++i) {
@@ -115,12 +123,83 @@ namespace gr {
         // Extract data carriers to output buffer and dump zero-carriers and pilot-carriers.
         for (unsigned int j = 0; j < length; ++j) {
           for (unsigned int k = 0; k < d_output_vlen; ++k) {
-            out[j*d_output_vlen + k] = in[j*d_fft_len + d_occupied_carriers[k] + d_fft_shift];
+            out[j*d_output_vlen + k] = in[(offset+j)*d_fft_len + d_occupied_carriers[k] + d_fft_shift] *
+                                       std::polar(1.f, (float)(d_occupied_carriers[k])*-2.f*PI_F*d_time_delay/d_fft_len);
           }
         }
       }
     }
 
+    void
+    mimo_ofdm_channel_estimator_vcvc_impl::estimate_time_delay(
+            gr_vector_const_void_star &input_items,
+            uint32_t reading_offset) {
+      gr_complex correlation;
+      float max = 0;
+      int max_index = -5;
+      for (int p = -5; p<6; ++p)
+      {
+          correlation = 0;
+          for(int q=0; q<d_n; ++q)//TODO fix this
+          {
+            const gr_complex *in = (const gr_complex *) input_items[q];
+            for (unsigned int c = 0; c < d_pilot_carriers.size(); ++c) 
+            {
+                correlation += in[reading_offset*d_fft_len + d_pilot_carriers[c] + d_fft_shift] * 
+                               std::polar(1.f, (float)(d_pilot_carriers[c])*-2.f*PI_F*p/d_fft_len); //TODO verallgemeinern!
+            }
+          }
+          if(std::abs(correlation) > max) 
+          {
+            max = std::abs(correlation);
+            max_index = p;
+          }
+      }
+       //Iterate over all pilot carriers.
+         //Iterate over N MIMO RX streams.
+        for (int i = 0; i < d_n; ++i) {
+          for (int j = 0; j < d_m; ++j) { // Iterate over MIMO pilot sequences of length M.
+
+          }
+        }
+    }
+
+    void
+    mimo_ofdm_channel_estimator_vcvc_impl::estimate_time_delay2(
+            gr_vector_const_void_star &input_items,
+            uint32_t reading_offset) {
+      float correlation;
+      float min = d_n*d_pilot_carriers.size()*4;
+      int min_index = 0;
+      for (int p = 0; p<4; ++p)
+      {
+          correlation = 0;
+          for(int q=0; q<d_n; ++q)//TODO fix this
+          {
+            const gr_complex *in = (const gr_complex *) input_items[q];
+            for (unsigned int c = 1; c < d_pilot_carriers.size(); ++c) 
+            {
+                correlation += std::abs(std::arg(in[reading_offset*d_fft_len + d_pilot_carriers[c] + d_fft_shift] * 
+                               std::polar(1.f, (float)(d_pilot_carriers[c])*2.f*PI_F*p/d_fft_len)) -  
+                               std::arg(in[reading_offset*d_fft_len + d_pilot_carriers[c-1] + d_fft_shift] * 
+                               std::polar(1.f, (float)(d_pilot_carriers[c-1])*2.f*PI_F*p/d_fft_len))); 
+            }
+          }
+          //std::cout << "correlation " << p << ": " << correlation << std::endl;
+          if(correlation < min) 
+          {
+            min = correlation;
+            min_index = p;
+          }
+      }
+      //std::cout << "delay2 " << min_index << std::endl;
+      d_time_delay = min_index;
+      std::cout << "time delay " << d_time_delay << std::endl;
+      //d_time_delay = max_index;
+       //Iterate over all pilot carriers.
+         //Iterate over N MIMO RX streams.
+    }
+    
     void
     mimo_ofdm_channel_estimator_vcvc_impl::estimate_channel_state(
             gr_vector_const_void_star &input_items,
@@ -139,10 +218,12 @@ namespace gr {
                     = correlate_pilots(&in[reading_offset*d_fft_len + d_pilot_carriers[c] + d_fft_shift],
                     d_pilot_symbols[j],
                     d_fft_len,
-                    correlation_offset);
+                    correlation_offset) * 
+                    std::polar(1.f, (float)(d_pilot_carriers[c])*-2.f*PI_F*d_time_delay/d_fft_len);
           }
         }
       }
+            //std::cout << "Chanest estimation " << d_channel_state[d_pilot_carriers[0]+d_fft_shift][0][0] << std::endl;
     }
 
     gr_complex
@@ -155,6 +236,7 @@ namespace gr {
       // Correlate the received pilot sequence with the transmitted one.
       for (unsigned int i = 0; i < d_m; ++i) {
         correlation += in[i*distance] * std::conj(pilot[(i+pilot_offset)%d_m]);
+        //std::cout << "chanest received pilots" << in[i*distance] << std::endl;
         energy += in[i*distance]*std::conj(in[i*distance]);
       }
       // Return normalized (assuming a normalized pilot sequence) correlation result.
@@ -213,77 +295,84 @@ namespace gr {
                        gr_vector_const_void_star &input_items,
                        gr_vector_void_star &output_items)
     {
-      std::cout<<"general work"<<std::endl;
-      /* Copy occupied OFDM sub-carriers to output buffer.
-       * (Neither the zero-carriers nor the pilot carriers) */
-      extract_payload_carriers(input_items, output_items, noutput_items);
-      std::cout<<"extracted payload carriers"<<std::endl;
 
-      // Read start tags to sync the pilot correlation.
+      // Search for next tag in inbuffer.
       std::vector <gr::tag_t> start_tags;
-      get_tags_in_window(start_tags, 0, 0, noutput_items+d_m-1, d_start_key);
+      get_tags_in_window(start_tags, 0, 0, noutput_items, d_start_key);
+      uint32_t items_to_process;
 
-      uint32_t tag_offset_correction = 0;
-      if (nitems_read(0) >= d_last_tag_offset){
-                tag_offset_correction = nitems_read(0)-d_last_tag_offset;
+      //std::cout<<"chanest, noutput_items " << noutput_items  << " tags " << start_tags.size() << ", new packet " << d_start_new_packet << std::endl;
+      for(int i=0; i<start_tags.size();i++)
+      {
+       // std::cout << "tag position: " << start_tags[i].offset << std::endl;
       }
-      uint16_t tag_index = 0;
-
-      // Iterate over OFDM symbols.
-      for (int s = 0; s < noutput_items; ++s) {
-      std::cout<<"iterate over ofdm symbol "<< s << std::endl;
-        if(start_tags.size() > 0 && nitems_read(0)+s == start_tags[tag_index].offset){
-      	  std::cout<<"update current start offset"<<std::endl;
-          // Update current start offset.
-          tag_offset_correction = d_m - (s%d_m);
-          if(tag_index < start_tags.size()-1){
-            tag_index++;
-          }
+      if(d_start_new_packet)
+      {
+        //std::cout << "new packet " << std::endl;
+        // We are at the beginning of a new packet. Sanity check that there is a tag at first position.
+        if(start_tags.size() < 1 || start_tags[0].offset - nitems_read(0) != 0)
+        {
+            std::cout << "ERROR, no tag at beginning of packet." << std::endl;
         }
-        // Experimental feature
-        if(start_tags.size() > 0 && start_tags[tag_index].offset-(d_m-1) <= nitems_read(0)+s && nitems_read(0)+s < start_tags[tag_index].offset){
-          // This is the last symbol of the frame.
-      std::cout<<"last symbol of frame"<<std::endl;
-          // Use old estimation.
-        } else {
-      std::cout<<"not last symbol of frame"<<std::endl;
+        items_to_process = d_n;
+        /* Estimate the channel of the first N symbols of the new packet
+         * without the use of history symbols (because we are on a new packet). */
+        estimate_time_delay(input_items, d_n-1);
+        estimate_time_delay2(input_items, d_n-1);
+
+        estimate_channel_state(input_items, d_n-1, 0);
+        interpolate_channel_state();
+        for(int i=0; i<d_n ; ++i)
+        {
+            add_item_tag(0, nitems_written(0) + i, d_csi_key, generate_csi_pmt());
+        }
+        d_start_new_packet = false;
+        d_correlation_offset = 1;
+      } else
+      {
+        //std::cout << "old packet" << std::endl;
+        // We are in the middle of a packet. Go on with channel estimation until the end of the packet.
+        if(start_tags.size() > 0)
+        {
+            d_start_new_packet = true;
+            items_to_process = start_tags[0].offset - nitems_read(0);
+        } else
+        {
+            items_to_process = noutput_items;
+        }
+        // Iterate over OFDM symbols.
+        for (int s = 0; s < items_to_process; ++s) {
           // Estimate the complex channel coefficient of all pilot carriers (of all MIMO branches).
-          estimate_channel_state(input_items, s, (s + tag_offset_correction) % d_m);
-      std::cout<<"estimated pilots"<<std::endl;
+          estimate_channel_state(input_items, s, (d_correlation_offset++)%d_n); 
           /* We have estimated the CSI for the pilot carriers.
            * Now, lets interpolate over all remaining OFDM sub-carriers. */
           interpolate_channel_state();
-      std::cout<<"interpolated"<<std::endl;
-        }
-        /* Now we have individual CSI for each sub-carrier of each MIMO-branch.
-         * Add tag with this CSI to the output vector.
-         * All CSI for one time step is stored in one 3-dim vector which is tagged
-         * to the output vector of the first MIMO branch. */
-        add_item_tag(0, nitems_written(0) + s, d_csi_key, generate_csi_pmt());
-	//std::cout << "channel state [" << d_channel_state[-21+d_fft_shift][0][0] << d_channel_state[-21+d_fft_shift][0][1]<< d_channel_state[-21+d_fft_shift][1][0]<< d_channel_state[-21+d_fft_shift][1][1] << std::endl;
-
-      std::cout<<"added tag"<<std::endl;
+          /* Now we have individual CSI for each sub-carrier of each MIMO-branch.
+           * Add tag with this CSI to the output vector.
+           * All CSI for one time step is stored in one 3-dim vector which is tagged
+           * to the output vector of the first MIMO branch. */
+          add_item_tag(0, nitems_written(0) + s, d_csi_key, generate_csi_pmt());
+          }
       }
-      std::cout<<"finished iterating over ofdm symbols"<<std::endl;
+            //std::cout << "items to process" << items_to_process << std::endl;
 
-      // Update last_tag_offset.
-      if (start_tags.size() > 0){
-        d_last_tag_offset = start_tags[start_tags.size()-1].offset;
-      }
+      /* Copy occupied OFDM sub-carriers to output buffer.
+       * (Neither the zero-carriers nor the pilot carriers) */
+      extract_payload_carriers(input_items, output_items, d_n-1, items_to_process);
 
       // Propagate all other tags (except the CSI tags which were changed) manually.
       std::vector <gr::tag_t> propagate_tags;
-      get_tags_in_window(propagate_tags, 0, 0, noutput_items);
+      get_tags_in_window(propagate_tags, 0, 0, items_to_process);
       for (int l = 0; l < propagate_tags.size(); ++l) {
           add_item_tag(0, propagate_tags[l].offset, propagate_tags[l].key, propagate_tags[l].value);
+       //   std::cout << "propagate, tags: " << propagate_tags[l].offset << std::endl;
       }
-
       // Tell runtime system how many input items we consumed on
       // each input stream.
-      consume_each (noutput_items);
-
+      consume_each (items_to_process);
       // Tell runtime system how many output items we produced.
-      return noutput_items;
+      //std::cout << "chanest written and consumed "<<items_to_process<<std::endl;
+      return items_to_process;
     }
 
   } /* namespace digital */

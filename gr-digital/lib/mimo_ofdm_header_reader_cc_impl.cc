@@ -170,6 +170,7 @@ namespace gr {
 
       // State machine.
       if (d_on_packet){
+      //std::cout << "header reader on packet" << std::endl;
         // We are still on the packet.
         // Check if this is the beginning of the packet.
         if (d_remaining_packet_len == d_packet_length){
@@ -185,6 +186,7 @@ namespace gr {
           nwritten = d_remaining_packet_len;
           d_remaining_packet_len = 0;
           d_on_packet = false;
+          //std::cout << "remaining packet within this buffer" << std::endl;
 
         } else {
           // The remaining packet length exceeds the current buffer.
@@ -193,6 +195,7 @@ namespace gr {
           nconsumed = noutput_items;
           nwritten = noutput_items;
           d_remaining_packet_len -= noutput_items;
+          //std::cout << "remaining packet exceeds this buffer" << std::endl;
         }
       } else {
         // We are not on a packet.
@@ -215,16 +218,19 @@ namespace gr {
             // Parse header.
             if (parse_header()) {
               // This header is valid.
+              std::cout << "Found valid header with len " << d_packet_length << std::endl;
               d_on_packet = true;
               d_remaining_packet_len = d_packet_length;
             } else {
               // This header is invalid.
+              std::cout << "Found invalid header" << std::endl;
               // Dump the segment.
               d_on_packet = false;
             }
           }
         } else {
           // There are no start tags in this buffer.
+          //std::cout << "Not on packet and no start tags." << std::endl;
           // Drop samples.
           nconsumed = noutput_items;
         }
@@ -234,6 +240,7 @@ namespace gr {
       // each input stream.
       consume_each (nconsumed);
 
+      //std::cout << "header reader: consumed " << nconsumed << ", written " << nwritten << std::endl;
       // Tell runtime system how many output items we produced.
       return nwritten;
     }

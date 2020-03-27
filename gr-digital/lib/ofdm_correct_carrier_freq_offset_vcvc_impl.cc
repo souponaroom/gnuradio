@@ -87,6 +87,7 @@ namespace gr {
             memset(&out[d_fft_len * length - d_carrier_offset], 0x00, sizeof(gr_complex) * d_carrier_offset);
             memcpy(out, &in[d_carrier_offset], sizeof(gr_complex) * (d_fft_len * length - d_carrier_offset));
           }
+          //std::cout << "carrier freq corrector pilot symbols = " << out[d_fft_len/4-1] << out[3*d_fft_len/4] << std::endl;
           /* The cyclic prefix was cut out somewhere before this block.
            * But the carrier frequency offset was not yet corrected back then.
            * (Because it is corrected right now). This leads to a phase shift
@@ -152,10 +153,12 @@ namespace gr {
       for (int l = 0; l < propagate_tags.size(); ++l) {
         if (propagate_tags[l].key != d_key) {
           add_item_tag(0, propagate_tags[l].offset, propagate_tags[l].key, propagate_tags[l].value);
+          std::cout << "carrier freq, tags: " << propagate_tags[l].offset << std::endl;
         }
       }
 
       // Tell runtime system how many output items we produced.
+      //std::cout << "carrier freq corrector, produced " << nprocessed << std::endl;
       return nprocessed;
     }
 

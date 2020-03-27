@@ -170,25 +170,28 @@ class ofdm_tx(gr.hier_block2):
         self.bps_payload       = bps_payload
         self.sync_word1 = sync_word1
         self.m = m
+        self.occupied_carriers = occupied_carriers
+        self.pilot_symbols = pilot_symbols
+        self.pilot_carriers = pilot_carriers
         self.mimo_technique = mimo_technique
 
         # Change SISO/MIMO specific default parameters.
         if self.mimo_technique is mimo.SISO:
-            if pilot_carriers is None:
+            if self.pilot_carriers is None:
                 self.pilot_carriers = _def_pilot_carriers
-            if pilot_symbols is None:
+            if self.pilot_symbols is None:
                 self.pilot_symbols = _def_pilot_symbols
-            if occupied_carriers is None:
+            if self.occupied_carriers is None:
                 self.occupied_carriers = _def_occupied_carriers
         else:
             max_carrier_offset = 6
-            if pilot_carriers is None:
+            if self.pilot_carriers is None:
                 self.pilot_carriers = [range(-fft_len/2+max_carrier_offset, 0, 3)+range(2, fft_len/2-max_carrier_offset+1, 3), ]
-            if occupied_carriers is None:
+            if self.occupied_carriers is None:
                 self.occupied_carriers = [[x for x in range(-fft_len/2+max_carrier_offset+2,
                                                             fft_len/2-max_carrier_offset-1, 1)
                                            if x not in self.pilot_carriers[0] + [0]], ]
-            if pilot_symbols is None:
+            if self.pilot_symbols is None:
                 # Generate Hadamard matrix as orthogonal pilot sequences.
                 self.pilot_symbols = hadamard(self.m)
 
@@ -315,6 +318,7 @@ class ofdm_tx(gr.hier_block2):
             cyclic_prefixer = []
             normalize = []
             for i in range(0, self.m):
+                print(self.pilot_symbols[i])
                 mimo_pilot_symbols = numpy.repeat(self.pilot_symbols[i],
                                                   len(self.pilot_carriers[0])).reshape(
                     (self.m, len(self.pilot_carriers[0])))

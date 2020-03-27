@@ -55,6 +55,7 @@ namespace gr {
                        std::vector<int> occupied_carriers,
                        const std::string &csi_key,
                        const std::string &start_key);
+      virtual int get_time_delay() = 0;
     };
 
   } // namespace digital

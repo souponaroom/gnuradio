@@ -275,6 +275,7 @@ namespace gr {
 
           // Set start tag and carrier frequency offset tag if it is the first data symbol.
           if(d_first_data_symbol) {
+              std::cout << "sync set start tag at frame " << d_frame_count << std::endl;
             for (int n = 0; n < d_n; ++n) {
               add_item_tag(n, nitems_written(0) + 0, d_start_key, pmt::from_long(d_frame_count++));
               add_item_tag(n, nitems_written(0) + 0, d_carrier_freq_off_key,
@@ -306,6 +307,7 @@ namespace gr {
         // Search for a frame in the input stream.
         uint32_t trigger_pos = find_trigger(trigger, 0, noutput_samples);
         if (trigger_pos < noutput_samples){
+          //std::cout << "sync found frame " << nitems_read(0)+trigger_pos << std::endl;
           // Found a trigger. Dump samples until here.
           nconsumed = trigger_pos;
           // Now we are on a frame.
@@ -317,6 +319,7 @@ namespace gr {
         }
       }
       consume_each(nconsumed);
+      //std::cout << "Sync: " << nwritten << " written." << std::endl;
       return nwritten;
     }
 
