@@ -53,7 +53,7 @@ namespace gr {
     class DIGITAL_API diversity_combiner_cc : virtual public gr::sync_block
     {
      public:
-      typedef boost::shared_ptr<diversity_combiner_cc> sptr;
+      typedef std::shared_ptr<diversity_combiner_cc> sptr;
 
       /*!
        * \brief Return a shared_ptr to a new instance of digital::diversity_combiner_cc.

@@ -24,11 +24,10 @@
 #include "config.h"
 #endif
 
-#include <boost/format.hpp>
+#include<fmt/format.h>
 #include <gnuradio/io_signature.h>
 #include "alamouti_decoder_cc_impl.h"
 
-using namespace boost;
 
 namespace gr {
   namespace digital {
@@ -115,11 +114,10 @@ namespace gr {
           // Check if the next tag is on an uneven position.
           if(tags[0].offset%2 != 0){
             // This should be prevented by the system developer in most cases.
-            GR_LOG_WARN(d_logger, format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d).\n "
+            GR_LOG_WARN(d_logger, fmt::format("Detected \'csi\' tag on uneven position (tag[{}].offset = {}).\n "
                                          "The Alamouti scheme works on sequences of 2 samples. "
                                          "If you are not really sure what you are doing, "
-                                         "you should only set 'csi' tags on even sample positions.")
-                                  %0 %tags[0].offset);
+                                         "you should only set 'csi' tags on even sample positions.", 0, tags[0].offset));
             // The CSI is updated with the start of the next sequence (=next even sample).
             ++symbol_length;
           }
@@ -135,11 +133,10 @@ namespace gr {
             // Check if the next tag is on an uneven position (which it should usually not).
             if(symbol_length%2 != 0){
               // This should be prevented by the system developer in most cases.
-              GR_LOG_WARN(d_logger, format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d). \n"
+              GR_LOG_WARN(d_logger, fmt::format("Detected \'csi\' tag on uneven position (tag[%d].offset = %d). \n"
                                                    "The Alamouti scheme works on sequences of 2 samples. "
                                                    "If you are not really sure what you are doing, "
-                                                   "you should only set 'csi' tags on even sample positions.")
-                                    %i %tags[i].offset);
+                                                   "you should only set 'csi' tags on even sample positions.", i, tags[i].offset));
               // The CSI is updated with the start of the next sequence (=next even sample).
               ++symbol_length;
             }
