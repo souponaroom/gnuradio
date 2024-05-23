@@ -1,60 +1,73 @@
 /* -*- c++ -*- */
 /*
  * Copyright 2012 Free Software Foundation, Inc.
+ * Copyright 2024 Daniel Estevez <daniel@destevez.net>
  *
  * This file is part of GNU Radio
  *
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
-#include "float_to_uchar_impl.h"
 #include "float_array_to_uchar.h"
+#include "float_to_uchar_impl.h"
 #include <gnuradio/io_signature.h>
+#include <volk/volk.h>
+#include <cmath>
 
 namespace gr {
-  namespace blocks {
+namespace blocks {
 
-    float_to_uchar::sptr float_to_uchar::make()
-    {
-      return gnuradio::get_initial_sptr(new float_to_uchar_impl());
+float_to_uchar::sptr float_to_uchar::make(size_t vlen, float scale, float bias)
+{
+    return gnuradio::make_block_sptr<float_to_uchar_impl>(vlen, scale, bias);
+}
+
+float_to_uchar_impl::float_to_uchar_impl(size_t vlen, float scale, float bias)
+    : sync_block("float_to_uchar",
+                 io_signature::make(1, 1, sizeof(float) * vlen),
+                 io_signature::make(1, 1, sizeof(unsigned char) * vlen)),
+      d_vlen(vlen),
+      d_scale(scale),
+      d_bias(bias)
+{
+    const int alignment_multiple = volk_get_alignment() / sizeof(char);
+    set_alignment(std::max(1, alignment_multiple));
+}
+
+int float_to_uchar_impl::work(int noutput_items,
+                              gr_vector_const_void_star& input_items,
+                              gr_vector_void_star& output_items)
+{
+    const float* in = (const float*)input_items[0];
+    unsigned char* out = (unsigned char*)output_items[0];
+
+#if VOLK_VERSION >= 030100
+    volk_32f_s32f_x2_convert_8u(out, in, d_scale, d_bias, d_vlen * noutput_items);
+#else
+    const float min_val = 0.0f;
+    const float max_val = UINT8_MAX;
+    const int nitems = d_vlen * noutput_items;
+    for (int j = 0; j < nitems; ++j) {
+        const float r = in[j] * d_scale + d_bias;
+        unsigned char u;
+        if (r > max_val) {
+            u = (uint8_t)(max_val);
+        } else if (r < min_val) {
+            u = (uint8_t)(min_val);
+        } else {
+            u = (uint8_t)(rintf(r));
+        }
+        out[j] = u;
     }
+#endif
 
-    float_to_uchar_impl::float_to_uchar_impl()
-      : sync_block("float_to_uchar",
-		      io_signature::make (1, 1, sizeof(float)),
-		      io_signature::make (1, 1, sizeof(unsigned char)))
-    {
-    }
+    return noutput_items;
+}
 
-    int
-    float_to_uchar_impl::work(int noutput_items,
-			      gr_vector_const_void_star &input_items,
-			      gr_vector_void_star &output_items)
-    {
-      const float *in = (const float *)input_items[0];
-      unsigned char *out = (unsigned char *)output_items[0];
-
-      float_array_to_uchar(in, out, noutput_items);
-
-      return noutput_items;
-    }
-
-  } /* namespace blocks */
-}/* namespace gr */
+} /* namespace blocks */
+} /* namespace gr */

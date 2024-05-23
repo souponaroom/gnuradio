@@ -4,114 +4,88 @@
  *
  * This file is part of GNU Radio
  *
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
-#include "vmcircbuf_prefs.h"
 #include "vmcircbuf.h"
+#include "vmcircbuf_prefs.h"
 #include <gnuradio/sys_paths.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-namespace fs = boost::filesystem;
+#include <string_view>
+#include <filesystem>
+#include <fstream>
+#include <string>
+namespace fs = std::filesystem;
 
 namespace gr {
 
-  /*
-   * The simplest thing that could possibly work:
-   *  the key is the filename; the value is the file contents.
-   */
+/*
+ * The simplest thing that could possibly work:
+ *  the key is the filename; the value is the file contents.
+ */
 
-  static std::string
-  pathname(const char *key)
-  {
-    static fs::path path;
-    path = fs::path(gr::appdata_path()) / ".gnuradio" / "prefs" / key;    
-    return path.string();
-  }
+template <typename string_type>
+static auto pathname(string_type key)
+{
+    return gr::paths::userconf() / "prefs" / key;
+}
 
-  static void
-  ensure_dir_path()
-  {
-    fs::path path = fs::path(gr::appdata_path()) / ".gnuradio";
-    if(!fs::is_directory(path))
-      fs::create_directory(path);
+static void ensure_dir_path()
+{
+    // recursively make sure the directory exists
+    fs::path path = gr::paths::userconf() / "prefs";
+    fs::create_directories(path);
+}
 
-    path = path / "prefs";
-    if(!fs::is_directory(path))
-      fs::create_directory(path);
-  }
+template <typename stream_t>
+static void
+log_ioerror(const std::string& who, const fs::path& path, const stream_t& stream)
+{
+    gr::logger logger(std::string{ "vmcircbuf_prefs::" } + who);
+    logger.set_level(logging::singleton().default_level());
+    logger.info("{} failed to open: bad {}, fail {}, eof {}",
+                path.string(),
+                static_cast<bool>(stream.badbit),
+                static_cast<bool>(stream.failbit),
+                static_cast<bool>(stream.eofbit));
+}
 
-  int
-  vmcircbuf_prefs::get(const char *key, char *value, int value_size)
-  {
+std::string vmcircbuf_prefs::get(std::string_view key)
+{
+    auto path = pathname(key);
     gr::thread::scoped_lock guard(s_vm_mutex);
-
-    FILE *fp = fopen(pathname (key).c_str(), "r");
-    if(fp == 0) {
-      perror(pathname (key).c_str());
-      return 0;
+    std::ifstream in_file(path, std::ios::in | std::ios::binary);
+    if (!in_file.good()) {
+        log_ioerror("get", path, in_file);
+        return {};
     }
+    // enable exceptions now, after we've gracefully return empty string for non-existent
+    // files etc
+    in_file.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+    return { std::istreambuf_iterator<char>{ in_file }, {} };
+}
 
-    const size_t ret = fread(value, 1, value_size - 1, fp);
-    value[ret] = '\0';
-    if(ret == 0 && !feof(fp)) {
-      if(ferror(fp) != 0) {
-        perror(pathname (key).c_str());
-        fclose(fp);
-        return -1;
-      }
-    }
-    fclose(fp);
-    return ret;
-  }
-
-  void
-  vmcircbuf_prefs::set(const char *key, const char *value)
-  {
+void vmcircbuf_prefs::set(std::string_view key, std::string_view value)
+{
+    gr::logger logger("vmcircbuf_prefs::set");
+    logger.set_level(logging::singleton().default_level());
     gr::thread::scoped_lock guard(s_vm_mutex);
 
     ensure_dir_path();
+    auto path = pathname(key);
 
-    FILE *fp = fopen(pathname(key).c_str(), "w");
-    if(fp == 0) {
-      perror(pathname (key).c_str());
-      return;
-    }
-
-    size_t ret = fwrite(value, 1, strlen(value), fp);
-    if(ret == 0) {
-      if(ferror(fp) != 0) {
-        perror(pathname (key).c_str());
-        fclose(fp);
+    std::ofstream out_file(path, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!out_file.good()) {
+        log_ioerror("set", path, out_file);
         return;
-      }
     }
-    fclose(fp);
-  };
+
+    out_file.exceptions(std::ios_base::badbit | std::ios_base::failbit);
+    out_file << value;
+};
 
 } /* namespace gr */

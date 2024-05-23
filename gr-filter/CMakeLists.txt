@@ -2,20 +2,8 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 
 ########################################################################
 # Setup dependencies
@@ -27,91 +15,52 @@ include(GrBoost)
 ########################################################################
 include(GrComponent)
 
-GR_REGISTER_COMPONENT("gr-filter" ENABLE_GR_FILTER
-    ENABLE_VOLK
-    Boost_FOUND
-    ENABLE_GNURADIO_RUNTIME
-    ENABLE_GR_FFT
-    ENABLE_GR_BLOCKS
-)
+gr_register_component("gr-filter" ENABLE_GR_FILTER Boost_FOUND ENABLE_GNURADIO_RUNTIME
+                      ENABLE_GR_FFT ENABLE_GR_BLOCKS)
 
-GR_SET_GLOBAL(GR_FILTER_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/lib
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_BINARY_DIR}/lib
-    ${CMAKE_CURRENT_BINARY_DIR}/include
-    ${GR_FFT_INCLUDE_DIRS}
-)
-
-SET(GR_PKG_FILTER_EXAMPLES_DIR ${GR_PKG_DATA_DIR}/examples/filter)
+set(GR_PKG_FILTER_EXAMPLES_DIR ${GR_PKG_DATA_DIR}/examples/filter)
 
 ########################################################################
 # Begin conditional configuration
 ########################################################################
 if(ENABLE_GR_FILTER)
+    ########################################################################
+    # Add subdirectories
+    ########################################################################
+    add_subdirectory(include/gnuradio/filter)
+    add_subdirectory(lib)
 
-########################################################################
-# Setup CPack components
-########################################################################
-include(GrPackage)
-CPACK_SET(CPACK_COMPONENT_GROUP_FILTER_DESCRIPTION "GNU Radio Filter Blocks")
+    # Check for scipy and pyqtgraph, but don't fail if they don't exist.
+    gr_python_check_module_raw("pyqtgraph" "import pyqtgraph" PYQTGRAPH_FOUND)
+    gr_python_check_module_raw("scipy" "import scipy" SCIPY_FOUND)
 
-CPACK_COMPONENT("filter_runtime"
-    GROUP        "Filter"
-    DISPLAY_NAME "Runtime"
-    DESCRIPTION  "Runtime"
-    DEPENDS      "runtime_runtime"
-)
+    if(NOT PYQTGRAPH_FOUND OR NOT SCIPY_FOUND)
+        message(WARNING "PyQtGraph and Scipy are required to run the filter design tool, "
+                        "but are not detected! Please make sure they are installed on "
+                        "the target system.")
+    endif(NOT PYQTGRAPH_FOUND OR NOT SCIPY_FOUND)
 
-CPACK_COMPONENT("filter_devel"
-    GROUP        "Filter"
-    DISPLAY_NAME "Development"
-    DESCRIPTION  "C++ headers, package config, import libraries"
-    DEPENDS      "runtime_devel"
-)
+    if(ENABLE_PYTHON)
+        add_subdirectory(python/filter)
+        add_subdirectory(python/filter/design)
+        add_subdirectory(python/filter/gui)
+        add_subdirectory(apps)
+        if(ENABLE_EXAMPLES)
+            add_subdirectory(examples)
+        endif(ENABLE_EXAMPLES)
+    endif(ENABLE_PYTHON)
+    if(ENABLE_GRC)
+        add_subdirectory(grc)
+    endif(ENABLE_GRC)
+    add_subdirectory(docs)
 
-CPACK_COMPONENT("filter_python"
-    GROUP        "Filter"
-    DISPLAY_NAME "Python"
-    DESCRIPTION  "Python modules for runtime; GRC xml files"
-    DEPENDS      "runtime_python;filter_runtime"
-)
+    ########################################################################
+    # Create Pkg Config File
+    ########################################################################
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/gnuradio-filter.pc.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/gnuradio-filter.pc @ONLY)
 
-CPACK_COMPONENT("filter_swig"
-    GROUP        "Filter"
-    DISPLAY_NAME "SWIG"
-    DESCRIPTION  "SWIG development .i files"
-    DEPENDS      "runtime_swig;filter_python;filter_devel"
-)
-
-########################################################################
-# Add subdirectories
-########################################################################
-add_subdirectory(include/gnuradio/filter)
-add_subdirectory(lib)
-if(ENABLE_PYTHON)
-    add_subdirectory(swig)
-    add_subdirectory(python/filter)
-    add_subdirectory(python/filter/design)
-    add_subdirectory(python/filter/gui)
-    add_subdirectory(grc)
-    add_subdirectory(apps)
-endif(ENABLE_PYTHON)
-add_subdirectory(examples)
-add_subdirectory(docs)
-
-########################################################################
-# Create Pkg Config File
-########################################################################
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/gnuradio-filter.pc.in
-    ${CMAKE_CURRENT_BINARY_DIR}/gnuradio-filter.pc
-@ONLY)
-
-install(
-    FILES ${CMAKE_CURRENT_BINARY_DIR}/gnuradio-filter.pc
-    DESTINATION ${GR_LIBRARY_DIR}/pkgconfig
-    COMPONENT "filter_devel"
-)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/gnuradio-filter.pc
+            DESTINATION ${GR_LIBRARY_DIR}/pkgconfig)
 
 endif(ENABLE_GR_FILTER)

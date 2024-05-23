@@ -1,23 +1,12 @@
 /* -*- c++ -*- */
 /*
  * Copyright 2012 Free Software Foundation, Inc.
+ * Copyright 2024 Daniel Estevez <daniel@destevez.net>
  *
  * This file is part of GNU Radio
  *
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
 
 #ifndef INCLUDED_FLOAT_TO_UCHAR_IMPL_H
@@ -26,19 +15,29 @@
 #include <gnuradio/blocks/float_to_uchar.h>
 
 namespace gr {
-  namespace blocks {
+namespace blocks {
 
-    class BLOCKS_API float_to_uchar_impl : public float_to_uchar
-    {
-    public:
-      float_to_uchar_impl();
+class BLOCKS_API float_to_uchar_impl : public float_to_uchar
+{
+private:
+    const size_t d_vlen;
+    float d_scale;
+    float d_bias;
 
-      int work(int noutput_items,
-	       gr_vector_const_void_star &input_items,
-	       gr_vector_void_star &output_items);
-    };
+public:
+    float_to_uchar_impl(size_t vlen, float scale, float bias);
 
-  } /* namespace blocks */
+    float scale() const override { return d_scale; }
+    float bias() const override { return d_bias; }
+    void set_scale(float scale) override { d_scale = scale; }
+    void set_bias(float bias) override { d_bias = bias; }
+
+    int work(int noutput_items,
+             gr_vector_const_void_star& input_items,
+             gr_vector_void_star& output_items) override;
+};
+
+} /* namespace blocks */
 } /* namespace gr */
 
 

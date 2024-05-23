@@ -3,20 +3,8 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 #
 """
 Display numbers as strings using engineering notation.
@@ -36,7 +24,8 @@ scale_factor['p'] = 1e-12
 scale_factor['f'] = 1e-15
 scale_factor['a'] = 1e-18
 
-def num_to_str (n, precision=6):
+
+def num_to_str(n, precision=6):
     '''Convert a number to a string in engineering notation.  E.g., 5e-9 -> 5n'''
     m = abs(n)
     format_spec = '%.' + repr(int(precision)) + 'g'
@@ -62,14 +51,16 @@ def num_to_str (n, precision=6):
         return '%s' % float(format_spec % (n))
 
 
-def str_to_num (value):
+def str_to_num(value):
     '''Convert a string in engineering notation to a number.  E.g., '15m' -> 15e-3'''
     try:
+        if not isinstance(value, str):
+            raise TypeError("Value must be a string")
         scale = 1.0
         suffix = value[-1]
-        if scale_factor.has_key (suffix):
-            return float (value[0:-1]) * scale_factor[suffix]
-        return float (value)
-    except:
-        raise RuntimeError (
+        if suffix in scale_factor:
+            return float(value[0:-1]) * scale_factor[suffix]
+        return float(value)
+    except (TypeError, KeyError, ValueError):
+        raise ValueError(
             "Invalid engineering notation value: %r" % (value,))

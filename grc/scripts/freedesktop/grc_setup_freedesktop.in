@@ -4,20 +4,8 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 #
 ##################################################
 # setup grc on a freedesktop platform
@@ -31,7 +19,7 @@ ICON_SIZES="16 24 32 48 64 128 256"
 if [ -n "$2" ]; then
 	SRCDIR="$2"
 else
-	SRCDIR="@SRCDIR@"
+	SRCDIR="@CMAKE_CURRENT_SOURCE_DIR@"
 fi
 
 case "$1" in
@@ -44,7 +32,8 @@ case "$1" in
 		xdg-icon-resource install --noupdate --context apps --theme gnome --size ${size} ${SRCDIR}/grc-icon-${size}.png gnuradio-grc; \
 		xdg-icon-resource install --noupdate --context apps --size ${size} ${SRCDIR}/grc-icon-${size}.png gnuradio-grc; \
 	done
-	xdg-icon-resource forceupdate
+	xdg-icon-resource forceupdate                #update for system (hicolor) theme
+	xdg-icon-resource forceupdate --theme gnome  #update for gnome theme
 	echo "Install mime type"
 	xdg-mime install ${SRCDIR}/gnuradio-grc.xml
 	echo "Install menu items"
@@ -61,7 +50,8 @@ case "$1" in
 		xdg-icon-resource uninstall --noupdate --context apps --theme gnome --size ${size} gnuradio-grc; \
 		xdg-icon-resource uninstall --noupdate --context apps --size ${size} gnuradio-grc; \
 	done
-	xdg-icon-resource forceupdate
+	xdg-icon-resource forceupdate                 #update for system (hicolor) theme
+	xdg-icon-resource forceupdate --theme gnome   #update for gnome theme
 	echo "Uninstall mime type"
 	xdg-mime uninstall ${SRCDIR}/gnuradio-grc.xml
 	echo "Uninstall menu items"

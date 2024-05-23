@@ -2,32 +2,19 @@
 Copyright 2008, 2009 Free Software Foundation, Inc.
 This file is part of GNU Radio
 
-GNU Radio Companion is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+SPDX-License-Identifier: GPL-2.0-or-later
 
-GNU Radio Companion is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 """
 
-import gtk
+
+from gi.repository import Gtk, Gdk
 
 from ..core.Constants import *
 
 
 # default path for the open/save dialogs
 DEFAULT_FILE_PATH = os.getcwd() if os.name != 'nt' else os.path.expanduser("~/Documents")
-
-# file extensions
-IMAGE_FILE_EXTENSION = '.png'
-TEXT_FILE_EXTENSION = '.txt'
+FILE_EXTENSION = '.grc'
 
 # name for new/unsaved flow graphs
 NEW_FLOGRAPH_TITLE = 'untitled'
@@ -36,13 +23,11 @@ NEW_FLOGRAPH_TITLE = 'untitled'
 MIN_WINDOW_WIDTH = 600
 MIN_WINDOW_HEIGHT = 400
 # dialog constraints
-MIN_DIALOG_WIDTH = 500
+MIN_DIALOG_WIDTH = 600
 MIN_DIALOG_HEIGHT = 500
 # default sizes
 DEFAULT_BLOCKS_WINDOW_WIDTH = 100
 DEFAULT_CONSOLE_WINDOW_WIDTH = 100
-
-DEFAULT_CANVAS_SIZE_DEFAULT = 1280, 1024
 
 FONT_SIZE = DEFAULT_FONT_SIZE = 8
 FONT_FAMILY = "Sans"
@@ -53,7 +38,8 @@ PARAM_FONT = "Sans 7.5"
 STATE_CACHE_SIZE = 42
 
 # Shared targets for drag and drop of blocks
-DND_TARGETS = [('STRING', gtk.TARGET_SAME_APP, 0)]
+DND_TARGETS = [Gtk.TargetEntry.new('STRING', Gtk.TargetFlags.SAME_APP, 0),
+               Gtk.TargetEntry.new('UTF8_STRING', Gtk.TargetFlags.SAME_APP, 1)]
 
 # label constraint dimensions
 LABEL_SEPARATION = 3
@@ -70,6 +56,7 @@ PORT_SEPARATION = 32
 
 PORT_MIN_WIDTH = 20
 PORT_LABEL_HIDDEN_WIDTH = 10
+PORT_EXTRA_BUS_HEIGHT = 40
 
 # minimal length of connector
 CONNECTOR_EXTENSION_MINIMAL = 11
@@ -78,17 +65,14 @@ CONNECTOR_EXTENSION_MINIMAL = 11
 CONNECTOR_EXTENSION_INCREMENT = 11
 
 # connection arrow dimensions
-CONNECTOR_ARROW_BASE = 13
-CONNECTOR_ARROW_HEIGHT = 17
+CONNECTOR_ARROW_BASE = 10
+CONNECTOR_ARROW_HEIGHT = 13
 
 # possible rotations in degrees
 POSSIBLE_ROTATIONS = (0, 90, 180, 270)
 
-# How close can the mouse get to the window border before mouse events are ignored.
-BORDER_PROXIMITY_SENSITIVITY = 50
-
 # How close the mouse can get to the edge of the visible window before scrolling is invoked.
-SCROLL_PROXIMITY_SENSITIVITY = 30
+SCROLL_PROXIMITY_SENSITIVITY = 50
 
 # When the window has to be scrolled, move it this distance in the required direction.
 SCROLL_DISTANCE = 15
@@ -96,8 +80,30 @@ SCROLL_DISTANCE = 15
 # How close the mouse click can be to a line and register a connection select.
 LINE_SELECT_SENSITIVITY = 5
 
-_SCREEN_RESOLUTION = gtk.gdk.screen_get_default().get_resolution()
-DPI_SCALING = _SCREEN_RESOLUTION / 96.0 if _SCREEN_RESOLUTION > 0 else 1.0
+DEFAULT_BLOCK_MODULE_TOOLTIP = """\
+This subtree holds all blocks (from OOT modules) that specify no module name. \
+The module name is the root category enclosed in square brackets.
+
+Please consider contacting OOT module maintainer for any block in here \
+and kindly ask to update their GRC Block Descriptions or Block Tree to include a module name."""
+
+
+# _SCREEN = Gdk.Screen.get_default()
+# _SCREEN_RESOLUTION = _SCREEN.get_resolution() if _SCREEN else -1
+# DPI_SCALING = _SCREEN_RESOLUTION / 96.0 if _SCREEN_RESOLUTION > 0 else 1.0
+# todo: figure out the GTK3 way (maybe cairo does this for us
+DPI_SCALING = 1.0
+
+# Gtk-themes classified as dark
+GTK_DARK_THEMES = [
+    'Adwaita-dark',
+    'HighContrastInverse',
+]
+
+GTK_SETTINGS_INI_PATH = '~/.config/gtk-3.0/settings.ini'
+
+GTK_INI_PREFER_DARK_KEY = 'gtk-application-prefer-dark-theme'
+GTK_INI_THEME_NAME_KEY = 'gtk-theme-name'
 
 
 def update_font_size(font_size):
@@ -108,7 +114,10 @@ def update_font_size(font_size):
     PORT_FONT = BLOCK_FONT
     PARAM_FONT = "%s %f" % (FONT_FAMILY, font_size - 0.5)
 
-    PORT_SEPARATION = PORT_SPACING + 2 * PORT_LABEL_PADDING + int(1.5 * font_size)
-    PORT_SEPARATION += -PORT_SEPARATION % (2 * CANVAS_GRID_SIZE)  # even multiple
+    PORT_SEPARATION = PORT_SPACING + 2 * \
+        PORT_LABEL_PADDING + int(1.5 * font_size)
+    PORT_SEPARATION += - \
+        PORT_SEPARATION % (2 * CANVAS_GRID_SIZE)  # even multiple
+
 
 update_font_size(DEFAULT_FONT_SIZE)

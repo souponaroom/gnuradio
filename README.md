@@ -1,104 +1,95 @@
 <p align="center">
-<img src="https://github.com/gnuradio/gnuradio/blob/master/docs/gnuradio.png" width="75%" />
+<img src="https://github.com/gnuradio/gnuradio/blob/main/docs/gnuradio.png" width="75%" />
 </p>
 
-[![Build](https://shield.lwan.ws/img/p5UKbS/weekly_runner)](https://ci.gnuradio.org/buildbot/#/)
+[![Make Test](https://github.com/gnuradio/gnuradio/actions/workflows/make-test.yml/badge.svg?branch=main)](https://github.com/gnuradio/gnuradio/actions/workflows/make-test.yml)
 ![Version](https://img.shields.io/github/tag/gnuradio/gnuradio.svg)
-[![AUR](https://img.shields.io/aur/license/yaourt.svg)](https://github.com/gnuradio/gnuradio/blob/master/COPYING) 
-[![Docs](https://img.shields.io/badge/docs-doxygen-orange.svg)](https://gnuradio.org/doc/doxygen/)
+[![AUR](https://img.shields.io/github/license/gnuradio/gnuradio)](https://github.com/gnuradio/gnuradio/blob/main/COPYING)
+[![Docs](https://img.shields.io/badge/docs-doxygen-orange.svg)](https://www.gnuradio.org/doc/doxygen/)
+[![Packaging status](https://repology.org/badge/tiny-repos/gnuradio.svg)](https://repology.org/project/gnuradio/badges)
 
-GNU Radio is a free & open-source software development toolkit that 
-provides signal processing blocks to implement software radios. It can 
-be used with readily-available, low-cost external RF hardware to create 
-software-defined radios, or without hardware in a simulation-like 
-environment. It is widely used in hobbyist, academic, and commercial 
-environments to support both wireless communications research and real-world 
-radio systems.
+# GNU Radio
 
-Please visit the GNU Radio website at https://gnuradio.org/ and the 
-wiki at https://wiki.gnuradio.org/. Bugs and feature requests are 
-tracked on GitHub's [Issue Tracker](https://github.com/gnuradio/gnuradio/issues). 
-If you have questions about GNU Radio, please search the **discuss-gnuradio** 
-mailing list [archive](https://lists.gnu.org/archive/html/discuss-gnuradio/), 
-as many questions have already been asked and answered. Please also 
-[subscribe](https://lists.gnu.org/mailman/listinfo/discuss-gnuradio) to 
-the mailing list and post your new questions there.
+<table align="center">
+    <tr>
+        <td>
+            <img src="./docs/grc_eg.png" height="300px" />
+        </td>
+        <td>
+            <img src="./docs/grc_eg_code.png" height="300px" />
+        </td>
+        <td>
+            <img src="./docs/grc_eg_out.png" height="300px" />
+        </td>
+    </tr>
+</table>
+
+GNU Radio is a free & open-source signal processing runtime and signal processing
+software development toolkit. Originally developed for use with software-defined
+radios and for simulating wireless communications, it's robust capabilities have
+led to adoption in hobbyist, academic, and commercial environments. GNU Radio has
+found use in software-defined radio, digital communications, nuclear physics, high-
+energy particle physics, astrophysics, radio astronomy and more!
+
+## Helpful Links
+
+* [GNU Radio Website](https://gnuradio.org)
+* [GNU Radio Wiki](https://wiki.gnuradio.org/)
+* [Github issue tracker for bug reports and feature requests](https://github.com/gnuradio/gnuradio/issues)
+* [View the GNU Radio Mailing List Archive](https://lists.gnu.org/archive/html/discuss-gnuradio/)
+* [Subscribe to the GNU Radio Mailing List](https://lists.gnu.org/mailman/listinfo/discuss-gnuradio)
+* [GNU Radio Chatroom on Matrix](https://chat.gnuradio.org/)
+* [Contributors and Affiliated Organizations](https://github.com/gnuradio/gnuradio/blob/main/CONTRIBUTORS.md)
+
+## How to Run the QT Version of GNU Radio Companion
+
+```bash
+    # Ensure PyQt5 and other dependencies are installed
+    pip install QDarkStyle qtpy
+    
+    # If you want to run tests
+    pip install pytest-qt pyautogui
+
+    # Build and install as usual (described below) and then run
+    gnuradio-companion --qt
+```
+
+## GNU Radio 4.0
+
+The next major release of GNU Radio, GNU Radio 4.0, is currently under active development. The effort is being spearheaded by FAIR (The Facility for Anti-Proton and Ion Research), part of GSI in Germany. Development of that version is currently taking place under their GitHub organization, [here](https://github.com/fair-acc/graph-prototype).
 
 
-## How to Build GNU Radio
+## How to Install GNU Radio
+
+### Prebuilt Binaries
+
+The recommended way to install GNU Radio on most platforms is using available binary package distributions. 
+
+The following command is for Debian, Ubuntu, and derivatives. Consult your distribution information to obtain the version of GNU Radio which is included.
+
+```
+    sudo apt install gnuradio
+```
+
+For other operating systems and versions, see [Quick Start](https://wiki.gnuradio.org/index.php/InstallingGR#Quick_Start)
+
+### Ubuntu PPA Installation
+
+For Ubuntu, the latest builds (both released and pulled from master branch) are maintained as PPAs (Personal Package Archives) on [launchpad.net](https://launchpad.net/~gnuradio). **Be sure to uninstall any previously installed versions of gnuradio first.** See [UnInstall GR](https://wiki.gnuradio.org/index.php?title=UnInstallGR#From_Distribution_package_manager_or_PPA).
+
+
+### Other Installation Methods
+
+Platform-specific guides and Cross-platform guides are described in [Other Installation Methods](https://wiki.gnuradio.org/index.php/InstallingGR#Other_Installation_Methods).
+
+### From Source
+
+Complete instructions for building GNU Radio from source code are detailed in 
+[Installing From Source](https://wiki.gnuradio.org/index.php?title=LinuxInstall#From_Source). 
 
 ### PyBOMBS
-PyBOMBS (Python Build Overlay Managed Bundle System) is the recommended 
-method for building and installing GNU Radio. Please see 
-https://github.com/gnuradio/pybombs for detailed instructions. Abbreviated 
-instructions are duplicated below.
 
-1. Install PyBOMBS:
-    ```
-    $ [sudo] pip install PyBOMBS
-    ```
-    or
-    ```
-    $ git clone https://github.com/gnuradio/pybombs.git
-    $ cd pybombs
-    $ sudo python setup.py install
-    ```
-
-2. Add PyBOMBS recipes:
-    ```
-    $ pybombs recipes add gr-recipes git+https://github.com/gnuradio/gr-recipes.git  
-    $ pybombs recipes add gr-etcetera git+https://github.com/gnuradio/gr-etcetera.git
-    ```
-
-3. Configure an installation prefix:
-    ```
-    $ pybombs prefix init ~/prefix/default/
-    ```
-
-4. Install GNU Radio:
-    ```
-    $ pybombs install gnuradio
-    ```
-
-5. Run GNU Radio Companion from your new prefix:
-    ```
-    $ source ~/prefix/default/setup_env.sh
-    $ gnuradio-companion
-    ```
-    or execute it without changing the current environment
-    ```
-    $ pybombs run gnuradio-companion
-    ```
-
-### Manual Source Build
-Complete build instructions are detailed in the 
-[GNU Radio Build Guide](https://gnuradio.org/doc/doxygen/build_guide.html). 
-Abbreviated instructions are duplicated below.
-
-1. Ensure that you have satisfied the external dependencies, see 
-[GNU Radio Dependencies](https://gnuradio.org/doc/doxygen/build_guide.html).
-
-2. Checkout the latest code:
-    ```
-    $ git clone https://github.com/gnuradio/gnuradio.git
-    ```
-
-3. Build with CMake:
-    ```
-    $ cd gnuradio
-    $ mkdir build
-    $ cd build
-    $ cmake [OPTIONS] ../
-    $ make
-    $ make test
-    $ sudo make install
-    ```
-    Useful `[OPTIONS]` include setting the install prefix 
-    `-DCMAKE_INSTALL_PREFIX=<directory to install to>` and the build type 
-    `-DCMAKE_BUILD_TYPE=<type>`. Currently, GNU Radio has a `"Debug"` type 
-    that builds with `-g -O2` which is useful for debugging the software, 
-    and a `"Release"` type that builds with `-O3`, which is the default.
-
+**We are no longer recommending** [PyBOMBS](https://github.com/gnuradio/pybombs#pybombs) **to install modern versions of GNU Radio.**
 
 ## Legal Matters
 

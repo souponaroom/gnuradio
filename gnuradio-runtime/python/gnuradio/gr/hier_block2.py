@@ -1,27 +1,18 @@
 #
 # Copyright 2006,2007,2014 Free Software Foundation, Inc.
+# Copyright 2023 Marcus Müller
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 #
 
 import functools
 
-from runtime_swig import hier_block2_swig, dot_graph
+from .gr_python import hier_block2_pb
+from .gr_python import logger
+
 import pmt
 
 
@@ -38,13 +29,16 @@ def _multiple_endpoints(func):
             func(self, block)
         else:
             try:
-                endp = [(p.to_basic_block(), 0) if hasattr(p, 'to_basic_block')
-                        else (p[0].to_basic_block(), p[1]) for p in points]
+                endp = [
+                    (p.to_basic_block(), 0) if hasattr(p, "to_basic_block") else (p[0].to_basic_block(), p[1])
+                    for p in points
+                ]
             except (ValueError, TypeError, AttributeError) as err:
                 raise ValueError("Unable to coerce endpoints: " + str(err))
 
             for (src, src_port), (dst, dst_port) in zip(endp, endp[1:]):
                 func(self, src, src_port, dst, dst_port)
+
     return wrapped
 
 
@@ -57,6 +51,7 @@ def _optional_endpoints(func):
             except (ValueError, TypeError) as err:
                 raise ValueError("Unable to coerce endpoints: " + str(err))
         func(self, src.to_basic_block(), srcport, dst.to_basic_block(), dstport)
+
     return wrapped
 
 
@@ -75,21 +70,42 @@ class hier_block2(object):
     Provides convenience functions and allows proper Python subclassing.
     """
 
-    def __init__(self, name, input_signature, output_signature):
+    def __init__(self, name: str, input_signature, output_signature, underlying_impl=None):
         """
         Create a hierarchical block with a given name and I/O signatures.
-        """
-        self._impl = hier_block2_swig(name, input_signature, output_signature)
 
-    def __getattr__(self, name):
+        Wrap the methods of the underlying C++ `hier_block_pb` in an impl
+        object, and add the methods of that to this object.
+
+        Add a python-side logger, to allow Python hierarchical blocks to do their own identifiable logging.
         """
-        Pass-through member requests to the C++ object.
+        self._impl = underlying_impl or hier_block2_pb(name, input_signature, output_signature)
+        self.logger = logger(f"Py Hier Blk {name}")
+        self._forward_impl_members()
+
+    def _forward_impl_members(self):
         """
-        if not hasattr(self, "_impl"):
-            raise RuntimeError(
-                "{0}: invalid state -- did you forget to call {0}.__init__ in "
-                "a derived class?".format(self.__class__.__name__))
-        return getattr(self._impl, name)
+        Make all public-facing function of the underlying hier block implementation available as members.
+
+        Does not take the __getattr__ route, as that doesn't permit autocompletion to work.
+        """
+        for member in dir(self._impl):
+            # can't necessarily use hasattr on an object that hasn't finished going through the __init__ chain
+            if member.startswith("_") or member in dir(self):
+                continue
+            setattr(self, member, getattr(self._impl, member))
+
+    def __repr__(self):
+        """
+        Return a representation of the block useful for debugging
+        """
+        return f"<python hier block {self.name()} wrapping GNU Radio hier_block2_pb object {id(self._impl):x}>"
+
+    def __str__(self):
+        """
+        Return a string representation useful for human-aimed printing
+        """
+        return f"Python hierarchical block {self.name()}"
 
     # FIXME: these should really be implemented
     # in the original C++ class (gr_hier_block2), then they would all be inherited here
@@ -151,8 +167,8 @@ class hier_block2(object):
         """
         self.primitive_message_port_register_hier_out(pmt.intern(portname))
 
-    def dot_graph(self):
-        """
-        Return graph representation in dot language
-        """
-        return dot_graph(self._impl)
+    # def dot_graph(self):
+    #     """
+    #     Return graph representation in dot language
+    #     """
+    #     return dot_graph(self._impl)

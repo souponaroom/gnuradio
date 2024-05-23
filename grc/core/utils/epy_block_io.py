@@ -1,4 +1,5 @@
 
+
 import inspect
 import collections
 
@@ -11,7 +12,8 @@ TYPE_MAP = {
     'int8': 'byte', 'uint8': 'byte',
 }
 
-BlockIO = collections.namedtuple('BlockIO', 'name cls params sinks sources doc callbacks')
+BlockIO = collections.namedtuple(
+    'BlockIO', 'name cls params sinks sources doc callbacks')
 
 
 def _ports(sigs, msgs):
@@ -32,10 +34,10 @@ def _ports(sigs, msgs):
 def _find_block_class(source_code, cls):
     ns = {}
     try:
-        exec source_code in ns
+        exec(source_code, ns)
     except Exception as e:
         raise ValueError("Can't interpret source code: " + str(e))
-    for var in ns.itervalues():
+    for var in ns.values():
         if inspect.isclass(var) and issubclass(var, cls):
             return var
     raise ValueError('No python block class found in code')
@@ -51,9 +53,9 @@ def extract(cls):
     if not inspect.isclass(cls):
         cls = _find_block_class(cls, gr.gateway.gateway_block)
 
-    spec = inspect.getargspec(cls.__init__)
+    spec = inspect.getfullargspec(cls.__init__)
     init_args = spec.args[1:]
-    defaults = map(repr, spec.defaults or ())
+    defaults = [repr(arg) for arg in (spec.defaults or ())]
     doc = cls.__doc__ or cls.__init__.__doc__ or ''
     cls_name = cls.__name__
 
@@ -71,11 +73,13 @@ def extract(cls):
 
     def settable(attr):
         try:
-            return callable(getattr(cls, attr).fset)  # check for a property with setter
+            # check for a property with setter
+            return callable(getattr(cls, attr).fset)
         except AttributeError:
             return attr in instance.__dict__  # not dir() - only the instance attribs
 
-    callbacks = [attr for attr in dir(instance) if attr in init_args and settable(attr)]
+    callbacks = [attr for attr in dir(
+        instance) if attr in init_args and settable(attr)]
 
     sinks = _ports(instance.in_sig(),
                    pmt.to_python(instance.message_ports_in()))
