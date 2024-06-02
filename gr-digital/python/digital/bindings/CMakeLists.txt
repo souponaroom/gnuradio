@@ -12,6 +12,8 @@ list(
     adaptive_algorithm_lms_python.cc
     adaptive_algorithm_nlms_python.cc
     additive_scrambler_python.cc
+    alamouti_decoder_cc_python.cc
+    alamouti_encoder_cc_python.cc
     binary_slicer_fb_python.cc
     burst_shaper_python.cc
     chunks_to_symbols_python.cc
@@ -42,6 +44,9 @@ list(
     diff_decoder_bb_python.cc
     diff_encoder_bb_python.cc
     diff_phasor_cc_python.cc
+    diff_stbc_decoder_cc_python.cc
+    diff_stbc_encoder_cc_python.cc
+    diversity_combiner_cc_python.cc
     fll_band_edge_cc_python.cc
     framer_sink_1_python.cc
     glfsr_python.cc
@@ -92,6 +97,8 @@ list(
     symbol_sync_cc_python.cc
     symbol_sync_ff_python.cc
     timing_error_detector_type_python.cc
+    vblast_decoder_cc_python.cc
+    vblast_encoder_cc_python.cc
     python_bindings.cc)
 
 gr_pybind_make_check_hash(digital ../../.. gr::digital "${digital_python_files}")
