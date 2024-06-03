@@ -2,24 +2,14 @@
 #
 # Copyright 2015 Free Software Foundation, Inc.
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 #
 
+
 import numpy as np
-import time, sys
+import time
+import sys
 import copy
 
 
@@ -33,7 +23,7 @@ def bsc_channel(p):
     p denotes an erroneous transition
     '''
     if not (p >= 0.0 and p <= 1.0):
-        print "given p is out of range!"
+        print("given p is out of range!")
         return np.array([], dtype=float)
 
     # 0 -> 0, 0 -> 1, 1 -> 0, 1 -> 1
@@ -53,10 +43,10 @@ def is_power_of_two(num):
 
 def bit_reverse(value, n):
     # is this really missing in NumPy???
-    seq = np.int(value)
-    rev = np.int(0)
-    rmask = np.int(1)
-    lmask = np.int(2 ** (n - 1))
+    seq = np.int_(value)
+    rev = np.int_(0)
+    rmask = np.int_(1)
+    lmask = np.int_(2 ** (n - 1))
     for i in range(n // 2):
         shiftval = n - 1 - (i * 2)
         rshift = np.left_shift(np.bitwise_and(seq, rmask), shiftval)
@@ -89,7 +79,7 @@ def get_Fn(n):
     if n == 1:
         return np.array([1, ])
     nump = power_of_2_int(n) - 1  # number of Kronecker products to calculate
-    F2 = np.array([[1, 0], [1, 1]], np.int)
+    F2 = np.array([[1, 0], [1, 1]], np.int_)
     Fn = F2
     for i in range(nump):
         Fn = np.kron(Fn, F2)
@@ -99,7 +89,7 @@ def get_Fn(n):
 def get_Gn(n):
     # this matrix is called generator matrix
     if not is_power_of_two(n):
-        print "invalid input"
+        print("invalid input")
         return None
     if n == 1:
         return np.array([1, ])
@@ -136,8 +126,8 @@ def show_progress_bar(ndone, ntotal):
     percentage = 100. * fract
     ndone_chars = int(nchars * fract)
     nundone_chars = nchars - ndone_chars
-    sys.stdout.write('\r[{0}{1}] {2:5.2f}% ({3} / {4})'.format('=' * ndone_chars, ' ' * nundone_chars, percentage, ndone, ntotal))
-
+    sys.stdout.write('\r[{0}{1}] {2:5.2f}% ({3} / {4})'.format('=' *
+                     ndone_chars, ' ' * nundone_chars, percentage, ndone, ntotal))
 
 
 def mutual_information(w):
@@ -177,13 +167,12 @@ def bhattacharyya_parameter(w):
 
 
 def main():
-    print 'helper functions'
+    print('helper functions')
 
     for i in range(9):
         print(i, 'is power of 2: ', is_power_of_two(i))
     n = 6
     m = 2 ** n
-
 
     pos = np.arange(m)
     rev_pos = bit_reverse_vector(pos, n)
@@ -199,7 +188,6 @@ def main():
 
     a = np.sum(np.sqrt(e * f))
     print(a)
-
 
 
 if __name__ == '__main__':

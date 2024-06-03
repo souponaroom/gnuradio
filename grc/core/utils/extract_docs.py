@@ -2,29 +2,19 @@
 Copyright 2008-2015 Free Software Foundation, Inc.
 This file is part of GNU Radio
 
-GNU Radio Companion is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+SPDX-License-Identifier: GPL-2.0-or-later
 
-GNU Radio Companion is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 """
+
 
 import sys
 import re
 import subprocess
 import threading
 import json
-import Queue
 import random
 import itertools
+import queue
 
 
 ###############################################################################
@@ -65,7 +55,8 @@ def docstring_guess_from_key(key):
     else:
         return doc_strings
 
-    pattern = re.compile('^' + init_name.replace('_', '_*').replace('x', r'\w') + r'\w*$')
+    pattern = re.compile(
+        '^' + init_name.replace('_', '_*').replace('x', r'\w') + r'\w*$')
     for match in filter(pattern.match, dir(module)):
         try:
             doc_strings[match] = getattr(module, match).__doc__
@@ -94,8 +85,7 @@ def docstring_from_make(key, imports, make):
         if '$' in blk_cls:
             raise ValueError('Not an identifier')
         ns = dict()
-        for _import in imports:
-            exec(_import.strip(), ns)
+        exec(imports.strip(), ns)
         blk = eval(blk_cls, ns)
         doc_strings = {key: blk.__doc__}
 
@@ -124,7 +114,7 @@ class SubprocessLoader(object):
         self.callback_query_result = callback_query_result
         self.callback_finished = callback_finished or (lambda: None)
 
-        self._queue = Queue.Queue()
+        self._queue = queue.Queue()
         self._thread = None
         self._worker = None
         self._shutdown = threading.Event()
@@ -146,7 +136,8 @@ class SubprocessLoader(object):
                 break
             try:
                 self._worker = subprocess.Popen(
-                    args=(sys.executable, '-uc', self.BOOTSTRAP.format(__file__)),
+                    args=(sys.executable, '-uc',
+                          self.BOOTSTRAP.format(__file__)),
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
@@ -157,21 +148,26 @@ class SubprocessLoader(object):
                 cmd, args = self._last_cmd
                 if cmd == 'query':
                     msg += " (crashed while loading {0!r})".format(args[0])
-                print >> sys.stderr, msg
+                print(msg, file=sys.stderr)
                 continue  # restart
             else:
                 break  # normal termination, return
             finally:
-                self._worker.terminate()
+                if self._worker:
+                    self._worker.stdin.close()
+                    self._worker.stdout.close()
+                    self._worker.stderr.close()
+                    self._worker.terminate()
+                    self._worker.wait()
         else:
-            print >> sys.stderr, "Warning: docstring loader crashed too often"
+            print("Warning: docstring loader crashed too often", file=sys.stderr)
         self._thread = None
         self._worker = None
         self.callback_finished()
 
     def _handle_worker(self):
         """ Send commands and responses back from worker. """
-        assert '1' == self._worker.stdout.read(1)
+        assert '1' == self._worker.stdout.read(1).decode('utf-8')
         for cmd, args in iter(self._queue.get, self.DONE):
             self._last_cmd = cmd, args
             self._send(cmd, args)
@@ -181,19 +177,24 @@ class SubprocessLoader(object):
     def _send(self, cmd, args):
         """ Send a command to worker's stdin """
         fd = self._worker.stdin
-        json.dump((self.AUTH_CODE, cmd, args), fd)
-        fd.write('\n'.encode())
+        query = json.dumps((self.AUTH_CODE, cmd, args))
+        fd.write(query.encode('utf-8'))
+        fd.write(b'\n')
+        fd.flush()
 
     def _receive(self):
         """ Receive response from worker's stdout """
         for line in iter(self._worker.stdout.readline, ''):
             try:
-                key, cmd, args = json.loads(line, encoding='utf-8')
+                key, cmd, args = json.loads(line.decode('utf-8'))
                 if key != self.AUTH_CODE:
                     raise ValueError('Got wrong auth code')
                 return cmd, args
             except ValueError:
-                continue  # ignore invalid output from worker
+                if self._worker.poll():
+                    raise IOError("Worker died")
+                else:
+                    continue  # ignore invalid output from worker
         else:
             raise IOError("Can't read worker response")
 
@@ -203,9 +204,9 @@ class SubprocessLoader(object):
             key, docs = args
             self.callback_query_result(key, docs)
         elif cmd == 'error':
-            print args
+            print(args)
         else:
-            print >> sys.stderr, "Unknown response:", cmd, args
+            print("Unknown response:", cmd, args, file=sys.stderr)
 
     def query(self, key, imports=None, make=None):
         """ Request docstring extraction for a certain key """
@@ -242,27 +243,31 @@ class SubprocessLoader(object):
 def worker_main():
     """
     Main entry point for the docstring extraction process.
-    Manages RPC with main process through.
+    Manages RPC with main process through stdin/stdout.
     Runs a docstring extraction for each key it read on stdin.
     """
-    def send(cmd, args):
+    def send(code, cmd, args):
         json.dump((code, cmd, args), sys.stdout)
-        sys.stdout.write('\n'.encode())
+        sys.stdout.write('\n')
+        # fluh out to get new commands from the queue into stdin
+        sys.stdout.flush()
 
     sys.stdout.write('1')
+    # flush out to signal the main process we are ready for new commands
+    sys.stdout.flush()
     for line in iter(sys.stdin.readline, ''):
-        code, cmd, args = json.loads(line, encoding='utf-8')
+        code, cmd, args = json.loads(line)
         try:
             if cmd == 'query':
                 key, imports, make = args
-                send('result', (key, docstring_from_make(key, imports, make)))
+                send(code, 'result', (key, docstring_from_make(key, imports, make)))
             elif cmd == 'query_key_only':
                 key, = args
-                send('result', (key, docstring_guess_from_key(key)))
+                send(code, 'result', (key, docstring_guess_from_key(key)))
             elif cmd == 'exit':
                 break
         except Exception as e:
-            send('error', repr(e))
+            send(code, 'error', repr(e))
 
 
 if __name__ == '__worker__':
@@ -270,12 +275,12 @@ if __name__ == '__worker__':
 
 elif __name__ == '__main__':
     def callback(key, docs):
-        print key
-        for match, doc in docs.iteritems():
-            print '-->', match
-            print doc.strip()
-            print
-        print
+        print(key)
+        for match, doc in docs.items():
+            print('-->', match)
+            print(str(doc).strip())
+            print()
+        print()
 
     r = SubprocessLoader(callback)
 
@@ -283,7 +288,8 @@ elif __name__ == '__main__':
     # r.query('uhd_source')
     r.query('expr_utils_graph')
     r.query('blocks_add_cc')
-    r.query('blocks_add_cc', ['import gnuradio.blocks'], 'gnuradio.blocks.add_cc(')
+    r.query('blocks_add_cc', ['import gnuradio.blocks'],
+            'gnuradio.blocks.add_cc(')
     # r.query('analog_feedforward_agc_cc')
     # r.query('uhd_source')
     # r.query('uhd_source')

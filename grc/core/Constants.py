@@ -1,39 +1,38 @@
 """
 Copyright 2008-2016 Free Software Foundation, Inc.
+Copyright 2021 GNU Radio contributors
 This file is part of GNU Radio
 
-GNU Radio Companion is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License, or (at your option) any later version.
+SPDX-License-Identifier: GPL-2.0-or-later
 
-GNU Radio Companion is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 """
 
+
 import os
-import numpy
+import numbers
 import stat
+
+import numpy
+
 
 # Data files
 DATA_DIR = os.path.dirname(__file__)
-FLOW_GRAPH_DTD = os.path.join(DATA_DIR, 'flow_graph.dtd')
-BLOCK_TREE_DTD = os.path.join(DATA_DIR, 'block_tree.dtd')
 BLOCK_DTD = os.path.join(DATA_DIR, 'block.dtd')
 DEFAULT_FLOW_GRAPH = os.path.join(DATA_DIR, 'default_flow_graph.grc')
 DEFAULT_HIER_BLOCK_LIB_DIR = os.path.expanduser('~/.grc_gnuradio')
-DOMAIN_DTD = os.path.join(DATA_DIR, 'domain.dtd')
+DEFAULT_FLOW_GRAPH_ID = 'default'
 
+CACHE_FILE = os.path.expanduser('~/.cache/grc_gnuradio/cache_v2.json')
+EXAMPLE_CACHE_FILE = os.path.expanduser('~/.cache/grc_gnuradio/example_cache.json')
+
+BLOCK_DESCRIPTION_FILE_FORMAT_VERSION = 1
 # File format versions:
+#  This constant is the max known version. If a version higher than this shows
+#  up, we assume we can't handle it.
 #  0: undefined / legacy
 #  1: non-numeric message port keys (label is used instead)
-FLOW_GRAPH_FILE_FORMAT_VERSION = 1
+#  2: connection info is stored as dictionary
+FLOW_GRAPH_FILE_FORMAT_VERSION = 2
 
 # Param tabs
 DEFAULT_PARAM_TAB = "General"
@@ -41,36 +40,35 @@ ADVANCED_PARAM_TAB = "Advanced"
 DEFAULT_BLOCK_MODULE_NAME = '(no module specified)'
 
 # Port domains
-GR_STREAM_DOMAIN = "gr_stream"
-GR_MESSAGE_DOMAIN = "gr_message"
+GR_STREAM_DOMAIN = "stream"
+GR_MESSAGE_DOMAIN = "message"
 DEFAULT_DOMAIN = GR_STREAM_DOMAIN
-
-BLOCK_FLAG_THROTTLE = 'throttle'
-BLOCK_FLAG_DISABLE_BYPASS = 'disable_bypass'
-BLOCK_FLAG_NEED_QT_GUI = 'need_qt_gui'
-BLOCK_FLAG_NEED_WX_GUI = 'need_wx_gui'
-BLOCK_FLAG_DEPRECATED = 'deprecated'
-
-# Block States
-BLOCK_DISABLED = 0
-BLOCK_ENABLED = 1
-BLOCK_BYPASSED = 2
 
 # File creation modes
 TOP_BLOCK_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | \
-                      stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH
+    stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH
 HIER_BLOCK_FILE_MODE = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH
+
+PARAM_TYPE_NAMES = {
+    'raw', 'enum',
+    'complex', 'real', 'float', 'int', 'short', 'byte',
+    'complex_vector', 'real_vector', 'float_vector', 'int_vector',
+    'hex', 'string', 'bool',
+    'file_open', 'file_save', 'dir_select', '_multiline', '_multiline_python_external',
+    'id', 'stream_id', 'name',
+    'gui_hint',
+    'import',
+}
+
+PARAM_TYPE_MAP = {
+    'complex': numbers.Complex,
+    'float': numbers.Real,
+    'real': numbers.Real,
+    'int': numbers.Integral,
+}
 
 # Define types, native python + numpy
 VECTOR_TYPES = (tuple, list, set, numpy.ndarray)
-COMPLEX_TYPES = [complex, numpy.complex, numpy.complex64, numpy.complex128]
-REAL_TYPES = [float, numpy.float, numpy.float32, numpy.float64]
-INT_TYPES = [int, long, numpy.int, numpy.int8, numpy.int16, numpy.int32, numpy.uint64,
-             numpy.uint, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64]
-# Cast to tuple for isinstance, concat subtypes
-COMPLEX_TYPES = tuple(COMPLEX_TYPES + REAL_TYPES + INT_TYPES)
-REAL_TYPES = tuple(REAL_TYPES + INT_TYPES)
-INT_TYPES = tuple(INT_TYPES)
 
 # Updating colors. Using the standard color palette from:
 #  http://www.google.com/design/spec/style/color.html#color-color-palette
@@ -109,7 +107,6 @@ CORE_TYPES = (  # name, key, sizeof, color
     ('Integer 16', 's16', 2, GRC_COLOR_YELLOW),
     ('Integer 8', 's8', 1, GRC_COLOR_PURPLE_A400),
     ('Bits (unpacked byte)', 'bit', 1, GRC_COLOR_PURPLE_A100),
-    ('Message Queue', 'msg', 0, GRC_COLOR_DARK_GREY),
     ('Async Message', 'message', 0, GRC_COLOR_GREY),
     ('Bus Connection', 'bus', 0, GRC_COLOR_WHITE),
     ('Wildcard', '', 0, GRC_COLOR_WHITE),
@@ -124,28 +121,24 @@ ALIAS_TYPES = {
     'bits': (1, GRC_COLOR_PURPLE_A100),
 }
 
-TYPE_TO_COLOR = dict()
-TYPE_TO_SIZEOF = dict()
+ALIASES_OF = {
+    'complex': {'fc32'},
+    'float': {'f32'},
+    'int': {'s32'},
+    'short': {'s16', 'sc16'},
+    'byte': {'s8', 'sc8'},
+    'bits': {'bit'},
 
-for name, key, sizeof, color in CORE_TYPES:
-    TYPE_TO_COLOR[key] = color
-    TYPE_TO_SIZEOF[key] = sizeof
+    'fc32': {'complex'},
+    'f32': {'float'},
+    's32': {'int'},
+    's16': {'short'},
+    'sc16': {'short'},
+    's8': {'byte'},
+    'sc8': {'byte'},
+    'bit': {'bits'},
+}
 
-for key, (sizeof, color) in ALIAS_TYPES.iteritems():
-    TYPE_TO_COLOR[key] = color
-    TYPE_TO_SIZEOF[key] = sizeof
-
-# Coloring
-COMPLEX_COLOR_SPEC = '#3399FF'
-FLOAT_COLOR_SPEC = '#FF8C69'
-INT_COLOR_SPEC = '#00FF99'
-SHORT_COLOR_SPEC = '#FFFF66'
-BYTE_COLOR_SPEC = '#FF66FF'
-COMPLEX_VECTOR_COLOR_SPEC = '#3399AA'
-FLOAT_VECTOR_COLOR_SPEC = '#CC8C69'
-INT_VECTOR_COLOR_SPEC = '#00CC99'
-SHORT_VECTOR_COLOR_SPEC = '#CCCC33'
-BYTE_VECTOR_COLOR_SPEC = '#CC66CC'
-ID_COLOR_SPEC = '#DDDDDD'
-WILDCARD_COLOR_SPEC = '#FFFFFF'
-MSG_COLOR_SPEC = '#777777'
+TYPE_TO_SIZEOF = {key: sizeof for name, key, sizeof, color in CORE_TYPES}
+TYPE_TO_SIZEOF.update((key, sizeof)
+                      for key, (sizeof, _) in ALIAS_TYPES.items())

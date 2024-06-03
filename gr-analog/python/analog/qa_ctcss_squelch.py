@@ -4,23 +4,15 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 #
 
+
+import math
+import random
 from gnuradio import gr, gr_unittest, analog, blocks
+
 
 class test_ctcss_squelch(gr_unittest.TestCase):
 
@@ -56,16 +48,24 @@ class test_ctcss_squelch(gr_unittest.TestCase):
 
     def test_ctcss_squelch_002(self):
         # Test runtime, gate=True
-        rate = 1
+        rate = 8000
         freq = 100
-        level = 0.0
-        length = 1
-        ramp = 1
+        other_freq = 103.5
+        level = 0.01
+        length = 0
+        ramp = 0
         gate = True
 
-        src_data = map(lambda x: float(x)/10.0, range(1, 40))
-        expected_result = src_data
-        expected_result[0] = 0
+        random.seed(1)
+        src_data = [0.5 * math.sin(2 * math.pi * 1000 * x / rate) + random.gauss(0, 0.1) for x in range(rate)]
+
+        # First half-second has incorrect CTCSS tone
+        for x in range(0, int(rate * 0.500)):
+            src_data[x] += 0.15 * math.sin(2 * math.pi * other_freq * x / rate)
+
+        # Second half-second has correct CTCSS tone
+        for x in range(int(rate * 0.500), rate):
+            src_data[x] += 0.15 * math.sin(2 * math.pi * freq * x / rate)
 
         src = blocks.vector_source_f(src_data)
         op = analog.ctcss_squelch_ff(rate, freq, level,
@@ -77,18 +77,34 @@ class test_ctcss_squelch(gr_unittest.TestCase):
         self.tb.run()
 
         result_data = dst.data()
-        self.assertFloatTuplesAlmostEqual(expected_result, result_data, 4)
+
+        # Squelch should open ~100 ms after the correct CTCSS tone appears
+        # so ~400 ms of audio should make it past the gate
+        self.assertGreater(len(result_data), rate * 0.390)
+        self.assertLess(len(result_data), rate * 0.410)
+        self.assertFloatTuplesAlmostEqual(src_data[-len(result_data):], result_data, 6)
 
     def test_ctcss_squelch_003(self):
         # Test runtime, gate=False
-        rate = 1
+        rate = 8000
         freq = 100
-        level = 0.5
-        length = 1
-        ramp = 1
+        other_freq = 103.5
+        level = 0.01
+        length = 0
+        ramp = 0
         gate = False
 
-        src_data = map(lambda x: float(x)/10.0, range(1, 40))
+        random.seed(1)
+        src_data = [0.5 * math.sin(2 * math.pi * 1000 * x / rate) + random.gauss(0, 0.1) for x in range(rate)]
+
+        # First half-second has incorrect CTCSS tone
+        for x in range(0, rate // 2):
+            src_data[x] += 0.15 * math.sin(2 * math.pi * other_freq * x / rate)
+
+        # Second half-second has correct CTCSS tone
+        for x in range(rate // 2, rate):
+            src_data[x] += 0.15 * math.sin(2 * math.pi * freq * x / rate)
+
         src = blocks.vector_source_f(src_data)
         op = analog.ctcss_squelch_ff(rate, freq, level,
                                      length, ramp, gate)
@@ -98,12 +114,14 @@ class test_ctcss_squelch(gr_unittest.TestCase):
         self.tb.connect(op, dst)
         self.tb.run()
 
-        expected_result = src_data
-        expected_result[0:5] = [0, 0, 0, 0, 0]
-
         result_data = dst.data()
-        self.assertFloatTuplesAlmostEqual(expected_result, result_data, 4)
+
+        # Squelch should open ~100 ms after the correct CTCSS tone appears
+        min_zero_samples = int(rate * 0.590)
+        self.assertFloatTuplesAlmostEqual([0] * min_zero_samples, result_data[:min_zero_samples], 6)
+        max_zero_samples = int(rate * 0.610)
+        self.assertFloatTuplesAlmostEqual(src_data[max_zero_samples:], result_data[max_zero_samples:], 6)
+
 
 if __name__ == '__main__':
-    gr_unittest.run(test_ctcss_squelch, "test_ctcss_squelch.xml")
-
+    gr_unittest.run(test_ctcss_squelch)

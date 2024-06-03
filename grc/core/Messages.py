@@ -1,28 +1,20 @@
 # Copyright 2007, 2015 Free Software Foundation, Inc.
 # This file is part of GNU Radio
 #
-# GNU Radio Companion is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
+# SPDX-License-Identifier: GPL-2.0-or-later
 #
-# GNU Radio Companion is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
 
 import traceback
 import sys
-import os
 
 #  A list of functions that can receive a message.
 MESSENGERS_LIST = list()
 _indent = ''
+
+# Global FlowGraph Error and the file that caused it
+flowgraph_error = None
+flowgraph_error_file = None
 
 
 def register_messenger(messenger):
@@ -50,6 +42,7 @@ def send(message):
     for messenger in MESSENGERS_LIST:
         messenger(_indent + message)
 
+
 # register stdout by default
 register_messenger(sys.stdout.write)
 
@@ -62,15 +55,14 @@ def send_init(platform):
           "Block paths:\n\t{paths}\n"
     send(msg.format(
         config=platform.config,
-        paths="\n\t".join(platform.config.block_paths))
-    )
+        paths="\n\t".join(platform.config.block_paths)))
 
 
 def send_xml_errors_if_any(xml_failures):
     if xml_failures:
         send('\nXML parser: Found {0} erroneous XML file{1} while loading the '
              'block tree (see "Help/Parser errors" for details)\n'.format(
-                    len(xml_failures), 's' if len(xml_failures) > 1 else ''))
+                 len(xml_failures), 's' if len(xml_failures) > 1 else ''))
 
 
 def send_start_load(file_path):
@@ -96,11 +88,11 @@ def send_fail_load(error):
 
 
 def send_start_gen(file_path):
-    send('\nGenerating: %r\n' % file_path)
+    send('\nGenerating: "%s"\n' % file_path)
 
 
 def send_auto_gen(file_path):
-    send('>>> Generating: %r\n' % file_path)
+    send('>>> Generating: "%s"\n' % file_path)
 
 
 def send_fail_gen(error):
@@ -124,8 +116,9 @@ def send_fail_save(file_path):
     send('>>> Error: Cannot save: %s\n' % file_path)
 
 
-def send_fail_connection():
-    send('>>> Error: Cannot create connection.\n')
+def send_fail_connection(msg=''):
+    send('>>> Error: Cannot create connection.\n' +
+         ('\t{}\n'.format(msg) if msg else ''))
 
 
 def send_fail_load_preferences(prefs_file_path):
@@ -138,3 +131,17 @@ def send_fail_save_preferences(prefs_file_path):
 
 def send_warning(warning):
     send('>>> Warning: %s\n' % warning)
+
+
+def send_flowgraph_error_report(flowgraph):
+    """ verbose error report for flowgraphs """
+    error_list = flowgraph.get_error_messages()
+    if not error_list:
+        return
+
+    send('*' * 50 + '\n')
+    summary_msg = '{} errors from flowgraph:\n'.format(len(error_list))
+    send(summary_msg)
+    for err in error_list:
+        send(err)
+    send('\n' + '*' * 50 + '\n')

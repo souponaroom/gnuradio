@@ -2,28 +2,20 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 
 if(DEFINED __INCLUDED_GR_COMPONENT_CMAKE)
     return()
 endif()
 set(__INCLUDED_GR_COMPONENT_CMAKE TRUE)
 
-set(_gr_enabled_components "" CACHE INTERNAL "" FORCE)
-set(_gr_disabled_components "" CACHE INTERNAL "" FORCE)
+set(_gr_enabled_components
+    ""
+    CACHE INTERNAL "" FORCE)
+set(_gr_disabled_components
+    ""
+    CACHE INTERNAL "" FORCE)
 
 if(NOT DEFINED ENABLE_DEFAULT)
     set(ENABLE_DEFAULT ON)
@@ -58,7 +50,7 @@ function(GR_REGISTER_COMPONENT name var)
     foreach(dep ${ARGN})
         list(FIND _gr_enabled_components ${dep} dep_enb_index)
         list(FIND _gr_disabled_components ${dep} dep_dis_index)
-        if (${dep_enb_index} EQUAL -1 AND ${dep_dis_index} EQUAL -1)
+        if(${dep_enb_index} EQUAL -1 AND ${dep_dis_index} EQUAL -1)
             list(APPEND comp_deps ${dep})
         else()
             list(APPEND comp_deps ${dep}_cached) #is a component, use cached version
@@ -66,9 +58,14 @@ function(GR_REGISTER_COMPONENT name var)
     endforeach(dep)
 
     #setup the dependent option for this component
-    CMAKE_DEPENDENT_OPTION(${var} "enable ${name} support" ${ENABLE_DEFAULT} "${comp_deps}" OFF)
-    set(${var} "${${var}}" PARENT_SCOPE)
-    set(${var}_cached "${${var}}" CACHE INTERNAL "" FORCE)
+    cmake_dependent_option(${var} "enable ${name} support" ${ENABLE_DEFAULT}
+                           "${comp_deps}" OFF)
+    set(${var}
+        "${${var}}"
+        PARENT_SCOPE)
+    set(${var}_cached
+        "${${var}}"
+        CACHE INTERNAL "" FORCE)
 
     #force was specified, but the dependencies were not met
     if(NOT ${var} AND var_force)
@@ -86,14 +83,19 @@ function(GR_REGISTER_COMPONENT name var)
     message(STATUS "  Override with -D${var}=ON/OFF")
 
     #make components lists into global variables
-    set(_gr_enabled_components ${_gr_enabled_components} CACHE INTERNAL "" FORCE)
-    set(_gr_disabled_components ${_gr_disabled_components} CACHE INTERNAL "" FORCE)
+    set(_gr_enabled_components
+        ${_gr_enabled_components}
+        CACHE INTERNAL "" FORCE)
+    set(_gr_disabled_components
+        ${_gr_disabled_components}
+        CACHE INTERNAL "" FORCE)
 endfunction(GR_REGISTER_COMPONENT)
 
-
 function(GR_APPEND_SUBCOMPONENT name)
-  list(APPEND _gr_enabled_components "* ${name}")
-  set(_gr_enabled_components ${_gr_enabled_components} CACHE INTERNAL "" FORCE)
+    list(APPEND _gr_enabled_components "* ${name}")
+    set(_gr_enabled_components
+        ${_gr_enabled_components}
+        CACHE INTERNAL "" FORCE)
 endfunction(GR_APPEND_SUBCOMPONENT name)
 
 ########################################################################

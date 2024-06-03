@@ -58,7 +58,7 @@ namespace gr {
     class DIGITAL_API alamouti_decoder_cc : virtual public gr::sync_interpolator
     {
      public:
-      typedef boost::shared_ptr<alamouti_decoder_cc> sptr;
+      typedef std::shared_ptr<alamouti_decoder_cc> sptr;
 
       /*!
        * \brief Return a shared_ptr to a new instance of digital::alamouti_decoder_cc.

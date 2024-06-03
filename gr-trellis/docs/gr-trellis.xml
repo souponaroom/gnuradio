@@ -272,7 +272,7 @@ y<subscript>j</subscript> (e.g., in the above example y<subscript>j</subscript>(
 
 <listitem>
 <para>
-The fourth way is specific to FSMs resulting from shift registers, and the output symbol being the entire transition (ie, current_state and current_input). These FSMs are useful when describibg ISI channels. In particular the state is comprised of the input symbols x(k-1), x(k-2),...,x(k-L), where L = ch_length-1 and each x(i) belongs to an alphabet of size mod_size. The output is taken to be x(k), x(k-1), x(k-2),...,x(k-L) (in decimal format)
+The fourth way is specific to FSMs resulting from shift registers, and the output symbol being the entire transition (ie, current_state and current_input). These FSMs are useful when describing ISI channels. In particular the state is comprised of the input symbols x(k-1), x(k-2),...,x(k-L), where L = ch_length-1 and each x(i) belongs to an alphabet of size mod_size. The output is taken to be x(k), x(k-1), x(k-2),...,x(k-L) (in decimal format)
 </para>
 <programlisting>
   fsm(const int mod_size, const int ch_length);
@@ -365,7 +365,7 @@ The output of this block is a sequence of K bytes, shorts or integers representi
 The input is a sequence of K x FSM.O( ) floats, where the k x K + i
 float represents the cost associated with the k-th
 step in the trellis and the i-th FSM output.
-Observe that these inputs are generated externally and thus the Viterbi block is not informed of their meaning (they can be genarated as soft or hard inputs, etc); the only requirement is that they represent additive costs.
+Observe that these inputs are generated externally and thus the Viterbi block is not informed of their meaning (they can be generated as soft or hard inputs, etc); the only requirement is that they represent additive costs.
 </para>
 </sect2>
 

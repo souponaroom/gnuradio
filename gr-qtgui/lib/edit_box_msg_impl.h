@@ -4,91 +4,79 @@
  *
  * This file is part of GNU Radio
  *
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
 
 #ifndef INCLUDED_QTGUI_EDIT_BOX_MSG_IMPL_H
 #define INCLUDED_QTGUI_EDIT_BOX_MSG_IMPL_H
 
 #include <gnuradio/qtgui/edit_box_msg.h>
-#include <QGroupBox>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLineEdit>
+
 #include <QComboBox>
+#include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QVBoxLayout>
 
 namespace gr {
-  namespace qtgui {
+namespace qtgui {
 
-    class QTGUI_API edit_box_msg_impl
-      : public QObject, public edit_box_msg
-    {
-      Q_OBJECT
+class QTGUI_API edit_box_msg_impl : public QObject, public edit_box_msg
+{
+    Q_OBJECT
 
-    private:
-      int d_argc;
-      char *d_argv;
-      data_type_t d_type;
-      bool d_is_pair;
-      bool d_is_static;
+private:
+    // Required now for Qt; argc must be greater than 0 and argv
+    // must have at least one valid character. Must be valid through
+    // life of the qApplication:
+    // http://harmattan-dev.nokia.com/docs/library/html/qt4/qapplication.html
+    char d_zero = 0;
+    int d_argc = 1;
+    char* d_argv = &d_zero;
 
-      QGroupBox *d_group;
-      QVBoxLayout *d_vlayout;
-      QHBoxLayout *d_hlayout;
-      QLabel *d_label;
-      QLineEdit *d_val;
-      QLineEdit *d_key;
-      QComboBox *d_type_box;
+    data_type_t d_type;
+    bool d_is_pair;
+    bool d_is_static;
 
-      pmt::pmt_t d_msg;
-      const pmt::pmt_t d_port;
+    QGroupBox* d_group;
+    QVBoxLayout* d_vlayout;
+    QHBoxLayout* d_hlayout;
+    QLabel* d_label;
+    QLineEdit* d_val;
+    QLineEdit* d_key;
+    QComboBox* d_type_box;
 
-    public:
-      edit_box_msg_impl(gr::qtgui::data_type_t type,
-                        const std::string &value="",
-                        const std::string &label="",
-                        bool is_pair=false,
-                        bool is_static=true,
-                        const std::string &key="",
-                        QWidget* parent=0);
-      ~edit_box_msg_impl();
+    pmt::pmt_t d_msg;
+    const pmt::pmt_t d_port;
 
-      // Overload the start method of gr::block to emit a message if a
-      // default value is provided.
-      bool start();
+public:
+    edit_box_msg_impl(gr::qtgui::data_type_t type,
+                      const std::string& value = "",
+                      const std::string& label = "",
+                      bool is_pair = false,
+                      bool is_static = true,
+                      const std::string& key = "",
+                      QWidget* parent = 0);
+    ~edit_box_msg_impl() override;
 
-      void exec_();
-      QWidget*  qwidget();
+    // Overload the start method of gr::block to emit a message if a
+    // default value is provided.
+    bool start() override;
 
-#ifdef ENABLE_PYTHON
-      PyObject* pyqwidget();
-#else
-      void* pyqwidget();
-#endif
+    void exec_() override;
+    QWidget* qwidget() override;
 
-      void set_value(pmt::pmt_t val);
+    void set_value(pmt::pmt_t val);
 
-    public slots:
-      void edit_finished();
-      void set_type(int);
-      void set_type(gr::qtgui::data_type_t type);
-    };
+public slots:
+    void edit_finished();
+    void set_type(int);
+    void set_type(gr::qtgui::data_type_t type);
+};
 
-  } /* namespace qtgui */
+} /* namespace qtgui */
 } /* namespace gr */
 
 #endif /* INCLUDED_QTGUI_EDIT_BOX_MSG_IMPL_H */

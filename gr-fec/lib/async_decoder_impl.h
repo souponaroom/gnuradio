@@ -4,68 +4,68 @@
  *
  * This file is part of GNU Radio
  *
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
 
 #ifndef INCLUDED_FEC_ASYNC_DECODER_IMPL_H
 #define INCLUDED_FEC_ASYNC_DECODER_IMPL_H
 
-#include <gnuradio/fec/async_decoder.h>
 #include <gnuradio/blocks/pack_k_bits.h>
+#include <gnuradio/fec/async_decoder.h>
+#include <volk/volk.h>
+#include <volk/volk_alloc.hh>
 
 namespace gr {
-  namespace fec {
+namespace fec {
 
-    class FEC_API async_decoder_impl : public async_decoder
-    {
-    private:
-      generic_decoder::sptr d_decoder;
-      size_t d_input_item_size;
-      size_t d_output_item_size;
+static const pmt::pmt_t ITERATIONS_KEY = pmt::mp("iterations");
 
-      pmt::pmt_t d_in_port;
-      pmt::pmt_t d_out_port;
+class FEC_API async_decoder_impl : public async_decoder
+{
+private:
+    generic_decoder::sptr d_decoder;
 
-      blocks::kernel::pack_k_bits *d_pack;
+    pmt::pmt_t d_in_port;
+    pmt::pmt_t d_out_port;
 
-      bool d_packed;
-      bool d_rev_pack;
-      int d_mtu;
+    blocks::kernel::pack_k_bits d_pack;
 
-      size_t d_max_bits_in;
-      float *d_tmp_f32;
-      int8_t *d_tmp_u8;
-      uint8_t *d_bits_out;
+    bool d_packed;
+    bool d_rev_pack;
+    int d_mtu;
 
-      void decode_packed(pmt::pmt_t msg);
-      void decode_unpacked(pmt::pmt_t msg);
+    size_t d_max_bits_in;
+    volk::vector<float> d_tmp_f32;
+    volk::vector<uint8_t> d_tmp_u8;
+    volk::vector<uint8_t> d_bits_out;
 
-    public:
-      async_decoder_impl(generic_decoder::sptr my_decoder,
-                         bool packed=false, bool rev_pack=true,
-                         int mtu=1500);
-      ~async_decoder_impl();
+    void decode(const pmt::pmt_t& msg);
 
-      int general_work(int noutput_items,
-                       gr_vector_int& ninput_items,
-                       gr_vector_const_void_star &input_items,
-                       gr_vector_void_star &output_items);
-    };
+// The volk_32f_s32f_x2_convert_8u kernel is only available since Volk 3.1.
+// In earlier versions we use this ad-hoc function.
+#if !(VOLK_VERSION >= 030100)
+    inline void convert_32f_to_8u(uint8_t* output_vector,
+                                  const float* input_vector,
+                                  const float scale,
+                                  const float bias,
+                                  unsigned int num_points);
+#endif
 
-  } /* namespace fec */
+public:
+    async_decoder_impl(generic_decoder::sptr my_decoder,
+                       bool packed = false,
+                       bool rev_pack = true,
+                       int mtu = 1500);
+    ~async_decoder_impl() override;
+
+    int general_work(int noutput_items,
+                     gr_vector_int& ninput_items,
+                     gr_vector_const_void_star& input_items,
+                     gr_vector_void_star& output_items) override;
+};
+
+} /* namespace fec */
 } /* namespace gr */
 
 #endif /* INCLUDED_FEC_ASYNC_DECODER_IMPL_H */

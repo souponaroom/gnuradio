@@ -24,11 +24,9 @@
 #include "config.h"
 #endif
 
+#include<fmt/format.h>
 #include <gnuradio/io_signature.h>
 #include "diff_stbc_decoder_cc_impl.h"
-
-#include <boost/format.hpp>
-using namespace boost;
 
 namespace gr {
   namespace digital {
@@ -115,11 +113,10 @@ namespace gr {
       for (unsigned int j = 0; j < tags.size(); ++j) {
         if (tags[j].offset%2 != 0){
           // This should be prevented by the system developer in most cases.
-          GR_LOG_DEBUG(d_logger, format("Detected start tag on uneven position (tag[%d].offset = %d).\n "
-                                        "This differential STBC scheme works on sequences of 2 samples. "
+          GR_LOG_DEBUG(d_logger, fmt::format("Detected start tag on uneven position (tag[{}].offset = {}).\n "
+                                        "This differenatial STBC scheme works on sequences of 2 samples. "
                                         "If you are not really sure what you are doing, "
-                                        "you should only set 'start' tags on even sample positions.")
-                                 %0 %tags[0].offset);
+                                        "you should only set 'start' tags on even sample positions.", 0, tags[0].offset));
           break;
         }
       }

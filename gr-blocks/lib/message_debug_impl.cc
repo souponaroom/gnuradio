@@ -1,120 +1,163 @@
 /* -*- c++ -*- */
 /*
  * Copyright 2005,2010,2012-2013 Free Software Foundation, Inc.
+ * Copyright 2021,2022 Marcus Müller
  *
  * This file is part of GNU Radio
  *
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
-
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
 
 #include "message_debug_impl.h"
 #include <gnuradio/io_signature.h>
-#include <cstdio>
-#include <iostream>
+
+/* ensure that tweakme.h is included before the bundled spdlog/fmt header, see
+ * https://github.com/gabime/spdlog/issues/2922 */
+#include <spdlog/tweakme.h>
+
+#include <pmt/pmt.h>
+#include <spdlog/common.h>
+#include <spdlog/fmt/fmt.h>
+#include <functional>
+#include <utility>
+#include <vector>
 
 namespace gr {
-  namespace blocks {
+namespace blocks {
 
-    message_debug::sptr
-    message_debug::make()
-    {
-      return gnuradio::get_initial_sptr
-        (new message_debug_impl());
+// Original code was inconsistent about line lengths, but 36 comes close to the average
+// old *** HEADING *** line length.
+constexpr unsigned int PRINT_LINE_LENGTH = 36;
+
+message_debug::sptr message_debug::make(bool en_uvec, spdlog::level::level_enum log_level)
+{
+    return gnuradio::make_block_sptr<message_debug_impl>(en_uvec, log_level);
+}
+
+message_debug_impl::message_debug_impl(bool en_uvec, spdlog::level::level_enum log_level)
+    : block("message_debug", io_signature::make(0, 0, 0), io_signature::make(0, 0, 0)),
+      d_en_uvec(en_uvec),
+      d_level(log_level)
+{
+    using msg_t = const pmt::pmt_t&;
+    std::vector<std::pair<std::string, std::function<void(msg_t)>>> mapping{
+        { "log", [&](msg_t m) { log(m); } },
+        { "print", [&](msg_t m) { print(m); } },
+        { "print_pdu", [&](msg_t m) { print_pdu(m); } },
+        { "store", [&](msg_t m) { store(m); } }
+    };
+    for (const auto& [name, handler] : mapping) {
+        const auto symbol = pmt::mp(name);
+        message_port_register_in(symbol);
+        set_msg_handler(symbol, handler);
     }
+}
 
-    void
-    message_debug_impl::print(pmt::pmt_t msg)
-    {
-      std::cout << "******* MESSAGE DEBUG PRINT ********\n";
-      pmt::print(msg);
-      std::cout << "************************************\n";
+message_debug_impl::~message_debug_impl() {}
+
+void message_debug_impl::log(const pmt::pmt_t& msg)
+{
+    if (pmt::is_pdu(msg)) {
+        const auto& meta = pmt::car(msg);
+        const auto& vector = pmt::cdr(msg);
+        auto length = pmt::blob_length(vector);
+        auto begin = reinterpret_cast<const uint8_t*>(pmt::blob_data(vector));
+        auto output_length = length;
+        if (!d_en_uvec)
+            output_length = std::min<decltype(length)>(output_length, 16);
+        auto datastring = fmt::format("{:X}{}",
+                                      fmt::join(begin, begin + output_length, " "),
+                                      output_length < length ? " …" : "");
+        d_logger->log(d_level,
+                      "PDU {:s}: {:10d} B [{}] ",
+                      pmt::write_string(meta),
+                      length,
+                      datastring);
+        return;
     }
+    d_logger->log(d_level, "Message: {}", pmt::write_string(msg));
+}
+void message_debug_impl::print(const pmt::pmt_t& msg)
+{
+    if (pmt::is_pdu(msg)) {
+        const auto& meta = pmt::car(msg);
+        const auto& vector = pmt::cdr(msg);
 
-    void
-    message_debug_impl::store(pmt::pmt_t msg)
-    {
-      gr::thread::scoped_lock guard(d_mutex);
-      d_messages.push_back(msg);
-    }
+        fmt::print("{:*^{}}\n"
+                   "{:s}\n",
+                   " VERBOSE PDU DEBUG PRINT ",
+                   PRINT_LINE_LENGTH,
+                   pmt::write_string(meta));
 
-    void
-    message_debug_impl::print_pdu(pmt::pmt_t pdu)
-    {
-      pmt::pmt_t meta = pmt::car(pdu);
-      pmt::pmt_t vector = pmt::cdr(pdu);
-      std::cout << "* MESSAGE DEBUG PRINT PDU VERBOSE *\n";
-      pmt::print(meta);
-      size_t len = pmt::blob_length(vector);
-      std::cout << "pdu_length = " << len << std::endl;
-      std::cout << "contents = " << std::endl;
-      size_t offset(0);
-      const uint8_t* d = (const uint8_t*) pmt::uniform_vector_elements(vector, offset);
-      for(size_t i=0; i<len; i+=16){
-        printf("%04x: ", ((unsigned int)i));
-        for(size_t j=i; j<std::min(i+16,len); j++){
-          printf("%02x ",d[j] );
+        size_t len = pmt::blob_length(vector);
+        if (d_en_uvec) {
+            fmt::print("pdu length = {:10d} bytes\n"
+                       "pdu vector contents = \n",
+                       len);
+            size_t offset(0);
+            const uint8_t* d =
+                (const uint8_t*)pmt::uniform_vector_elements(vector, offset);
+            for (size_t i = 0; i < len; i += 16) {
+                fmt::print("{:04x}: ", static_cast<unsigned int>(i));
+                for (size_t j = i; j < std::min(i + 16, len); j++) {
+                    fmt::print("{:02x} ", d[j]);
+                }
+                fmt::print("\n");
+            }
+        } else {
+            fmt::print("pdu length = {:10d} bytes (printing disabled)\n", len);
         }
 
-        std::cout << std::endl;
-      }
-
-      std::cout << "***********************************\n";
+    } else {
+        fmt::print("{:*^{}}\n"
+                   "{:s}\n",
+                   " MESSAGE DEBUG PRINT ",
+                   PRINT_LINE_LENGTH,
+                   pmt::write_string(msg));
     }
 
-    int
-    message_debug_impl::num_messages()
-    {
-      return (int)d_messages.size();
+    fmt::print("{:*^{}}\n", "", PRINT_LINE_LENGTH);
+}
+
+void message_debug_impl::store(const pmt::pmt_t& msg)
+{
+    gr::thread::scoped_lock guard(d_mutex);
+    d_messages.push_back(msg);
+}
+
+// ! DEPRECATED as of 3.10 use print() for all printing!
+void message_debug_impl::print_pdu(const pmt::pmt_t& pdu)
+{
+    if (pmt::is_pdu(pdu)) {
+        d_logger->info("The `print_pdu` port is deprecated and will be removed; "
+                       "forwarding to `print`.");
+        this->print(pdu);
+    } else {
+        d_logger->info("The `print_pdu` port is deprecated and will be removed.");
+        d_logger->warn("Non PDU type message received. Dropping.");
+    }
+}
+
+size_t message_debug_impl::num_messages()
+{
+    gr::thread::scoped_lock guard(d_mutex);
+    return d_messages.size();
+}
+
+pmt::pmt_t message_debug_impl::get_message(size_t i)
+{
+    gr::thread::scoped_lock guard(d_mutex);
+
+    if (i >= d_messages.size()) {
+        throw std::runtime_error("message_debug: index for message out of bounds.");
     }
 
-    pmt::pmt_t
-    message_debug_impl::get_message(int i)
-    {
-      gr::thread::scoped_lock guard(d_mutex);
+    return d_messages[i];
+}
 
-      if((size_t)i >= d_messages.size()) {
-        throw std::runtime_error("message_debug: index for message out of bounds.\n");
-      }
+spdlog::level::level_enum message_debug_impl::level() const { return d_level; }
+void message_debug_impl::set_level(spdlog::level::level_enum level) { d_level = level; }
 
-      return d_messages[i];
-    }
-
-    message_debug_impl::message_debug_impl()
-      : block("message_debug",
-                 io_signature::make(0, 0, 0),
-                 io_signature::make(0, 0, 0))
-    {
-      message_port_register_in(pmt::mp("print"));
-      set_msg_handler(pmt::mp("print"), boost::bind(&message_debug_impl::print, this, _1));
-
-      message_port_register_in(pmt::mp("store"));
-      set_msg_handler(pmt::mp("store"), boost::bind(&message_debug_impl::store, this, _1));
-
-      message_port_register_in(pmt::mp("print_pdu"));
-      set_msg_handler(pmt::mp("print_pdu"), boost::bind(&message_debug_impl::print_pdu, this, _1));
-    }
-
-    message_debug_impl::~message_debug_impl()
-    {
-    }
-
-  } /* namespace blocks */
+} /* namespace blocks */
 } /* namespace gr */
-

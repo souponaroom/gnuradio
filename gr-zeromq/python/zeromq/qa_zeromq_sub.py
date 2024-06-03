@@ -5,20 +5,8 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 #
 
 from gnuradio import gr, gr_unittest
@@ -29,54 +17,137 @@ import numpy
 import time
 import zmq
 
+
 class qa_zeromq_sub (gr_unittest.TestCase):
 
-    def setUp (self):
-        self.tb = gr.top_block ()
+    def setUp(self):
+        self.tb = gr.top_block()
         self.zmq_context = zmq.Context()
         self.pub_socket = self.zmq_context.socket(zmq.PUB)
-        self.pub_socket.bind("tcp://127.0.0.1:5559")
+        self.pub_socket.bind("tcp://127.0.0.1:0")
+        self._address = self.pub_socket.getsockopt(zmq.LAST_ENDPOINT).decode()
 
-    def tearDown (self):
+    def tearDown(self):
         self.pub_socket.close()
         self.zmq_context.term()
         self.tb = None
 
-    def test_001 (self):
+    def test_001(self):
         vlen = 10
-        src_data = numpy.array(range(vlen)*100, 'float32')
-        zeromq_sub_source = zeromq.sub_source(gr.sizeof_float, vlen, "tcp://127.0.0.1:5559")
+        src_data = numpy.array(list(range(vlen)) * 100, 'float32')
+        zeromq_sub_source = zeromq.sub_source(
+            gr.sizeof_float, vlen, self._address)
         sink = blocks.vector_sink_f(vlen)
         self.tb.connect(zeromq_sub_source, sink)
 
         self.tb.start()
         time.sleep(0.05)
-        self.pub_socket.send(src_data.tostring())
-        time.sleep(0.25)
+        self.pub_socket.send(src_data.tobytes())
+        time.sleep(0.5)
         self.tb.stop()
         self.tb.wait()
         self.assertFloatTuplesAlmostEqual(sink.data(), src_data)
 
-    def test_002 (self):
+    def test_002(self):
         vlen = 10
-
         # Construct multipart source data to publish
-        raw_data = [numpy.array(range(vlen)*100, 'float32'), numpy.array(range(vlen, 2*vlen)*100, 'float32')]
-        src_data = [a.tostring() for a in raw_data]
-        zeromq_sub_source = zeromq.sub_source(gr.sizeof_float, vlen, "tcp://127.0.0.1:5559")
+        raw_data = [
+            numpy.array(
+                range(vlen),
+                'float32') *
+            100,
+            numpy.array(
+                range(
+                    vlen,
+                    2 *
+                    vlen),
+                'float32') *
+            100]
+        src_data = [a.tobytes() for a in raw_data]
+        zeromq_sub_source = zeromq.sub_source(
+            gr.sizeof_float, vlen, self._address)
         sink = blocks.vector_sink_f(vlen)
         self.tb.connect(zeromq_sub_source, sink)
 
         self.tb.start()
         time.sleep(0.05)
         self.pub_socket.send_multipart(src_data)
-        time.sleep(0.25)
+        time.sleep(0.5)
         self.tb.stop()
         self.tb.wait()
 
         # Source block will concatenate everything together
         expected_data = numpy.concatenate(raw_data)
         self.assertFloatTuplesAlmostEqual(sink.data(), expected_data)
+
+    def test_003(self):
+        # Check that message is received when correct key is used
+        # Construct multipart source data to publish
+        vlen = 10
+        raw_data = [
+            numpy.array(
+                range(vlen),
+                'float32') *
+            100,
+            numpy.array(
+                range(
+                    vlen,
+                    2 *
+                    vlen),
+                'float32') *
+            100]
+        src_data = [a.tobytes() for a in raw_data]
+
+        src_data = [b"filter_key"] + src_data
+
+        zeromq_sub_source = zeromq.sub_source(
+            gr.sizeof_float, vlen, self._address, key="filter_key")
+        sink = blocks.vector_sink_f(vlen)
+        self.tb.connect(zeromq_sub_source, sink)
+
+        self.tb.start()
+        time.sleep(0.05)
+        self.pub_socket.send_multipart(src_data)
+        time.sleep(0.5)
+        self.tb.stop()
+        self.tb.wait()
+
+        # Source block will concatenate everything together
+        expected_data = numpy.concatenate(raw_data)
+        self.assertFloatTuplesAlmostEqual(sink.data(), expected_data)
+
+    def test_004(self):
+        # Test that no message is received when wrong key is used
+        vlen = 10
+        raw_data = [
+            numpy.array(
+                range(vlen),
+                'float32') *
+            100,
+            numpy.array(
+                range(
+                    vlen,
+                    2 *
+                    vlen),
+                'float32') *
+            100]
+        src_data = [a.tobytes() for a in raw_data]
+
+        src_data = [b"filter_key"] + src_data
+
+        zeromq_sub_source = zeromq.sub_source(
+            gr.sizeof_float, vlen, self._address, key="wrong_filter_key")
+        sink = blocks.vector_sink_f(vlen)
+        self.tb.connect(zeromq_sub_source, sink)
+
+        self.tb.start()
+        time.sleep(0.05)
+        self.pub_socket.send_multipart(src_data)
+        time.sleep(0.5)
+        self.tb.stop()
+        self.tb.wait()
+
+        assert(len(sink.data()) == 0)
 
 
 if __name__ == '__main__':

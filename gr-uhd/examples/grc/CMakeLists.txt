@@ -2,30 +2,31 @@
 #
 # This file is part of GNU Radio
 #
-# GNU Radio is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# GNU Radio is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with GNU Radio; see the file COPYING.  If not, write to
-# the Free Software Foundation, Inc., 51 Franklin Street,
-# Boston, MA 02110-1301, USA.
 
 install(
-    FILES
-    uhd_const_wave.grc
-    uhd_dpsk_mod.grc
-    uhd_fft.grc
-    uhd_rx_dpsk.grc
-    uhd_two_tone_loopback.grc
-    uhd_tx_dpsk.grc
-    uhd_wbfm_receive.grc
-    DESTINATION ${GR_PKG_UHD_EXAMPLES_DIR}
-    COMPONENT "uhd_python"
-)
+    FILES rfnoc_addsub.grc
+          rfnoc_duc_radio.grc
+          rfnoc_duc_radio_multichan.grc
+          rfnoc_fir_filter.grc
+          rfnoc_keep1.grc
+          rfnoc_logpwr_split.grc
+          rfnoc_moving_average.grc
+          rfnoc_null_source_sink.grc
+          rfnoc_radio_ddc.grc
+          rfnoc_radio_ddc_multichan.grc
+          rfnoc_replay.grc
+          rfnoc_siggen.grc
+          rfnoc_split_stream.grc
+          rfnoc_switchboard.grc
+          rfnoc_vector_iir_split.grc
+          rfnoc_window.grc
+          uhd_const_wave.grc
+          uhd_fft.grc
+          uhd_msg_tune.grc
+          uhd_normalized_gain.grc
+          uhd_siggen_gui.grc
+          uhd_two_tone_loopback.grc
+          uhd_wbfm_receive.grc
+    DESTINATION ${GR_PKG_UHD_EXAMPLES_DIR})
