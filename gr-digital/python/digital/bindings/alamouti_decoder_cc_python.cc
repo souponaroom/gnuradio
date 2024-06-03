@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(alamouti_decoder_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(573eb9db62b2f52c6098c795c6ac82eb)                     */
+/* BINDTOOL_HEADER_FILE_HASH(779cee443ec43af6e2efc5e0cdd46808)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -40,6 +40,7 @@ void bind_alamouti_decoder_cc(py::module& m)
 
         .def(py::init(&alamouti_decoder_cc::make),
              py::arg("vlen") = 1,
+             py::arg("csi_tag_key") = "csi",
              D(alamouti_decoder_cc, make))
 
 

@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(vblast_decoder_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(763e5c164b9fc9824c0e512f81ffd9e8)                     */
+/* BINDTOOL_HEADER_FILE_HASH(ff3570d00afde8e4dd7934fd74a458d4)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -42,6 +42,9 @@ void bind_vblast_decoder_cc(py::module& m)
              py::arg("num_inputs"),
              py::arg("equalizer_type"),
              py::arg("vlen") = 1,
+             py::arg("csi_tag_key") = "csi",
+             py::arg("snr_tag_key") = "snr",
+             py::arg("frame_tag_key") = "start",
              D(vblast_decoder_cc, make))
 
 

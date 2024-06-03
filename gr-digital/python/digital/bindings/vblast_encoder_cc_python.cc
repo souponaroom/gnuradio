@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(vblast_encoder_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(1fd6d8a0de8f7fdbc6f66efef81a7b66)                     */
+/* BINDTOOL_HEADER_FILE_HASH(bc8c92e1a0697b86c575667c812635cf)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -38,6 +38,7 @@ void bind_vblast_encoder_cc(py::module& m)
 
         .def(py::init(&vblast_encoder_cc::make),
              py::arg("num_outputs"),
+             py::arg("packet_len_tag_key") = "packet_length",
              D(vblast_encoder_cc, make))
 
 

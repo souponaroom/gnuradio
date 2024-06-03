@@ -83,7 +83,7 @@ outputs:
 
 asserts:
 - ${ fft_len > 0 }
-- ${ cp_len > 0 }
+- ${ cp_len > 0 }
 - ${ cp_len < fft_len }
 - ${ rolloff >= 0 }
 

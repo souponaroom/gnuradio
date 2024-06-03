@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(diversity_combiner_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(d15105960442403391bf82622e289a9e)                     */
+/* BINDTOOL_HEADER_FILE_HASH(04ab5dd07bfe8b87ab430c230fca89a3)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -34,9 +34,7 @@ void bind_diversity_combiner_cc(py::module& m)
 
 
     py::class_<diversity_combiner_cc,
-               gr::sync_block,
-               gr::block,
-               gr::basic_block,
+               gr::sync_interpolator,
                std::shared_ptr<diversity_combiner_cc>>(
         m, "diversity_combiner_cc", D(diversity_combiner_cc))
 
@@ -44,6 +42,7 @@ void bind_diversity_combiner_cc(py::module& m)
              py::arg("num_inputs"),
              py::arg("vlen"),
              py::arg("combining_technique"),
+             py::arg("csi_tag_key") = "csi",
              D(diversity_combiner_cc, make))
 
 

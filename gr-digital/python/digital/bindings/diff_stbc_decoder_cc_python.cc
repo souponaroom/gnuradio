@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(diff_stbc_decoder_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(0db3a2dbf1dc425cbca33a95cca869cd)                     */
+/* BINDTOOL_HEADER_FILE_HASH(86f757a6f7938d12f1b68c9fa5c9fee1)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -42,6 +42,7 @@ void bind_diff_stbc_decoder_cc(py::module& m)
         .def(py::init(&diff_stbc_decoder_cc::make),
              py::arg("phase_offset") = 0.,
              py::arg("vlen") = 1,
+             py::arg("start_key") = "start",
              D(diff_stbc_decoder_cc, make))
 
 

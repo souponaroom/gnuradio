@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(diff_stbc_encoder_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(f820419933e2cde250a5e9c7774200a4)                     */
+/* BINDTOOL_HEADER_FILE_HASH(f117f3f4c49f38c7577794aeddcb2524)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -34,7 +34,6 @@ void bind_diff_stbc_encoder_cc(py::module& m)
 
 
     py::class_<diff_stbc_encoder_cc,
-               gr::sync_block,
                gr::block,
                gr::basic_block,
                std::shared_ptr<diff_stbc_encoder_cc>>(
@@ -43,6 +42,7 @@ void bind_diff_stbc_encoder_cc(py::module& m)
         .def(py::init(&diff_stbc_encoder_cc::make),
              py::arg("phase_offset") = 0.,
              py::arg("block_len") = 1,
+             py::arg("len_tag_key") = "packet_length",
              D(diff_stbc_encoder_cc, make))
 
 

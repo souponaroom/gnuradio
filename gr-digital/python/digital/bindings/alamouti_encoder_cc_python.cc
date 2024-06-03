@@ -14,7 +14,7 @@
 /* BINDTOOL_GEN_AUTOMATIC(0)                                                       */
 /* BINDTOOL_USE_PYGCCXML(1)                                                        */
 /* BINDTOOL_HEADER_FILE(alamouti_encoder_cc.h)                                        */
-/* BINDTOOL_HEADER_FILE_HASH(7ab486af4e10073ca5c0574d3d8c7d8e)                     */
+/* BINDTOOL_HEADER_FILE_HASH(7b7616c4ac0883ae9a5aa5d498190299)                     */
 /***********************************************************************************/
 
 #include <pybind11/complex.h>
@@ -40,7 +40,9 @@ void bind_alamouti_encoder_cc(py::module& m)
                std::shared_ptr<alamouti_encoder_cc>>(
         m, "alamouti_encoder_cc", D(alamouti_encoder_cc))
 
-        .def(py::init(&alamouti_encoder_cc::make), D(alamouti_encoder_cc, make))
+        .def(py::init(&alamouti_encoder_cc::make),
+             py::arg("vlen") = 1,
+             D(alamouti_encoder_cc, make))
 
 
         ;
